@@ -38,6 +38,8 @@ from nemisis.crash_models import (
     FaultBoundary,
     HypothesisReceipt,
     IntegrityStatus,
+    MinimizationReceipt,
+    NoFaultReplayReceipt,
     ReproCapsule,
     RetryContract,
     TimelineEntry,
@@ -55,6 +57,7 @@ from nemisis.sqlite_credit import (
     RUNNER_VERSION,
     bind_anchor,
     execute_attempt,
+    execute_no_fault_replay,
     initial_database_digest,
     runner_environment_digest,
 )
@@ -83,6 +86,7 @@ _HYPOTHESES = (
     (1, "effect-commit-v1", FaultBoundary.EFFECT_COMMIT, 1),
     (2, "marker-commit-v1", FaultBoundary.MARKER_COMMIT, 2),
 )
+_MINIMIZATION_CONFIRMATIONS = 2
 
 
 class CrashCheckError(ValueError):
@@ -229,6 +233,32 @@ def check(
                 hypothesis_receipts=hypothesis_receipts,
             )
 
+        minimization_receipt, capsule = _minimize_witness(
+            contract,
+            capsule,
+            base_binding,
+            base_source.path,
+            root / "minimization-worlds",
+        )
+        minimization_receipts = (minimization_receipt,)
+        if not minimization_receipt.irreducible:
+            detail = "The selected witness could not be proven irreducible in two fresh worlds."
+            attempt = _failed_attempt(
+                capsule, base_binding, WorldRole.BASE, TruthLabel.LOCAL, detail
+            )
+            return _publish(
+                run_id,
+                started_at,
+                capsule,
+                contract,
+                (base_binding,),
+                (attempt,),
+                CrashVerdict.EVIDENCE_INCOMPLETE,
+                detail,
+                hypothesis_receipts=hypothesis_receipts,
+                minimization_receipts=minimization_receipts,
+            )
+
         base_attempts = _execute_confirmations(
             capsule, base_binding, base_source.path, root / "base-worlds", WorldRole.BASE
         )
@@ -243,6 +273,7 @@ def check(
                 CrashVerdict.EVIDENCE_INCOMPLETE,
                 "The originating base did not reproduce in five fresh worlds.",
                 hypothesis_receipts=hypothesis_receipts,
+                minimization_receipts=minimization_receipts,
             )
         if _untrusted_fork():
             attempt = _failed_attempt(
@@ -262,6 +293,7 @@ def check(
                 CrashVerdict.EVIDENCE_INCOMPLETE,
                 attempt.failure_detail or "Untrusted fork blocked.",
                 hypothesis_receipts=hypothesis_receipts,
+                minimization_receipts=minimization_receipts,
             )
 
         # Candidate materialization deliberately begins only after the base witness is frozen.
@@ -314,6 +346,7 @@ def check(
             verdict,
             summary,
             hypothesis_receipts=hypothesis_receipts,
+            minimization_receipts=minimization_receipts,
         )
 
 
@@ -608,11 +641,7 @@ def _hunt_hypotheses(
         (receipt.fault_boundary for receipt in receipts if receipt.selected),
         FaultBoundary.EFFECT_COMMIT,
     )
-    capsule = _seal_capsule(
-        contract,
-        selected_boundary,
-        _hypothesis_trace(receipts),
-    )
+    capsule = _seal_capsule(contract, selected_boundary)
     return receipts, capsule
 
 
@@ -645,6 +674,96 @@ def _hypothesis_trace(receipts: tuple[HypothesisReceipt, ...]) -> tuple[str, ...
             }
         )
         for receipt in receipts
+    )
+
+
+def _minimize_witness(
+    contract: RetryContract,
+    parent: ReproCapsule,
+    binding: AnchorBinding,
+    source: Path,
+    work_root: Path,
+) -> tuple[MinimizationReceipt, ReproCapsule]:
+    """Test deletion twice; this alpha proceeds only with an irreducible one-action witness."""
+
+    def one(index: int) -> NoFaultReplayReceipt:
+        nonce = f"minimize-{index}-{uuid.uuid4().hex}"
+        try:
+            return execute_no_fault_replay(
+                capsule=parent,
+                binding=binding,
+                source_tree=source,
+                work_dir=work_root / f"world-{index}",
+                execution_nonce=nonce,
+            )
+        except Exception as error:  # Preserve fail-closed minimization evidence.
+            now = datetime.now(UTC)
+            return NoFaultReplayReceipt.with_digest(
+                receipt_id=f"no-fault-{uuid.uuid4().hex}",
+                execution_status=ExecutionStatus.SETUP_ERROR,
+                integrity_status=IntegrityStatus.INCOMPLETE,
+                observation=CrashObservation.NOT_OBSERVED,
+                parent_capsule_digest=parent.digest,
+                contract_digest=parent.contract_digest,
+                binding_digest=binding.digest,
+                tree_digest=binding.tree_digest,
+                post_execution_tree_digest=binding.tree_digest,
+                environment_digest=parent.environment_digest,
+                event_digest=parent.event_digest,
+                initial_database_digest=parent.initial_database_digest,
+                database_id=f"db-{uuid.uuid4().hex}",
+                execution_nonce=nonce,
+                started_at=now,
+                ended_at=now,
+                spawns=(),
+                failure_detail=f"minimization orchestration failed ({type(error).__name__})",
+            )
+
+    with ThreadPoolExecutor(max_workers=_MINIMIZATION_CONFIRMATIONS) as executor:
+        futures = [
+            executor.submit(one, index) for index in range(1, _MINIMIZATION_CONFIRMATIONS + 1)
+        ]
+        confirmations = tuple(future.result() for future in futures)
+    completed = all(
+        attempt.execution_status is ExecutionStatus.COMPLETED
+        and attempt.integrity_status is IntegrityStatus.VALID
+        for attempt in confirmations
+    )
+    reproduced = completed and all(
+        attempt.observation is CrashObservation.DUPLICATE_EFFECT for attempt in confirmations
+    )
+    irreducible = completed and all(
+        attempt.observation is CrashObservation.EXACTLY_ONCE for attempt in confirmations
+    )
+    stable = {
+        "candidate_schedule": (),
+        "confirmation_count": len(confirmations),
+        "contract_digest": contract.digest,
+        "irreducible": irreducible,
+        "originating_base_tree_digest": binding.tree_digest,
+        "parent_capsule_digest": parent.digest,
+        "parent_schedule": (FaultBoundary.EFFECT_COMMIT,),
+        "removed_fault": FaultBoundary.EFFECT_COMMIT,
+        "reproduced": reproduced,
+        "retained": reproduced,
+    }
+    receipt = MinimizationReceipt.with_digest(
+        parent_capsule_digest=parent.digest,
+        contract_digest=contract.digest,
+        originating_base_tree_digest=binding.tree_digest,
+        parent_schedule=(FaultBoundary.EFFECT_COMMIT,),
+        candidate_schedule=(),
+        removed_fault=FaultBoundary.EFFECT_COMMIT,
+        confirmations=confirmations,
+        reproduced=reproduced,
+        retained=reproduced,
+        irreducible=irreducible,
+        trace_digest=sha256_json(stable),
+    )
+    return receipt, _seal_capsule(
+        contract,
+        parent.fault_boundary,
+        (receipt.trace_digest,),
     )
 
 
@@ -792,11 +911,14 @@ def _publish(
     summary: str,
     *,
     hypothesis_receipts: tuple[HypothesisReceipt, ...] = (),
+    minimization_receipts: tuple[MinimizationReceipt, ...] = (),
 ) -> CrashCheckResult:
     if capsule.engine_code_digest != engine_code_digest():
         raise CrashCheckError("capsule engine digest differs from the installed engine")
-    if hypothesis_receipts and capsule.minimization_trace != _hypothesis_trace(hypothesis_receipts):
-        raise CrashCheckError("capsule minimization trace differs from its hunt receipts")
+    if minimization_receipts and capsule.minimization_trace != (
+        minimization_receipts[0].trace_digest,
+    ):
+        raise CrashCheckError("capsule minimization trace differs from its reduction receipt")
     root = _absolute(Path(os.environ.get("NEMISIS_ARTIFACT_ROOT", ".nemisis")))
     run_relative = Path("runs") / run_id
     repro_relative = Path("repros") / "double-credit" / capsule.digest
@@ -813,6 +935,8 @@ def _publish(
     }
     if hypothesis_receipts:
         artifacts["hunt"] = (repro_relative / "hunt.json").as_posix()
+    if minimization_receipts:
+        artifacts["minimization"] = (repro_relative / "minimization.json").as_posix()
     execution = (
         ExecutionStatus.COMPLETED
         if all(item.execution_status is ExecutionStatus.COMPLETED for item in attempts)
@@ -841,6 +965,7 @@ def _publish(
         capsule_digest=capsule.digest,
         engine_code_digest=capsule.engine_code_digest,
         hypothesis_receipts=hypothesis_receipts,
+        minimization_receipts=minimization_receipts,
         bindings=bindings,
         attempts=attempts,
         started_at=started_at,
@@ -867,6 +992,7 @@ def _publish(
     _write_exact(repro_dir / "metadata.json", canonical_json(metadata) + b"\n")
     _write_exact(repro_dir / "test_repro.py", _regression_asset(capsule))
     if hypothesis_receipts:
+        hypothesis_trace = _hypothesis_trace(hypothesis_receipts)
         hunt = {
             "hypotheses": [
                 {
@@ -879,13 +1005,16 @@ def _publish(
                     "trace_digest": trace_digest,
                     "trusted_operation_count": receipt.trusted_operation_count,
                 }
-                for receipt, trace_digest in zip(
-                    hypothesis_receipts, capsule.minimization_trace, strict=True
-                )
+                for receipt, trace_digest in zip(hypothesis_receipts, hypothesis_trace, strict=True)
             ],
             "schema_version": "nemisis.crashcheck.hunt.v1",
         }
         _write_exact(repro_dir / "hunt.json", canonical_json(hunt) + b"\n")
+    if minimization_receipts:
+        _write_exact(
+            repro_dir / "minimization.json",
+            canonical_json(minimization_receipts[0]) + b"\n",
+        )
     manifest = {
         "bindings": [item.model_dump(mode="json") for item in bindings],
         "capsule": capsule.model_dump(mode="json"),

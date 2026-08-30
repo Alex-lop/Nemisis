@@ -18,6 +18,8 @@ from nemisis.crash_models import (
     FaultBoundary,
     HypothesisReceipt,
     IntegrityStatus,
+    MinimizationReceipt,
+    NoFaultReplayReceipt,
     ReproCapsule,
     TimelineEntry,
     TimelineState,
@@ -244,6 +246,84 @@ def _hypothesis_values(receipt: HypothesisReceipt) -> dict[str, object]:
     }
 
 
+def _no_fault_receipt(
+    capsule: ReproCapsule, binding: AnchorBinding, index: int
+) -> NoFaultReplayReceipt:
+    workers = (
+        _worker(
+            1,
+            "first",
+            nonce=f"min-worker-{index}-1",
+            session=f"min-session-{index}-1",
+        ).model_copy(update={"exit_code": 0}),
+        _worker(
+            2,
+            "replay",
+            nonce=f"min-worker-{index}-2",
+            session=f"min-session-{index}-2",
+        ).model_copy(update={"exit_code": 0}),
+    )
+    return NoFaultReplayReceipt.with_digest(
+        receipt_id=f"minimization-{index}",
+        execution_status=ExecutionStatus.COMPLETED,
+        integrity_status=IntegrityStatus.VALID,
+        observation=CrashObservation.EXACTLY_ONCE,
+        parent_capsule_digest=capsule.digest,
+        contract_digest=capsule.contract_digest,
+        binding_digest=binding.digest,
+        tree_digest=binding.tree_digest,
+        post_execution_tree_digest=binding.tree_digest,
+        environment_digest=capsule.environment_digest,
+        event_digest=capsule.event_digest,
+        initial_database_digest=capsule.initial_database_digest,
+        initial_database_file_digest=HASHES[7],
+        database_id=f"min-database-{index}",
+        execution_nonce=f"min-execution-{index}",
+        started_at=NOW,
+        ended_at=NOW + timedelta(seconds=3),
+        spawns=workers,
+        initial_snapshot=_snapshot(effects=0, marker=0),
+        first_delivery_snapshot=_snapshot(),
+        final_snapshot=_snapshot(),
+    )
+
+
+def _minimization_receipts(
+    capsule: ReproCapsule, binding: AnchorBinding
+) -> tuple[MinimizationReceipt]:
+    confirmations = (
+        _no_fault_receipt(capsule, binding, 1),
+        _no_fault_receipt(capsule, binding, 2),
+    )
+    stable = {
+        "candidate_schedule": (),
+        "confirmation_count": 2,
+        "contract_digest": capsule.contract_digest,
+        "irreducible": True,
+        "originating_base_tree_digest": binding.tree_digest,
+        "parent_capsule_digest": capsule.digest,
+        "parent_schedule": (FaultBoundary.EFFECT_COMMIT,),
+        "removed_fault": FaultBoundary.EFFECT_COMMIT,
+        "reproduced": False,
+        "retained": False,
+    }
+    return (
+        MinimizationReceipt.with_digest(
+            parent_capsule_digest=capsule.digest,
+            contract_digest=capsule.contract_digest,
+            originating_base_tree_digest=binding.tree_digest,
+            parent_schedule=(FaultBoundary.EFFECT_COMMIT,),
+            candidate_schedule=(),
+            removed_fault=FaultBoundary.EFFECT_COMMIT,
+            confirmations=confirmations,
+            reproduced=False,
+            retained=False,
+            irreducible=True,
+            trace_digest=sha256_json(stable),
+        ),
+    )
+
+
 def _attempt_receipt_values(receipt: AttemptReceipt) -> dict[str, object]:
     return {
         name: getattr(receipt, name) for name in AttemptReceipt.model_fields if name != "digest"
@@ -293,6 +373,7 @@ def _full_result_values(capsule: ReproCapsule) -> dict[str, object]:
             *_confirmations(capsule, candidate, candidate_attempt),
         ),
         hypothesis_receipts=_hypothesis_receipts(capsule),
+        minimization_receipts=_minimization_receipts(capsule, base),
     )
     return values
 
@@ -461,14 +542,17 @@ def test_role_aware_verdicts_require_matching_completed_observations() -> None:
         bindings=(base, candidate),
         attempts=(*base_attempts, *candidate_exact_attempts),
         hypothesis_receipts=_hypothesis_receipts(capsule),
+        minimization_receipts=_minimization_receipts(capsule, base),
     )
     result = CrashCheckResult.with_digest(**values)
     assert result.verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE
     hunt_receipts = values["hypothesis_receipts"]
     values["hypothesis_receipts"] = ()
+    values["minimization_receipts"] = ()
     with pytest.raises(ValidationError, match="conclusive full check"):
         CrashCheckResult.with_digest(**values)
     values["hypothesis_receipts"] = hunt_receipts
+    values["minimization_receipts"] = _minimization_receipts(capsule, base)
 
     candidate_duplicate = AttemptReceipt.with_digest(
         **_attempt_values(
@@ -675,6 +759,46 @@ def test_hypothesis_receipt_is_strict_digest_bound_base_evidence() -> None:
         HypothesisReceipt.with_digest(**values)
 
 
+def test_minimization_receipt_binds_trace_and_fresh_confirmations() -> None:
+    capsule = _capsule()
+    binding = _binding(capsule)
+    receipt = _minimization_receipts(capsule, binding)[0]
+    values = {
+        name: getattr(receipt, name)
+        for name in MinimizationReceipt.model_fields
+        if name != "digest"
+    }
+    values["trace_digest"] = HASHES[8]
+    with pytest.raises(ValidationError, match="trace digest mismatch"):
+        MinimizationReceipt.with_digest(**values)
+
+    missing_database_digest = {
+        name: getattr(receipt.confirmations[0], name)
+        for name in NoFaultReplayReceipt.model_fields
+        if name != "digest"
+    }
+    missing_database_digest["initial_database_file_digest"] = None
+    with pytest.raises(ValidationError, match="completed no-fault replay"):
+        NoFaultReplayReceipt.with_digest(**missing_database_digest)
+
+    values = {
+        name: getattr(receipt, name)
+        for name in MinimizationReceipt.model_fields
+        if name != "digest"
+    }
+    confirmations = list(receipt.confirmations)
+    duplicate_values = {
+        name: getattr(confirmations[1], name)
+        for name in NoFaultReplayReceipt.model_fields
+        if name != "digest"
+    }
+    duplicate_values["database_id"] = confirmations[0].database_id
+    confirmations[1] = NoFaultReplayReceipt.with_digest(**duplicate_values)
+    values["confirmations"] = tuple(confirmations)
+    with pytest.raises(ValidationError, match="fresh execution identities"):
+        MinimizationReceipt.with_digest(**values)
+
+
 def test_hypothesis_receipt_requires_local_attempt() -> None:
     capsule = _capsule()
     attempt_values = _attempt_values(capsule, _binding(capsule), role=WorldRole.BASE, index=101)
@@ -708,6 +832,7 @@ def test_hypothesis_receipt_records_terminal_failure_but_conclusive_result_rejec
         tuple[HypothesisReceipt, HypothesisReceipt], result_values["hypothesis_receipts"]
     )
     result_values["hypothesis_receipts"] = (failed, receipts[1])
+    result_values["minimization_receipts"] = ()
     result_values["verdict"] = CrashVerdict.EVIDENCE_INCOMPLETE
     assert CrashCheckResult.with_digest(**result_values).hypothesis_receipts[0] == failed
     result_values["verdict"] = CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE
@@ -783,6 +908,7 @@ def test_conclusive_result_requires_canonical_deterministic_hypothesis_selection
         HypothesisReceipt.with_digest(**first),
         HypothesisReceipt.with_digest(**second),
     )
+    values["minimization_receipts"] = ()
     with pytest.raises(ValidationError, match="deterministic ordering"):
         CrashCheckResult.with_digest(**values)
 

@@ -27,6 +27,7 @@ from nemisis.crash_models import (
     CrashVerdict,
     ExecutionStatus,
     IntegrityStatus,
+    MinimizationReceipt,
     ReproCapsule,
     RetryContract,
     WorldRole,
@@ -92,8 +93,20 @@ def test_three_tree_hero_runs_fifteen_fresh_worlds(
     assert len({attempt.execution_nonce for attempt in result.attempts}) == 15
     assert len(result.hypothesis_receipts) == 2
     hunt_attempts = [receipt.attempt for receipt in result.hypothesis_receipts]
-    assert len({attempt.database_id for attempt in [*hunt_attempts, *result.attempts]}) == 17
-    assert len({attempt.execution_nonce for attempt in [*hunt_attempts, *result.attempts]}) == 17
+    assert len(result.minimization_receipts) == 1
+    reduction = result.minimization_receipts[0]
+    assert reduction.irreducible
+    assert not reduction.reproduced
+    assert not reduction.retained
+    assert len(reduction.confirmations) == 2
+    database_ids = {attempt.database_id for attempt in hunt_attempts}
+    database_ids.update(attempt.database_id for attempt in reduction.confirmations)
+    database_ids.update(attempt.database_id for attempt in result.attempts)
+    execution_nonces = {attempt.execution_nonce for attempt in hunt_attempts}
+    execution_nonces.update(attempt.execution_nonce for attempt in reduction.confirmations)
+    execution_nonces.update(attempt.execution_nonce for attempt in result.attempts)
+    assert len(database_ids) == 19
+    assert len(execution_nonces) == 19
     assert sum(receipt.selected for receipt in result.hypothesis_receipts) == 1
     assert all(
         len(attempt.spawns) == 2
@@ -113,6 +126,7 @@ def test_hero_artifacts_and_digests_are_exact(
         "contract": repro / "contract.json",
         "event": repro / "event.json",
         "hunt": repro / "hunt.json",
+        "minimization": repro / "minimization.json",
         "manifest": root / f"runs/{result.run_id}/manifest.json",
         "metadata": repro / "metadata.json",
         "regression_test": repro / "test_repro.py",
@@ -132,6 +146,9 @@ def test_hero_artifacts_and_digests_are_exact(
     contract = RetryContract.model_validate_json(expected_paths["contract"].read_bytes())
     event = json.loads(expected_paths["event"].read_bytes())
     hunt = json.loads(expected_paths["hunt"].read_bytes())
+    minimization = MinimizationReceipt.model_validate_json(
+        expected_paths["minimization"].read_bytes()
+    )
     metadata = json.loads(expected_paths["metadata"].read_bytes())
     report = expected_paths["report"].read_text(encoding="utf-8")
 
@@ -143,9 +160,8 @@ def test_hero_artifacts_and_digests_are_exact(
         == capsule.engine_code_digest
         == crashcheck_module.engine_code_digest()
     )
-    assert len(capsule.minimization_trace) == 2
-    assert all(capsule.minimization_trace)
-    assert [item["trace_digest"] for item in hunt["hypotheses"]] == list(capsule.minimization_trace)
+    assert capsule.minimization_trace == (minimization.trace_digest,)
+    assert len({item["trace_digest"] for item in hunt["hypotheses"]}) == 2
     assert hunt["schema_version"] == "nemisis.crashcheck.hunt.v1"
     assert metadata == {
         "capsule_digest": capsule.digest,
@@ -298,6 +314,7 @@ def test_distinct_contract_capsules_publish_without_overwriting(
         "contract.json",
         "event.json",
         "hunt.json",
+        "minimization.json",
         "metadata.json",
         "test_repro.py",
     }
@@ -365,6 +382,49 @@ def test_live_blocker_never_falls_back_to_local(
     assert result.attempts[0].role is WorldRole.BASE
     assert result.attempts[0].spawns == ()
     assert result.attempts[0].observation is CrashObservation.NOT_OBSERVED
+
+
+def test_inconclusive_hunt_publishes_incomplete_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "inconclusive-hunt"
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(root))
+    monkeypatch.setattr(crashcheck_module, "_hunt_is_conclusive", lambda _receipts: False)
+
+    result = check(BUGGY_REF, MISLEADING_GREEN_REF, SCENARIO_ID)
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert len(result.hypothesis_receipts) == 2
+    assert result.minimization_receipts == ()
+    assert "minimization" not in result.artifacts
+
+
+def test_minimization_exception_publishes_incomplete_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "failed-minimization"
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(root))
+
+    def fail_minimization(**_kwargs: object) -> object:
+        raise RuntimeError("synthetic local minimization failure")
+
+    monkeypatch.setattr(crashcheck_module, "execute_no_fault_replay", fail_minimization)
+
+    result = check(BUGGY_REF, MISLEADING_GREEN_REF, SCENARIO_ID)
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert result.execution_status is ExecutionStatus.SETUP_ERROR
+    assert len(result.bindings) == len(result.attempts) == 1
+    assert len(result.minimization_receipts) == 1
+    reduction = result.minimization_receipts[0]
+    assert not reduction.irreducible
+    assert all(
+        attempt.execution_status is ExecutionStatus.SETUP_ERROR
+        and "RuntimeError" in (attempt.failure_detail or "")
+        for attempt in reduction.confirmations
+    )
 
 
 def test_anchor_binding_failure_is_a_scoped_crashcheck_error(

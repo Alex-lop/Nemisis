@@ -145,7 +145,13 @@ class HuntMeasurement(StrictModel):
     selected_world_count: Literal[1] = 1
     selected_hypothesis_id: Literal["effect-commit-v1"] = "effect-commit-v1"
     selected_fault_boundary: Literal[FaultBoundary.EFFECT_COMMIT] = FaultBoundary.EFFECT_COMMIT
-    minimization_ratio: float = Field(default=0.5, ge=0.5, le=0.5)
+    hypothesis_selection_ratio: float = Field(default=0.5, ge=0.5, le=0.5)
+    minimization_trial_count: Literal[1] = 1
+    minimization_world_count: Literal[2] = 2
+    initial_fault_action_count: Literal[1] = 1
+    final_fault_action_count: Literal[1] = 1
+    minimization_ratio: float = Field(default=1.0, ge=1.0, le=1.0)
+    minimization_wall_time_ns: int = Field(ge=0)
     time_to_first_witness_ns: int = Field(ge=0)
     wall_time_ns: int = Field(ge=0)
 
@@ -206,7 +212,7 @@ class BenchmarkEnvironment(StrictModel):
 
 class BenchmarkResult(StrictModel):
     schema_version: Literal["nemisis.crashcheck.benchmark.v1"] = "nemisis.crashcheck.benchmark.v1"
-    source_commit: str = Field(pattern=r"^[0-9a-f]{40}(?:-dirty)?$", max_length=46)
+    source_commit: str = Field(pattern=r"^[0-9a-f]{40}$", max_length=40)
     scenario_id: Literal["sqlite-credit-v1"] = "sqlite-credit-v1"
     capsule_digest: Sha256
     engine_code_digest: Sha256
@@ -286,8 +292,8 @@ def run_benchmark(output: Path) -> BenchmarkResult:
     """Run and canonically publish the fixed three-tree local benchmark."""
     started = monotonic_ns()
     commit = source_commit()
-    if commit is None:
-        raise BenchmarkError("an exact source_commit() value is required")
+    if commit is None or commit.endswith("-dirty"):
+        raise BenchmarkError("a clean exact source_commit() value is required")
 
     with tempfile.TemporaryDirectory(prefix="nemisis-benchmark-") as temporary:
         root = Path(temporary)
@@ -609,6 +615,7 @@ def _measure_hunt(result: CrashCheckResult, capsule: ReproCapsule) -> HuntMeasur
     receipts = result.hypothesis_receipts
     reproduced = tuple(receipt for receipt in receipts if receipt.reproduced)
     selected = tuple(receipt for receipt in receipts if receipt.selected)
+    minimization = result.minimization_receipts
     if (
         result.capsule_digest != capsule.digest
         or result.engine_code_digest != capsule.engine_code_digest
@@ -625,14 +632,24 @@ def _measure_hunt(result: CrashCheckResult, capsule: ReproCapsule) -> HuntMeasur
         or selected[0].hypothesis_id != "effect-commit-v1"
         or selected[0].fault_boundary is not FaultBoundary.EFFECT_COMMIT
         or capsule.fault_boundary is not selected[0].fault_boundary
-        or len(capsule.minimization_trace) != len(receipts)
-        or selected[0].trusted_operation_count
-        / max(receipt.trusted_operation_count for receipt in receipts)
-        != 0.5
+        or len(minimization) != 1
+        or not minimization[0].irreducible
+        or minimization[0].reproduced
+        or minimization[0].retained
+        or capsule.minimization_trace != (minimization[0].trace_digest,)
+        or any(
+            attempt.execution_status is not ExecutionStatus.COMPLETED
+            or attempt.integrity_status is not IntegrityStatus.VALID
+            or attempt.observation is not CrashObservation.EXACTLY_ONCE
+            for attempt in minimization[0].confirmations
+        )
     ):
         raise BenchmarkError("CrashCheck hunt differs from the audited base-only search")
     earliest_start = min(receipt.attempt.started_at for receipt in receipts)
+    minimization_start = min(attempt.started_at for attempt in minimization[0].confirmations)
+    minimization_end = max(attempt.ended_at for attempt in minimization[0].confirmations)
     return HuntMeasurement(
+        minimization_wall_time_ns=_duration_ns(minimization_start, minimization_end),
         time_to_first_witness_ns=_duration_ns(earliest_start, reproduced[0].attempt.ended_at),
         wall_time_ns=_duration_ns(
             earliest_start, max(receipt.attempt.ended_at for receipt in receipts)
@@ -727,7 +744,12 @@ def _input_digest(
             "environment": environment,
             "event_digest": event_digest,
             "hunt": hunt.model_dump(
-                mode="json", exclude={"time_to_first_witness_ns", "wall_time_ns"}
+                mode="json",
+                exclude={
+                    "minimization_wall_time_ns",
+                    "time_to_first_witness_ns",
+                    "wall_time_ns",
+                },
             ),
             "scenario_id": SCENARIO_ID,
             "schema_version": SCHEMA_VERSION,

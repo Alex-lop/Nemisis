@@ -118,6 +118,13 @@ def _print_crash_result(
             else "no witness selected"
         )
         print(f"hunt: {len(result.hypothesis_receipts)} hypotheses -> {selection}")
+    if minimization_receipts := getattr(result, "minimization_receipts", ()):
+        minimization = minimization_receipts[0]
+        outcome = "irreducible" if minimization.irreducible else "incomplete"
+        print(
+            "minimization: removed fault replayed "
+            f"{len(minimization.confirmations)}x -> {outcome}; final schedule 1/1 action"
+        )
     representative = next(
         (
             attempt

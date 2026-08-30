@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import stat
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +26,6 @@ from nemisis.crash_models import (
 )
 from nemisis.crashcheck import _audited_contract, _seal_capsule
 from nemisis.hashing import canonical_json, sha256_json
-from nemisis.local import source_commit
 from nemisis.sqlite_credit import runner_environment_digest
 
 TREE_DIGESTS = {
@@ -42,7 +42,16 @@ def benchmark_runs(
     root = tmp_path_factory.mktemp("benchmark").resolve()
     first = root / "first.json"
     second = root / "second.json"
-    return (run_benchmark(first), first), (run_benchmark(second), second)
+    commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    with pytest.MonkeyPatch.context() as monkeypatch:
+        monkeypatch.setattr(benchmark_module, "source_commit", lambda: commit)
+        monkeypatch.setenv("NEMISIS_ENGINE_SOURCE_COMMIT", commit)
+        return (run_benchmark(first), first), (run_benchmark(second), second)
 
 
 def test_measures_the_audited_three_tree_outcome_matrix(
@@ -85,7 +94,9 @@ def test_measures_the_audited_three_tree_outcome_matrix(
         assert all(item.observation is expected for item in crash.attempts)
 
     assert result.crashcheck_verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
-    assert result.hunt.model_dump(exclude={"time_to_first_witness_ns", "wall_time_ns"}) == {
+    assert result.hunt.model_dump(
+        exclude={"minimization_wall_time_ns", "time_to_first_witness_ns", "wall_time_ns"}
+    ) == {
         "role": "base",
         "attempted_world_count": 2,
         "completed_world_count": 2,
@@ -94,7 +105,12 @@ def test_measures_the_audited_three_tree_outcome_matrix(
         "selected_world_count": 1,
         "selected_hypothesis_id": "effect-commit-v1",
         "selected_fault_boundary": FaultBoundary.EFFECT_COMMIT,
-        "minimization_ratio": 0.5,
+        "hypothesis_selection_ratio": 0.5,
+        "minimization_trial_count": 1,
+        "minimization_world_count": 2,
+        "initial_fault_action_count": 1,
+        "final_fault_action_count": 1,
+        "minimization_ratio": 1.0,
     }
     assert result.hunt.time_to_first_witness_ns <= result.hunt.wall_time_ns
 
@@ -103,9 +119,8 @@ def test_binds_exact_source_capsule_environment_and_canonical_bytes(
     benchmark_runs: tuple[tuple[BenchmarkResult, Path], tuple[BenchmarkResult, Path]],
 ) -> None:
     result, output = benchmark_runs[0]
-    commit = source_commit()
-    assert commit is not None
-    assert result.source_commit == commit
+    commit = result.source_commit
+    assert len(commit) == 40 and not commit.endswith("-dirty")
     assert result.event_digest == EVENT_DIGEST
     pre_hunt_capsule = _seal_capsule(_audited_contract())
     assert result.capsule_digest != pre_hunt_capsule.digest
@@ -123,7 +138,12 @@ def test_binds_exact_source_capsule_environment_and_canonical_bytes(
             "environment": result.environment,
             "event_digest": result.event_digest,
             "hunt": result.hunt.model_dump(
-                mode="json", exclude={"time_to_first_witness_ns", "wall_time_ns"}
+                mode="json",
+                exclude={
+                    "minimization_wall_time_ns",
+                    "time_to_first_witness_ns",
+                    "wall_time_ns",
+                },
             ),
             "scenario_id": "sqlite-credit-v1",
             "schema_version": "nemisis.crashcheck.benchmark.v1",
@@ -170,7 +190,18 @@ def test_fails_closed_without_an_exact_source_commit(
     output = tmp_path.resolve() / "result.json"
     monkeypatch.setattr(benchmark_module, "source_commit", lambda: None)
 
-    with pytest.raises(BenchmarkError, match=r"exact source_commit\(\)"):
+    with pytest.raises(BenchmarkError, match=r"clean exact source_commit\(\)"):
+        run_benchmark(output)
+    assert not output.exists()
+
+
+def test_fails_closed_for_a_dirty_source_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path.resolve() / "result.json"
+    monkeypatch.setattr(benchmark_module, "source_commit", lambda: f"{'a' * 40}-dirty")
+
+    with pytest.raises(BenchmarkError, match=r"clean exact source_commit\(\)"):
         run_benchmark(output)
     assert not output.exists()
 
@@ -184,6 +215,7 @@ def _without_timings(value: Any) -> Any:
             not in {
                 "crashcheck_wall_time_ns",
                 "duration_ns",
+                "minimization_wall_time_ns",
                 "result_digest",
                 "time_to_first_witness_ns",
                 "wall_time_ns",

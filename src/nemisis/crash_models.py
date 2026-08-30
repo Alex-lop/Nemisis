@@ -326,6 +326,187 @@ class AttemptReceipt(_DigestedModel):
         return self
 
 
+class NoFaultReplayReceipt(_DigestedModel):
+    """One fresh two-process replay with the capsule's fault action removed."""
+
+    schema_version: Literal["1"] = "1"
+    receipt_id: SafeId
+    role: Literal[WorldRole.BASE] = WorldRole.BASE
+    transport: Literal[TruthLabel.LOCAL] = TruthLabel.LOCAL
+    execution_status: ExecutionStatus
+    integrity_status: IntegrityStatus
+    observation: CrashObservation
+    parent_capsule_digest: Sha256
+    contract_digest: Sha256
+    binding_digest: Sha256
+    tree_digest: Sha256
+    post_execution_tree_digest: Sha256 | None = None
+    environment_digest: Sha256
+    event_digest: Sha256
+    initial_database_digest: Sha256
+    initial_database_file_digest: Sha256 | None = None
+    database_id: SafeId
+    execution_nonce: SafeId
+    started_at: datetime
+    ended_at: datetime
+    spawns: tuple[WorkerSpawnReceipt, ...] = Field(max_length=2)
+    initial_snapshot: CreditSnapshot | None = None
+    first_delivery_snapshot: CreditSnapshot | None = None
+    final_snapshot: CreditSnapshot | None = None
+    failure_detail: str | None = Field(default=None, max_length=1_000)
+
+    @model_validator(mode="after")
+    def evidence_is_coherent(self) -> NoFaultReplayReceipt:
+        if self.ended_at < self.started_at:
+            raise ValueError("no-fault replay ended before it started")
+        if len({spawn.spawn_index for spawn in self.spawns}) != len(self.spawns):
+            raise ValueError("no-fault worker spawn indices must be unique")
+        if any(spawn.event_digest != self.event_digest for spawn in self.spawns):
+            raise ValueError("no-fault worker event digest differs from the replay")
+        for snapshot in (
+            self.initial_snapshot,
+            self.first_delivery_snapshot,
+            self.final_snapshot,
+        ):
+            if snapshot is not None:
+                snapshot._require_canonical_digest()
+        if self.execution_status is ExecutionStatus.COMPLETED:
+            if (
+                self.integrity_status is not IntegrityStatus.VALID
+                or self.failure_detail is not None
+                or self.post_execution_tree_digest != self.tree_digest
+                or len(self.spawns) != 2
+                or tuple(spawn.phase for spawn in self.spawns) != ("first", "replay")
+                or any(spawn.exit_code != 0 for spawn in self.spawns)
+                or len({spawn.worker_nonce for spawn in self.spawns}) != 2
+                or len({spawn.ipc_session_id for spawn in self.spawns}) != 2
+                or self.initial_database_file_digest is None
+                or self.initial_snapshot is None
+                or self.first_delivery_snapshot is None
+                or self.final_snapshot is None
+            ):
+                raise ValueError("completed no-fault replay lacks exact two-process evidence")
+            initial = _snapshot_state(self.initial_snapshot)
+            first = _snapshot_state(self.first_delivery_snapshot)
+            final = _snapshot_state(self.final_snapshot)
+            if initial != (0, 0, 0, 0):
+                raise ValueError("no-fault replay did not begin from the seeded state")
+            expected_first = (first[0], 1, first[0], 1)
+            expected = (
+                first[0] * 2,
+                2,
+                first[0] * 2,
+                1,
+            )
+            if self.observation is CrashObservation.EXACTLY_ONCE and (
+                first[0] <= 0 or first != expected_first or final != first
+            ):
+                raise ValueError("no-fault exactly-once observation contradicts final state")
+            if self.observation is CrashObservation.DUPLICATE_EFFECT and (
+                first[0] <= 0 or first != expected_first or final != expected
+            ):
+                raise ValueError("no-fault duplicate observation contradicts final state")
+            if self.observation is CrashObservation.NOT_OBSERVED:
+                raise ValueError("completed no-fault replay requires a conclusive observation")
+        elif self.failure_detail is None:
+            raise ValueError("incomplete no-fault replay requires a failure detail")
+        return self
+
+
+class MinimizationReceipt(_DigestedModel):
+    """Deterministic deletion trial proving whether one fault action is necessary."""
+
+    schema_version: Literal["1"] = "1"
+    parent_capsule_digest: Sha256
+    contract_digest: Sha256
+    originating_base_tree_digest: Sha256
+    parent_schedule: tuple[FaultBoundary, ...] = Field(min_length=1, max_length=1)
+    candidate_schedule: tuple[FaultBoundary, ...] = Field(max_length=1)
+    removed_fault: FaultBoundary
+    confirmations: tuple[NoFaultReplayReceipt, ...] = Field(min_length=2, max_length=2)
+    reproduced: bool
+    retained: bool
+    irreducible: bool
+    trace_digest: Sha256
+
+    @model_validator(mode="after")
+    def reduction_is_coherent(self) -> MinimizationReceipt:
+        expected_parent = (FaultBoundary.EFFECT_COMMIT,)
+        if (
+            self.parent_schedule != expected_parent
+            or self.candidate_schedule
+            or self.removed_fault is not FaultBoundary.EFFECT_COMMIT
+        ):
+            raise ValueError("minimization trial differs from the trusted one-fault deletion")
+        for attempt in self.confirmations:
+            attempt._require_canonical_digest()
+        if any(
+            attempt.parent_capsule_digest != self.parent_capsule_digest
+            or attempt.contract_digest != self.contract_digest
+            or attempt.tree_digest != self.originating_base_tree_digest
+            for attempt in self.confirmations
+        ):
+            raise ValueError("minimization confirmations differ from their exact parent inputs")
+        unique_groups = (
+            [attempt.digest for attempt in self.confirmations],
+            [attempt.receipt_id for attempt in self.confirmations],
+            [attempt.database_id for attempt in self.confirmations],
+            [attempt.execution_nonce for attempt in self.confirmations],
+            [spawn.worker_nonce for attempt in self.confirmations for spawn in attempt.spawns],
+            [spawn.ipc_session_id for attempt in self.confirmations for spawn in attempt.spawns],
+        )
+        shared_groups = (
+            [attempt.binding_digest for attempt in self.confirmations],
+            [attempt.environment_digest for attempt in self.confirmations],
+            [attempt.event_digest for attempt in self.confirmations],
+            [attempt.initial_database_digest for attempt in self.confirmations],
+        )
+        database_file_digests = {
+            attempt.initial_database_file_digest
+            for attempt in self.confirmations
+            if attempt.initial_database_file_digest is not None
+        }
+        if (
+            any(len(values) != len(set(values)) for values in unique_groups)
+            or any(len(set(values)) != 1 for values in shared_groups)
+            or len(database_file_digests) > 1
+        ):
+            raise ValueError("minimization confirmations require fresh execution identities")
+        completed = all(
+            attempt.execution_status is ExecutionStatus.COMPLETED
+            and attempt.integrity_status is IntegrityStatus.VALID
+            for attempt in self.confirmations
+        )
+        reproduced = completed and all(
+            attempt.observation is CrashObservation.DUPLICATE_EFFECT
+            for attempt in self.confirmations
+        )
+        irreducible = completed and all(
+            attempt.observation is CrashObservation.EXACTLY_ONCE for attempt in self.confirmations
+        )
+        if (
+            self.reproduced is not reproduced
+            or self.retained is not reproduced
+            or self.irreducible is not irreducible
+        ):
+            raise ValueError("minimization decision contradicts its confirmation receipts")
+        stable = {
+            "candidate_schedule": self.candidate_schedule,
+            "confirmation_count": len(self.confirmations),
+            "contract_digest": self.contract_digest,
+            "irreducible": self.irreducible,
+            "originating_base_tree_digest": self.originating_base_tree_digest,
+            "parent_capsule_digest": self.parent_capsule_digest,
+            "parent_schedule": self.parent_schedule,
+            "removed_fault": self.removed_fault,
+            "reproduced": self.reproduced,
+            "retained": self.retained,
+        }
+        if sha256_json(stable) != self.trace_digest:
+            raise ValueError("minimization trace digest mismatch")
+        return self
+
+
 class ReproCapsule(_DigestedModel):
     """Immutable semantic witness; volatile tree bindings and nonces stay outside it."""
 
@@ -427,6 +608,7 @@ class CrashCheckResult(_DigestedModel):
     capsule_digest: Sha256
     engine_code_digest: Sha256
     hypothesis_receipts: tuple[HypothesisReceipt, ...] = Field(default=(), max_length=2)
+    minimization_receipts: tuple[MinimizationReceipt, ...] = Field(default=(), max_length=1)
     bindings: tuple[AnchorBinding, ...] = Field(min_length=1, max_length=3)
     attempts: tuple[AttemptReceipt, ...] = Field(min_length=1, max_length=24)
     started_at: datetime
@@ -445,8 +627,10 @@ class CrashCheckResult(_DigestedModel):
             binding._require_canonical_digest()
         for attempt in self.attempts:
             attempt._require_canonical_digest()
-        for receipt in self.hypothesis_receipts:
-            receipt._require_canonical_digest()
+        for hypothesis in self.hypothesis_receipts:
+            hypothesis._require_canonical_digest()
+        for reduction in self.minimization_receipts:
+            reduction._require_canonical_digest()
         for artifact_path in self.artifacts.values():
             safe_relative_path(artifact_path)
         binding_digests = [binding.digest for binding in self.bindings]
@@ -479,6 +663,13 @@ class CrashCheckResult(_DigestedModel):
             _validate_hypothesis_receipt_links(
                 self.hypothesis_receipts, binding_by_digest, self.attempts
             )
+        if self.minimization_receipts:
+            _validate_minimization_receipts(
+                self.hypothesis_receipts,
+                self.minimization_receipts,
+                binding_by_digest,
+                self.attempts,
+            )
         completed = all(
             attempt.execution_status is ExecutionStatus.COMPLETED for attempt in self.attempts
         )
@@ -509,6 +700,11 @@ class CrashCheckResult(_DigestedModel):
                 raise ValueError("conclusive verdict requires completed valid attempts")
             if self.hypothesis_receipts:
                 _validate_conclusive_hypothesis_receipts(self.hypothesis_receipts)
+                if (
+                    len(self.minimization_receipts) != 1
+                    or not self.minimization_receipts[0].irreducible
+                ):
+                    raise ValueError("conclusive full check requires proven witness minimization")
             elif len(self.bindings) > 1:
                 raise ValueError("conclusive full check requires both crash-boundary hypotheses")
             _validate_conclusive_verdict(self.verdict, self.attempts)
@@ -522,6 +718,68 @@ class CrashCheckResult(_DigestedModel):
         ):
             raise ValueError("unsupported verdict contradicts its attempts")
         return self
+
+
+def _validate_minimization_receipts(
+    hypothesis_receipts: tuple[HypothesisReceipt, ...],
+    minimization_receipts: tuple[MinimizationReceipt, ...],
+    binding_by_digest: dict[str, AnchorBinding],
+    proof_attempts: tuple[AttemptReceipt, ...],
+) -> None:
+    if len(minimization_receipts) != 1 or len(hypothesis_receipts) != 2:
+        raise ValueError("minimization requires one trial after the canonical hypothesis hunt")
+    receipt = minimization_receipts[0]
+    selected = [item for item in hypothesis_receipts if item.selected]
+    base_bindings = {
+        attempt.binding_digest for attempt in proof_attempts if attempt.role is WorldRole.BASE
+    }
+    if len(selected) != 1 or len(base_bindings) != 1:
+        raise ValueError("minimization requires one selected witness and one base binding")
+    base_binding = binding_by_digest[next(iter(base_bindings))]
+    selected_attempt = selected[0].attempt
+    if (
+        receipt.parent_capsule_digest != selected[0].provisional_capsule_digest
+        or receipt.contract_digest != base_binding.contract_digest
+        or receipt.originating_base_tree_digest != base_binding.tree_digest
+        or any(
+            attempt.binding_digest != base_binding.digest
+            or attempt.environment_digest != selected_attempt.environment_digest
+            or attempt.event_digest != selected_attempt.event_digest
+            or attempt.initial_database_digest != selected_attempt.initial_database_digest
+            or (
+                attempt.initial_database_file_digest is not None
+                and attempt.initial_database_file_digest
+                != selected_attempt.initial_database_file_digest
+            )
+            for attempt in receipt.confirmations
+        )
+    ):
+        raise ValueError("minimization receipt differs from the selected base witness")
+    minimization_freshness = (
+        {attempt.digest for attempt in receipt.confirmations},
+        {attempt.receipt_id for attempt in receipt.confirmations},
+        {attempt.database_id for attempt in receipt.confirmations},
+        {attempt.execution_nonce for attempt in receipt.confirmations},
+        {spawn.worker_nonce for attempt in receipt.confirmations for spawn in attempt.spawns},
+        {spawn.ipc_session_id for attempt in receipt.confirmations for spawn in attempt.spawns},
+    )
+    other_attempts = (
+        *(item.attempt for item in hypothesis_receipts),
+        *proof_attempts,
+    )
+    other_freshness = (
+        {attempt.digest for attempt in other_attempts},
+        {attempt.receipt_id for attempt in other_attempts},
+        {attempt.database_id for attempt in other_attempts},
+        {attempt.execution_nonce for attempt in other_attempts},
+        {spawn.worker_nonce for attempt in other_attempts for spawn in attempt.spawns},
+        {spawn.ipc_session_id for attempt in other_attempts for spawn in attempt.spawns},
+    )
+    if any(
+        minimized & other
+        for minimized, other in zip(minimization_freshness, other_freshness, strict=True)
+    ):
+        raise ValueError("minimization, hunt, and proof identities must be disjoint")
 
 
 def _validate_hypothesis_receipt_links(

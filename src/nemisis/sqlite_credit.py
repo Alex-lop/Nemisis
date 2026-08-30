@@ -32,6 +32,7 @@ from nemisis.crash_models import (
     ExecutionStatus,
     FaultBoundary,
     IntegrityStatus,
+    NoFaultReplayReceipt,
     ReproCapsule,
     RetryContract,
     TimelineEntry,
@@ -338,6 +339,114 @@ def execute_attempt(
         checkpoint_reached=checkpoint_reached,
         kill_signal=int(kill_signal) if kill_signal is not None else None,
         replay_acknowledged=replay_acknowledged,
+        failure_detail=failure_detail,
+    )
+
+
+def execute_no_fault_replay(
+    *,
+    capsule: ReproCapsule,
+    binding: AnchorBinding,
+    source_tree: Path,
+    work_dir: Path,
+    execution_nonce: str,
+    timeout_seconds: float = 10.0,
+) -> NoFaultReplayReceipt:
+    """Delete the sole fault action, then deliver the event in two fresh workers."""
+    started_at = datetime.now(UTC)
+    spawns: list[_Spawn] = []
+    initial: CreditSnapshot | None = None
+    first_delivery: CreditSnapshot | None = None
+    final: CreditSnapshot | None = None
+    initial_file_digest: str | None = None
+    tree_after: str | None = None
+    status = ExecutionStatus.COMPLETED
+    integrity = IntegrityStatus.VALID
+    observation = CrashObservation.NOT_OBSERVED
+    failure_detail: str | None = None
+    database_id = f"db-{uuid.uuid4().hex}"
+    root = source_tree.resolve()
+    event = {
+        "account_id": capsule.account_id,
+        "amount_cents": capsule.amount_cents,
+        "event_id": capsule.event_id,
+    }
+    database = work_dir.resolve() / f"{database_id}.sqlite3"
+    try:
+        _preflight(capsule, binding, root, work_dir.resolve(), execution_nonce, timeout_seconds)
+        work_dir.mkdir(parents=True, exist_ok=False)
+        initial_file_digest = _seed_database(database, event)
+        initial = _probe(database, event)
+
+        first = _spawn_worker(
+            capsule=capsule,
+            binding=binding,
+            source_tree=root,
+            database=database,
+            execution_nonce=execution_nonce,
+            index=1,
+            phase="first",
+        )
+        spawns.append(first)
+        _expect_hello(first, capsule, execution_nonce, timeout_seconds)
+        _finish_replay(first, capsule, execution_nonce, timeout_seconds)
+        first_delivery = _probe(database, event)
+
+        replay_worker = _spawn_worker(
+            capsule=capsule,
+            binding=binding,
+            source_tree=root,
+            database=database,
+            execution_nonce=execution_nonce,
+            index=2,
+            phase="replay",
+        )
+        spawns.append(replay_worker)
+        _expect_hello(replay_worker, capsule, execution_nonce, timeout_seconds)
+        _finish_replay(replay_worker, capsule, execution_nonce, timeout_seconds)
+        final = _probe(database, event)
+        tree_after = sha256_tree(root, ignored_names=frozenset({"__pycache__"}))
+        if tree_after != binding.tree_digest:
+            raise _AttemptFailure(
+                ExecutionStatus.INTEGRITY_ERROR,
+                "source tree changed during no-fault replay",
+                integrity=IntegrityStatus.INVALID,
+            )
+        observation = _observation(final, capsule.amount_cents)
+    except _AttemptFailure as error:
+        status, integrity, failure_detail = error.status, error.integrity, error.detail
+    except (OSError, sqlite3.Error, ValueError) as error:
+        status = ExecutionStatus.SETUP_ERROR
+        integrity = IntegrityStatus.INCOMPLETE
+        failure_detail = f"{type(error).__name__}: {str(error)[:800]}"
+
+    cleanup_error = _cleanup(spawns)
+    if cleanup_error is not None:
+        status = ExecutionStatus.CLEANUP_ERROR
+        integrity = IntegrityStatus.INCOMPLETE
+        failure_detail = cleanup_error
+    return NoFaultReplayReceipt.with_digest(
+        receipt_id=f"no-fault-{uuid.uuid4().hex}",
+        execution_status=status,
+        integrity_status=integrity,
+        observation=observation,
+        parent_capsule_digest=capsule.digest,
+        contract_digest=capsule.contract_digest,
+        binding_digest=binding.digest,
+        tree_digest=binding.tree_digest,
+        post_execution_tree_digest=tree_after,
+        environment_digest=capsule.environment_digest,
+        event_digest=capsule.event_digest,
+        initial_database_digest=capsule.initial_database_digest,
+        initial_database_file_digest=initial_file_digest,
+        database_id=database_id,
+        execution_nonce=execution_nonce,
+        started_at=started_at,
+        ended_at=datetime.now(UTC),
+        spawns=tuple(_spawn_receipt(item, capsule.event_digest) for item in spawns),
+        initial_snapshot=initial,
+        first_delivery_snapshot=first_delivery,
+        final_snapshot=final,
         failure_detail=failure_detail,
     )
 

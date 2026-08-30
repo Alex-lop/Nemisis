@@ -127,6 +127,19 @@ def _render_report(tmp_path: Path, *, complete: bool, fixed: bool = False) -> st
             )
             if complete
             else (),
+            minimization_receipts=(
+                SimpleNamespace(
+                    removed_fault=FaultBoundary.EFFECT_COMMIT,
+                    confirmations=(
+                        SimpleNamespace(observation=CrashObservation.EXACTLY_ONCE),
+                        SimpleNamespace(observation=CrashObservation.EXACTLY_ONCE),
+                    ),
+                    irreducible=True,
+                    trace_digest="m" * 64,
+                ),
+            )
+            if complete
+            else (),
             model_dump=lambda **_: {"unsafe": "</pre><script>alert(2)</script>"},
         ),
     )
@@ -166,12 +179,15 @@ def test_crash_report_uses_receipt_and_capsule_values_and_escapes_html(tmp_path:
     assert "<strong>Final state observed.</strong> 2468¢ / ledger 2 / marker 1" in report
     assert f"<code>{'a' * 40}</code>" in report
     assert f"<code>{'e' * 64}</code>" in report
-    assert "2-hypothesis hunt and minimization" in report
+    assert "2-hypothesis candidate-blind hunt" in report
     assert "Selected outcome: REPRODUCED · 1 of 2 selected" in report
     assert "effect-commit-v1" in report
     assert "marker-commit-v1" in report
     assert "REPRODUCED" in report
     assert "NOT REPRODUCED" in report
+    assert "Deterministic witness minimization" in report
+    assert "empty schedule observed" in report
+    assert "one-action schedule is irreducible" in report
     assert "event-digest&lt;&amp;" in report
     assert "attempt-&lt;unsafe&gt;" in report
     assert "capsule-digest&lt;&amp;" in report
@@ -214,6 +230,7 @@ def test_incomplete_report_makes_no_success_claim_and_uses_semantic_html(tmp_pat
     assert "blocked by &lt;script&gt;alert(1)&lt;/script&gt;" in report
     assert "real process-group SIGKILL" not in report
     assert "hypothesis hunt and minimization" not in report
+    assert "Deterministic witness minimization" not in report
     assert "Selected outcome" not in report
     assert "<head>" in report
     assert '<main id="main" class="verdict-warn">' in report

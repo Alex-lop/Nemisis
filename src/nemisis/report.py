@@ -61,7 +61,7 @@ def write_crash_report(result: CrashCheckResult, capsule: ReproCapsule, path: Pa
         )
     hunt_section = (
         f"""<section class="card" aria-labelledby="hypothesis-hunt">
-<h2 id="hypothesis-hunt">{len(result.hypothesis_receipts)}-hypothesis hunt and minimization</h2>
+<h2 id="hypothesis-hunt">{len(result.hypothesis_receipts)}-hypothesis candidate-blind hunt</h2>
 <p>{selection_summary}</p>
 <div class="table-wrap" role="region" aria-label="Hypothesis hunt receipts" tabindex="0"><table>
 <caption>Stored candidate-blind hunt receipts; no hypotheses are reconstructed by this \
@@ -73,6 +73,25 @@ report.</caption>
         if result.hypothesis_receipts
         else ""
     )
+    minimization_receipts = getattr(result, "minimization_receipts", ())
+    if minimization_receipts:
+        minimization = minimization_receipts[0]
+        observations = ", ".join(
+            attempt.observation.value for attempt in minimization.confirmations
+        )
+        reduction_outcome = (
+            "reduction rejected; the one-action schedule is irreducible"
+            if minimization.irreducible
+            else "minimization evidence incomplete"
+        )
+        minimization_section = f"""<section class="card" aria-labelledby="minimization">
+<h2 id="minimization">Deterministic witness minimization</h2>
+<p>Tried deleting the capsule's sole <code>{escape(minimization.removed_fault.value)}</code>
+fault action in {len(minimization.confirmations)} fresh base worlds. The empty schedule observed
+<code>{escape(observations)}</code>; {escape(reduction_outcome)}.</p>
+<p>Stable reduction trace <code>{escape(minimization.trace_digest)}</code></p></section>"""
+    else:
+        minimization_section = ""
     representative = next(
         (attempt for attempt in result.attempts if attempt.execution_status.value != "COMPLETED"),
         next(
@@ -227,6 +246,7 @@ body {{ padding: .75rem; }} .comparison {{ grid-template-columns: 1fr; }}
 <li>{final_story}</li>
 </ol>{failure}</section>
 {hunt_section}
+{minimization_section}
 <section class="card" aria-labelledby="source-bindings">
 <h2 id="source-bindings">Source bindings</h2>
 <div class="table-wrap" role="region" aria-label="Source bindings" tabindex="0"><table>
