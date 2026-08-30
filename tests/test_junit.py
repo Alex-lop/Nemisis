@@ -36,7 +36,9 @@ def test_parses_trusted_outcomes_and_structural_precedence(tmp_path: Path) -> No
         + _case("skip", "PASS", "<failure /><skipped />"),
     )
 
-    assert parse_junit(report, {"pass", "assertion", "exception", "error", "skip"}) == {
+    assert parse_junit(
+        report, {"pass", "assertion", "exception", "error", "skip"}, exit_code=1
+    ) == {
         "pass": Outcome.PASS,
         "assertion": Outcome.ASSERTION_FAIL,
         "exception": Outcome.ERROR,
@@ -45,10 +47,23 @@ def test_parses_trusted_outcomes_and_structural_precedence(tmp_path: Path) -> No
     }
 
 
-@pytest.mark.parametrize("exit_code", [2, 3, 4, 5])
-def test_collection_exit_fails_closed(tmp_path: Path, exit_code: int) -> None:
+@pytest.mark.parametrize("exit_code", [None, -9, 2, 3, 4, 5, 6])
+def test_collection_exit_fails_closed(tmp_path: Path, exit_code: int | None) -> None:
     report = _report(tmp_path, _case("known", "PASS"))
     assert parse_junit(report, {"known"}, exit_code=exit_code) == {"known": Outcome.ERROR}
+
+
+@pytest.mark.parametrize(
+    "exit_code,case",
+    [
+        (1, _case("known", "PASS")),
+        (0, _case("known", "ASSERTION_FAIL", "<failure />")),
+    ],
+)
+def test_process_exit_and_report_must_agree(tmp_path: Path, exit_code: int, case: str) -> None:
+    assert parse_junit(_report(tmp_path, case), {"known"}, exit_code=exit_code) == {
+        "known": Outcome.ERROR
+    }
 
 
 def test_missing_result_depends_on_process_state(tmp_path: Path) -> None:

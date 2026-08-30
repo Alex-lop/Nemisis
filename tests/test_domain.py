@@ -17,7 +17,7 @@ def test_canonical_digest_is_order_independent() -> None:
 
 
 @pytest.mark.parametrize("expected", list(ExpectedRelation))
-@pytest.mark.parametrize("base,candidate", product(Outcome, repeat=2))
+@pytest.mark.parametrize("base,candidate", list(product(Outcome, repeat=2)))
 def test_classification_truth_table(
     expected: ExpectedRelation, base: Outcome, candidate: Outcome
 ) -> None:

@@ -24,7 +24,12 @@ def parse_junit(
         raise ValueError("expected_ids contains duplicates")
     if timed_out:
         return dict.fromkeys(expected, Outcome.TIMEOUT)
-    if not report_path.is_file() or exit_code in range(2, 6):
+    if (
+        not report_path.is_file()
+        or not isinstance(exit_code, int)
+        or isinstance(exit_code, bool)
+        or exit_code not in {0, 1}
+    ):
         return dict.fromkeys(expected, Outcome.ERROR)
     try:
         if report_path.stat().st_size > MAX_JUNIT_BYTES:
@@ -58,6 +63,11 @@ def parse_junit(
         return dict.fromkeys(expected, Outcome.ERROR)
     for test_id in expected - outcomes.keys():
         outcomes[test_id] = Outcome.NOT_RUN
+    failed = any(
+        outcome in {Outcome.ASSERTION_FAIL, Outcome.ERROR} for outcome in outcomes.values()
+    )
+    if (exit_code == 0 and failed) or (exit_code == 1 and not failed):
+        return dict.fromkeys(expected, Outcome.ERROR)
     return outcomes
 
 

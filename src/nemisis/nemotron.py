@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import os
 import re
 from collections.abc import Mapping, Sequence
@@ -41,6 +42,11 @@ MAX_DIFF_BYTES = 100_000
 MAX_TEST_BYTES = 30_000
 MAX_TOTAL_TEST_BYTES = 60_000
 MAX_RESPONSE_BYTES = 150_000
+MAX_BASE_MATERIAL_BYTES = 100_000
+MAX_CONTRACT_CATALOG_IDS = 16
+MAX_CONTRACT_SCALARS = 16
+MIN_CONTRACT_SCALAR = -1_000_000_000
+MAX_CONTRACT_SCALAR = 1_000_000_000
 
 PROMPT_TEMPLATE = """You are Nemisis's adversarial test author.
 Given a ticket and candidate diff, return behavioral claims and complete pytest files.
@@ -54,7 +60,16 @@ use INVARIANT for behavior that must pass on both. Link every claim and test by 
 """
 PROMPT_TEMPLATE_DIGEST = sha256_text(PROMPT_TEMPLATE)
 
+CONTRACT_PROMPT_TEMPLATE = """You are Nemisis's retry-contract selector.
+Use only the supplied audited catalog IDs and scalar bounds. Return only the supplied
+JSON schema. Do not return code, commands, SQL, tests, predicates, schedules, patches,
+environment variables, markdown, or prose. Every scalar key must be supplied by the
+request and every scalar value must remain within its inclusive bounds.
+"""
+CONTRACT_PROMPT_TEMPLATE_DIGEST = sha256_text(CONTRACT_PROMPT_TEMPLATE)
+
 _SAFE_PART = re.compile(r"^[A-Za-z0-9_.-]+$")
+_TOKEN_FACTORY_HOST = re.compile(r"^api\.tokenfactory(?:\.[a-z0-9-]+)?\.nebius\.com$")
 _STRUCTURED_FEATURES = frozenset({"json_schema", "structured_output", "structured_outputs"})
 _ALLOWED_IMPORTS = frozenset({"inventory", "pytest"})
 _DANGEROUS_NAMES = frozenset(
@@ -120,11 +135,29 @@ class _ModelPayload(StrictModel):
     generated_tests: tuple[_ProposedTest, ...] = Field(min_length=1, max_length=MAX_GENERATED_TESTS)
 
 
+class _ContractScalar(StrictModel):
+    name: SafeId
+    value: int = Field(ge=MIN_CONTRACT_SCALAR, le=MAX_CONTRACT_SCALAR)
+
+
+class _ContractPayload(StrictModel):
+    catalog_ids: tuple[SafeId, ...] = Field(min_length=1, max_length=MAX_CONTRACT_CATALOG_IDS)
+    scalars: tuple[_ContractScalar, ...] = Field(max_length=MAX_CONTRACT_SCALARS)
+
+
 class NemotronGeneration(StrictModel):
     """Validated model proposals and their sanitized live-call receipt."""
 
     claims: tuple[ClaimSpec, ...]
     generated_tests: tuple[GeneratedTestSpec, ...]
+    receipt: ModelCallReceipt
+
+
+class NemotronContractGeneration(StrictModel):
+    """Candidate-blind selection from trusted contracts and bounded scalar values."""
+
+    catalog_ids: tuple[SafeId, ...]
+    scalars: dict[str, int]
     receipt: ModelCallReceipt
 
 
@@ -175,6 +208,90 @@ class NemotronClient:
             )
             self._truth_label = TruthLabel.LIVE
         self._client = client
+
+    def generate_contract(
+        self,
+        issue: str,
+        base_material: str,
+        catalog_ids: Sequence[str],
+        bounds: Mapping[str, tuple[int, int]],
+    ) -> NemotronContractGeneration:
+        """Select only trusted catalog IDs and in-range values without candidate input."""
+        trusted_ids, trusted_bounds = _validate_contract_input(
+            issue, base_material, catalog_ids, bounds
+        )
+        self._validate_model()
+
+        started_at = datetime.now(UTC)
+        started = monotonic()
+        prompt = json.dumps(
+            {
+                "base_material": base_material,
+                "bounds": {
+                    name: {"maximum": maximum, "minimum": minimum}
+                    for name, (minimum, maximum) in trusted_bounds.items()
+                },
+                "catalog_ids": trusted_ids,
+                "issue": issue,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        request: dict[str, object] = {
+            "model": self.model_id,
+            "messages": [
+                {"role": "system", "content": CONTRACT_PROMPT_TEMPLATE},
+                {"role": "user", "content": prompt},
+            ],
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "nemisis_retry_contract",
+                    "strict": True,
+                    "schema": _ContractPayload.model_json_schema(),
+                },
+            },
+            "max_tokens": MAX_OUTPUT_TOKENS,
+            "temperature": 0,
+            "timeout": TIMEOUT_SECONDS,
+        }
+        input_digest = sha256_json(
+            {
+                "base_url": self.base_url,
+                "max_retries": MAX_RETRIES,
+                "request": request,
+            }
+        )
+        try:
+            completion = self._client.chat.completions.create(**request)
+        except Exception as exc:
+            raise _provider_error(exc, "contract generation") from exc
+
+        raw = _completion_content(completion)
+        encoded = _encode_bounded(raw, "model response", MAX_RESPONSE_BYTES)
+        try:
+            payload = _ContractPayload.model_validate_json(encoded)
+        except (ValidationError, ValueError) as exc:
+            raise NemotronResponseError("Nemotron contract failed the required schema") from exc
+        selected_ids, scalars = _validate_contract_payload(payload, trusted_ids, trusted_bounds)
+        receipt = ModelCallReceipt(
+            truth_label=self._truth_label,
+            timestamp=started_at,
+            endpoint_region=_endpoint_region(self.base_url),
+            model_id=self.model_id,
+            input_digest=input_digest,
+            prompt_template_digest=CONTRACT_PROMPT_TEMPLATE_DIGEST,
+            latency_ms=max(0, round((monotonic() - started) * 1_000)),
+            outcome="success",
+            schema_valid=True,
+            response_digest=sha256_bytes(encoded),
+        )
+        return NemotronContractGeneration(
+            catalog_ids=selected_ids,
+            scalars=scalars,
+            receipt=receipt,
+        )
 
     def generate(
         self,
@@ -294,6 +411,73 @@ class NemotronClient:
             raise ModelUnavailableError(
                 f"configured model {self.model_id!r} lacks JSON-schema output capability"
             )
+
+
+def _validate_contract_input(
+    issue: str,
+    base_material: str,
+    catalog_ids: Sequence[str],
+    bounds: Mapping[str, tuple[int, int]],
+) -> tuple[tuple[str, ...], dict[str, tuple[int, int]]]:
+    if not issue.strip():
+        raise ValueError("issue must not be empty")
+    if not base_material.strip():
+        raise ValueError("base material must not be empty")
+    _encode_bounded(issue, "issue", MAX_TICKET_BYTES)
+    _encode_bounded(base_material, "base material", MAX_BASE_MATERIAL_BYTES)
+    if (
+        isinstance(catalog_ids, (str, bytes))
+        or not 1 <= len(catalog_ids) <= MAX_CONTRACT_CATALOG_IDS
+    ):
+        raise ValueError(f"catalog_ids must contain 1 to {MAX_CONTRACT_CATALOG_IDS} IDs")
+    if any(
+        not isinstance(catalog_id, str)
+        or len(catalog_id) > 120
+        or not _SAFE_PART.fullmatch(catalog_id)
+        for catalog_id in catalog_ids
+    ):
+        raise ValueError("catalog IDs must use trusted safe identifiers")
+    trusted_ids = tuple(sorted(catalog_ids))
+    if len(trusted_ids) != len(set(trusted_ids)):
+        raise ValueError("catalog IDs must be unique")
+    if not isinstance(bounds, Mapping) or len(bounds) > MAX_CONTRACT_SCALARS:
+        raise ValueError(f"bounds must contain at most {MAX_CONTRACT_SCALARS} scalars")
+
+    trusted_bounds: dict[str, tuple[int, int]] = {}
+    for name, bound in sorted(bounds.items()):
+        if not isinstance(name, str) or len(name) > 120 or not _SAFE_PART.fullmatch(name):
+            raise ValueError("scalar names must use trusted safe identifiers")
+        if (
+            not isinstance(bound, tuple)
+            or len(bound) != 2
+            or any(not isinstance(value, int) or isinstance(value, bool) for value in bound)
+        ):
+            raise ValueError("each scalar bound must be an integer (minimum, maximum) tuple")
+        minimum, maximum = bound
+        if minimum < MIN_CONTRACT_SCALAR or maximum > MAX_CONTRACT_SCALAR or minimum > maximum:
+            raise ValueError("scalar bounds are invalid or exceed the supported range")
+        trusted_bounds[name] = (minimum, maximum)
+    return trusted_ids, trusted_bounds
+
+
+def _validate_contract_payload(
+    payload: _ContractPayload,
+    trusted_ids: tuple[str, ...],
+    trusted_bounds: Mapping[str, tuple[int, int]],
+) -> tuple[tuple[str, ...], dict[str, int]]:
+    selected_ids = tuple(sorted(payload.catalog_ids))
+    if len(selected_ids) != len(set(selected_ids)) or not set(selected_ids).issubset(trusted_ids):
+        raise NemotronResponseError("Nemotron selected an unknown or duplicate catalog ID")
+    scalars = {scalar.name: scalar.value for scalar in payload.scalars}
+    if len(scalars) != len(payload.scalars):
+        raise NemotronResponseError("Nemotron returned duplicate scalar keys")
+    if scalars.keys() != trusted_bounds.keys():
+        raise NemotronResponseError("Nemotron scalar keys do not exactly match supplied bounds")
+    for name, value in scalars.items():
+        minimum, maximum = trusted_bounds[name]
+        if not minimum <= value <= maximum:
+            raise NemotronResponseError(f"Nemotron scalar {name!r} is outside supplied bounds")
+    return selected_ids, dict(sorted(scalars.items()))
 
 
 def _validate_input(ticket: str, candidate_diff: str, max_generated_tests: int) -> None:
@@ -501,8 +685,19 @@ def _provider_error(exc: Exception, operation: str) -> NemotronError:
 
 def _validate_base_url(value: str) -> None:
     parsed = urlparse(value)
-    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
-        raise ValueError("Token Factory base URL must be an HTTPS origin without credentials")
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or not _TOKEN_FACTORY_HOST.fullmatch(parsed.hostname)
+        or parsed.port not in {None, 443}
+        or parsed.username
+        or parsed.password
+        or parsed.path not in {"/v1", "/v1/"}
+        or parsed.params
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("Token Factory base URL must be an official Nebius HTTPS /v1 endpoint")
 
 
 def _endpoint_region(base_url: str) -> str:

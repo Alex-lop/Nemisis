@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 from base64 import b64decode
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -37,6 +38,7 @@ from nemisis.junit import MAX_JUNIT_BYTES
 DEFAULT_TIMEOUT_SECONDS = 300.0
 INSTANCE_TIMEOUT_SECONDS = 240
 MAX_STREAM_BYTES = 1_000_000
+EXECUTION_NONCE_ENV = "NEMISIS_EXECUTION_NONCE"
 WORKSPACE = "/workspace"
 SOURCE_ARCHIVE = "/opt/nemisis/source.tar.gz"
 CANDIDATE_PATCH = "/opt/nemisis/candidate.patch"
@@ -57,7 +59,9 @@ _PREPARE_ARGS = (
 _TREE_CODE = (
     "import hashlib,json,pathlib,sys;"
     "root=pathlib.Path(sys.argv[1]);"
-    "paths=sorted((p for p in root.rglob('*') if p.is_file()),"
+    "ignored=set(sys.argv[2:]);"
+    "paths=sorted((p for p in root.rglob('*') if p.is_file() and "
+    "p.relative_to(root).parts[0] not in ignored),"
     "key=lambda p:p.relative_to(root).as_posix());"
     "assert all(not p.is_symlink() for p in paths);"
     "entries=[{'path':p.relative_to(root).as_posix(),'sha256':"
@@ -92,11 +96,14 @@ archive_sha=$(
 tar --extract --gzip --file /opt/nemisis/verification-bundle.tar.gz \
   --directory /workspace/__nemisis_bundle__ --no-same-owner --no-same-permissions
 before=$(python -I -c "$3" /workspace/__nemisis_bundle__)
+source_before=$(python -I -c "$3" /workspace __nemisis_bundle__ __nemisis_results__)
 cd /workspace
 python -I -c "$2"
 status=$?
 after=$(python -I -c "$3" /workspace/__nemisis_bundle__)
+source_after=$(python -I -c "$3" /workspace __nemisis_bundle__ __nemisis_results__)
 [ "$before" = "$after" ] || { echo NEMISIS_BUNDLE_ERROR=mutated; exit 4; }
+[ "$source_before" = "$source_after" ] || { echo NEMISIS_BUNDLE_ERROR=source-mutated; exit 4; }
 if [ -f /workspace/__nemisis_results__/junit.xml ]; then
   python -I -c "$4"
 fi
@@ -117,6 +124,7 @@ _SECRET = re.compile(
     r"(?i)((?:[A-Z0-9_-]*(?:authorization|api[_-]?key|password|secret|token)"
     r"[A-Z0-9_-]*)\s*[:=]\s*|bearer\s+)\S+"
 )
+_EXECUTION_NONCE = re.compile(r"[0-9a-f]{32}")
 
 
 class ContreeBackendError(RuntimeError):
@@ -133,6 +141,15 @@ class ContreeProtocolError(ContreeBackendError):
 
 class ContreeExecutionError(ContreeBackendError):
     """ConTree infrastructure failed before a valid process result existed."""
+
+
+class ContreeBatchError(ContreeExecutionError):
+    """A batch failed after zero or more provider operations were started."""
+
+    def __init__(self, message: str, *, operation_ids: tuple[str, ...]) -> None:
+        super().__init__(message)
+        self.operation_ids = operation_ids
+        self.started_operation_ids = operation_ids
 
 
 @dataclass(frozen=True)
@@ -154,6 +171,31 @@ class ContreeExecution:
     stdout: str | None
     stderr: str | None
     metrics: tuple[tuple[str, int | float], ...]
+    execution_nonce: str | None = None
+
+
+@dataclass(frozen=True)
+class ContreeInvocation:
+    """One fixed, nonce-bound ConTree process invocation."""
+
+    image_uuid: str
+    command: str
+    args: tuple[str, ...]
+    files: Mapping[str, FileSpec]
+    execution_nonce: str
+
+    def __post_init__(self) -> None:
+        _prepare_invocation(self)
+
+
+@dataclass(frozen=True)
+class _PreparedInvocation:
+    image_uuid: str
+    command: str
+    args: tuple[str, ...]
+    files: dict[str, FileSpec]
+    execution_nonce: str
+    env: dict[str, str]
 
 
 class _Client(Protocol):
@@ -278,6 +320,58 @@ class ContreeBackend:
             files={BUNDLE_ARCHIVE: FileSpec(uuid=bundle.uuid, mode="0444")},
         )
 
+    def execute_many(
+        self, invocations: Sequence[ContreeInvocation]
+    ) -> tuple[ContreeExecution, ...]:
+        """Submit the whole validated batch before awaiting every started operation."""
+        prepared = tuple(_prepare_invocation(invocation) for invocation in invocations)
+        nonces = [invocation.execution_nonce for invocation in prepared]
+        if len(nonces) != len(set(nonces)):
+            raise ValueError("execution nonces must be unique within a batch")
+
+        started: list[tuple[_PreparedInvocation, str]] = []
+        submit_failure: ContreeBackendError | None = None
+        for invocation in prepared:
+            try:
+                operation_id = self._submit(
+                    image_uuid=invocation.image_uuid,
+                    command=invocation.command,
+                    args=invocation.args,
+                    files=invocation.files,
+                    env=invocation.env,
+                )
+            except ContreeBackendError as exc:
+                submit_failure = exc
+                break
+            started.append((invocation, operation_id))
+
+        executions: list[ContreeExecution] = []
+        completion_failures: list[ContreeBackendError] = []
+        for invocation, operation_id in started:
+            try:
+                executions.append(
+                    self._await_operation(
+                        operation_id=operation_id,
+                        image_uuid=invocation.image_uuid,
+                        command=invocation.command,
+                        args=invocation.args,
+                        files=invocation.files,
+                        env=invocation.env,
+                        execution_nonce=invocation.execution_nonce,
+                    )
+                )
+            except ContreeBackendError as exc:
+                completion_failures.append(exc)
+
+        operation_ids = tuple(operation_id for _, operation_id in started)
+        if submit_failure is not None or completion_failures:
+            phase = "submission" if submit_failure is not None else "completion"
+            raise ContreeBatchError(
+                f"ConTree batch {phase} failed; all started operations were awaited",
+                operation_ids=operation_ids,
+            ) from None
+        return tuple(executions)
+
     @staticmethod
     def tree_digest(execution: ContreeExecution) -> str:
         values = _sentinels(execution.stdout, _TREE_PREFIX)
@@ -307,6 +401,32 @@ class ContreeBackend:
         files: dict[str, FileSpec],
     ) -> ContreeExecution:
         _required_text(image_uuid, "source image UUID")
+        operation_id = self._submit(
+            image_uuid=image_uuid,
+            command=command,
+            args=args,
+            files=files,
+            env=dict(_ENV),
+        )
+        return self._await_operation(
+            operation_id=operation_id,
+            image_uuid=image_uuid,
+            command=command,
+            args=args,
+            files=files,
+            env=dict(_ENV),
+            execution_nonce=None,
+        )
+
+    def _submit(
+        self,
+        *,
+        image_uuid: str,
+        command: str,
+        args: tuple[str, ...],
+        files: dict[str, FileSpec],
+        env: dict[str, str],
+    ) -> str:
         try:
             started = self._client.spawn_instance(
                 command,
@@ -314,7 +434,7 @@ class ContreeBackend:
                 disposable=False,
                 args=list(args),
                 shell=False,
-                env=dict(_ENV),
+                env=env,
                 cwd=WORKSPACE,
                 networking=_NETWORKING,
                 timeout=INSTANCE_TIMEOUT_SECONDS,
@@ -324,6 +444,19 @@ class ContreeBackend:
             operation_id = _required_text(started.uuid, "spawn operation UUID")
         except (ContreeError, TimeoutError) as exc:
             raise _request_error(exc) from None
+        return operation_id
+
+    def _await_operation(
+        self,
+        *,
+        operation_id: str,
+        image_uuid: str,
+        command: str,
+        args: tuple[str, ...],
+        files: dict[str, FileSpec],
+        env: dict[str, str],
+        execution_nonce: str | None,
+    ) -> ContreeExecution:
         try:
             completed = self._client.wait_operation(operation_id, timeout=self._timeout)
         except (ContreeError, TimeoutError) as exc:
@@ -335,6 +468,8 @@ class ContreeBackend:
             command=command,
             args=args,
             files=files,
+            env=env,
+            execution_nonce=execution_nonce,
         )
 
 
@@ -348,6 +483,46 @@ def _auth_file() -> Path:
 def _request_error(exc: BaseException, *, operation_id: str | None = None) -> ContreeExecutionError:
     operation = f" operation {operation_id}" if operation_id is not None else ""
     return ContreeExecutionError(f"ConTree{operation} request failed ({type(exc).__name__})")
+
+
+def _prepare_invocation(invocation: ContreeInvocation) -> _PreparedInvocation:
+    if not isinstance(invocation, ContreeInvocation):
+        raise TypeError("invocations must be ContreeInvocation instances")
+    image_uuid = _input_text(invocation.image_uuid, "source image UUID")
+    command = _input_text(invocation.command, "command")
+    if not _EXECUTION_NONCE.fullmatch(invocation.execution_nonce):
+        raise ValueError("execution nonce must be 32 lowercase hexadecimal characters")
+    if not isinstance(invocation.args, tuple) or any(
+        not isinstance(argument, str) or "\x00" in argument for argument in invocation.args
+    ):
+        raise ValueError("invocation args must be a tuple of NUL-free strings")
+    if not isinstance(invocation.files, Mapping):
+        raise ValueError("invocation files must be a mapping")
+    files: dict[str, FileSpec] = {}
+    for path, file in invocation.files.items():
+        if not isinstance(path, str) or not path.startswith("/") or "\x00" in path:
+            raise ValueError("invocation file paths must be absolute NUL-free strings")
+        if (
+            not isinstance(file, FileSpec)
+            or not isinstance(file.uuid, str)
+            or not file.uuid.strip()
+        ):
+            raise ValueError("invocation files must have valid provider UUIDs")
+        files[path] = file
+    return _PreparedInvocation(
+        image_uuid=image_uuid,
+        command=command,
+        args=invocation.args,
+        files=files,
+        execution_nonce=invocation.execution_nonce,
+        env={**_ENV, EXECUTION_NONCE_ENV: invocation.execution_nonce},
+    )
+
+
+def _input_text(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value.strip() or "\x00" in value:
+        raise ValueError(f"invocation {field} must be a non-empty NUL-free string")
+    return value
 
 
 def _required_text(value: str | EllipsisType | None, field: str) -> str:
@@ -405,6 +580,8 @@ def _execution(
     command: str,
     args: tuple[str, ...],
     files: dict[str, FileSpec],
+    env: dict[str, str],
+    execution_nonce: str | None,
 ) -> ContreeExecution:
     if completed.status is not OperationStatus.SUCCESS:
         status = str(completed.status) if completed.status is not ... else "MISSING"
@@ -426,7 +603,7 @@ def _execution(
         or metadata.args != list(args)
         or metadata.shell is not False
         or metadata.disposable is not False
-        or metadata.env != _ENV
+        or metadata.env != env
         or metadata.cwd != WORKSPACE
         or metadata.networking != _NETWORKING
         or metadata.timeout != INSTANCE_TIMEOUT_SECONDS
@@ -471,4 +648,5 @@ def _execution(
         stdout=_stream(result.stdout, "stdout"),
         stderr=_stream(result.stderr, "stderr"),
         metrics=metrics,
+        execution_nonce=execution_nonce,
     )

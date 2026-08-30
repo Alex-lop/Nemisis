@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from inspect import signature
 from typing import cast
 
 import pytest
@@ -10,6 +11,7 @@ import nemisis.nemotron as nemotron
 from nemisis.hashing import sha256_json, sha256_text
 from nemisis.models import TruthLabel
 from nemisis.nemotron import (
+    CONTRACT_PROMPT_TEMPLATE_DIGEST,
     DEFAULT_BASE_URL,
     DEFAULT_MODEL_ID,
     MAX_RETRIES,
@@ -54,6 +56,20 @@ def _payload(
                 "content": content,
                 "expected_relation": "CHANGE_WITNESS",
             }
+        ],
+    }
+
+
+def _contract_payload(
+    *,
+    catalog_ids: list[str] | None = None,
+    scalars: dict[str, int] | None = None,
+) -> dict[str, object]:
+    return {
+        "catalog_ids": catalog_ids or ["sqlite-credit-v1"],
+        "scalars": [
+            {"name": name, "value": value}
+            for name, value in (scalars or {"amount_cents": 2_500, "replay_count": 1}).items()
         ],
     }
 
@@ -158,6 +174,81 @@ def test_generate_returns_validated_tests_and_sanitized_receipt() -> None:
     assert "diff --git" not in serialized
 
 
+def test_generate_contract_is_candidate_blind_and_returns_only_trusted_values() -> None:
+    fake = _FakeClient(_contract_payload())
+    result = _adapter(fake).generate_contract(
+        "Credit retries must be atomic",
+        "app.credits.apply_credit uses CreditStore",
+        ("sqlite-credit-v1", "sqlite-credit-refinement-v1"),
+        {"amount_cents": (1, 10_000), "replay_count": (1, 2)},
+    )
+
+    assert "candidate" not in signature(NemotronClient.generate_contract).parameters
+    assert result.catalog_ids == ("sqlite-credit-v1",)
+    assert result.scalars == {"amount_cents": 2_500, "replay_count": 1}
+    assert result.receipt.truth_label is TruthLabel.MOCKED
+    assert result.receipt.prompt_template_digest == CONTRACT_PROMPT_TEMPLATE_DIGEST
+    call = fake.chat.completions.calls[0]
+    messages = cast(list[dict[str, str]], call["messages"])
+    assert "candidate" not in "\n".join(message["content"] for message in messages).lower()
+    response_format = cast(dict[str, object], call["response_format"])
+    json_schema = cast(dict[str, object], response_format["json_schema"])
+    assert json_schema["name"] == "nemisis_retry_contract"
+    schema = cast(dict[str, object], json_schema["schema"])
+    assert set(cast(dict[str, object], schema["properties"])) == {"catalog_ids", "scalars"}
+    serialized = result.model_dump_json()
+    assert "Credit retries" not in serialized
+    assert "CreditStore" not in serialized
+
+
+def test_contract_input_digest_is_stable_across_mapping_and_catalog_order() -> None:
+    first = _adapter(_FakeClient(_contract_payload())).generate_contract(
+        "issue",
+        "base",
+        ("sqlite-credit-v2", "sqlite-credit-v1"),
+        {"replay_count": (1, 2), "amount_cents": (1, 10_000)},
+    )
+    second = _adapter(_FakeClient(_contract_payload())).generate_contract(
+        "issue",
+        "base",
+        ("sqlite-credit-v1", "sqlite-credit-v2"),
+        {"amount_cents": (1, 10_000), "replay_count": (1, 2)},
+    )
+
+    assert first.receipt.input_digest == second.receipt.input_digest
+
+
+@pytest.mark.parametrize(
+    "payload,error",
+    [
+        (_contract_payload(catalog_ids=["unknown"]), "unknown"),
+        (_contract_payload(scalars={"amount_cents": 20_000, "replay_count": 1}), "outside"),
+        (_contract_payload(scalars={"amount_cents": 2_500}), "exactly"),
+        ({**_contract_payload(), "python": "assert True"}, "schema"),
+    ],
+)
+def test_generate_contract_rejects_untrusted_or_unbounded_output(
+    payload: dict[str, object], error: str
+) -> None:
+    with pytest.raises(NemotronResponseError, match=error):
+        _adapter(_FakeClient(payload)).generate_contract(
+            "issue",
+            "base",
+            ("sqlite-credit-v1",),
+            {"amount_cents": (1, 10_000), "replay_count": (1, 2)},
+        )
+
+
+def test_generate_contract_rejects_invalid_bounds_before_provider_calls() -> None:
+    fake = _FakeClient(_contract_payload())
+    with pytest.raises(ValueError, match="bound"):
+        _adapter(fake).generate_contract(
+            "issue", "base", ("sqlite-credit-v1",), {"amount_cents": (10, 1)}
+        )
+    assert fake.models.calls == []
+    assert fake.chat.completions.calls == []
+
+
 def test_only_an_internally_constructed_authenticated_client_emits_live(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -178,6 +269,28 @@ def test_requires_credentials_without_an_injected_client(monkeypatch: pytest.Mon
     with pytest.raises(MissingCredentialsError, match="NEBIUS_API_KEY"):
         NemotronClient()
     assert DEFAULT_BASE_URL == "https://api.tokenfactory.nebius.com/v1/"
+
+
+@pytest.mark.parametrize(
+    "base_url",
+    [
+        "https://example.com/v1/",
+        "https://api.tokenfactory.nebius.com.evil.invalid/v1/",
+        "https://api.tokenfactory.nebius.com:8443/v1/",
+        "https://api.tokenfactory.nebius.com/v1/?redirect=evil",
+    ],
+)
+def test_rejects_non_nebius_or_ambiguous_credential_destinations(base_url: str) -> None:
+    with pytest.raises(ValueError, match="official Nebius"):
+        NemotronClient(client=cast(_Client, _FakeClient(_payload())), base_url=base_url)
+
+
+def test_accepts_the_documented_regional_token_factory_endpoint() -> None:
+    client = NemotronClient(
+        client=cast(_Client, _FakeClient(_payload())),
+        base_url="https://api.tokenfactory.us-central1.nebius.com/v1/",
+    )
+    assert client.base_url == "https://api.tokenfactory.us-central1.nebius.com/v1/"
 
 
 @pytest.mark.parametrize(
