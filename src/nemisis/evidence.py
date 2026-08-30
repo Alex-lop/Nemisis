@@ -20,6 +20,13 @@ def validate_manifest(manifest: RunManifest) -> None:
         raise ValueError("verification bundle model binding mismatch")
     if manifest.bundle.prompt_template_digest != manifest.prompt_template_digest:
         raise ValueError("verification bundle prompt binding mismatch")
+    if manifest.runtime_mode is RuntimeMode.LOCAL and (
+        manifest.truth_label is not TruthLabel.FIXTURE
+        or manifest.model_call is not None
+        or manifest.model_id is not None
+        or manifest.endpoint_region is not None
+    ):
+        raise ValueError("local runtime requires fixture-labelled local evidence")
     worlds = {world.world_id: world for world in manifest.worlds}
     if len(worlds) != len(manifest.worlds):
         raise ValueError("world IDs must be unique")

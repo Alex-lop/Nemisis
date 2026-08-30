@@ -55,6 +55,8 @@ The current default is the global Token Factory endpoint and
 capability through the live model catalog before generation. The Sandbox path uploads the source,
 validated patch, and one byte-identical bundle; creates persistent common/base/candidate images;
 checks exact tree digests; and derives granular outcomes from trusted JUnit annotations.
+The packaged duplicate and crash-window claims remain mandatory acceptance gates in every live
+bundle; Nemotron-generated claims add adversarial evidence but cannot omit those ticket promises.
 
 That JUnit channel is limited to the audited packaged fixture/candidate and validated generated-test
 subset, with Sandbox networking disabled. ConTree client 0.3.0 exposes guest-written files and

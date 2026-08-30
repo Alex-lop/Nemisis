@@ -6,6 +6,7 @@ import pytest
 
 from nemisis.evidence import validate_manifest
 from nemisis.local import verify_local
+from nemisis.models import TruthLabel
 
 
 def test_mismatched_or_stale_evidence_cannot_publish(tmp_path: Path) -> None:
@@ -65,4 +66,16 @@ def test_bundle_tree_matrix_and_runner_metadata_are_exactly_bound(tmp_path: Path
     with pytest.raises(ValueError, match="execution runner binding mismatch"):
         validate_manifest(
             manifest.model_copy(update={"executions": (wrong_runner, *manifest.executions[1:])})
+        )
+
+
+def test_local_evidence_cannot_be_relabeled_live(tmp_path: Path) -> None:
+    manifest = verify_local(output_root=tmp_path).manifest
+    relabeled_worlds = tuple(
+        world.model_copy(update={"runtime_label": TruthLabel.LIVE}) for world in manifest.worlds
+    )
+
+    with pytest.raises(ValueError, match="local runtime requires fixture"):
+        validate_manifest(
+            manifest.model_copy(update={"truth_label": TruthLabel.LIVE, "worlds": relabeled_worlds})
         )

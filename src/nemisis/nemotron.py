@@ -47,6 +47,8 @@ Given a ticket and candidate diff, return behavioral claims and complete pytest 
 Only return the supplied JSON schema. Do not return commands, runner configuration,
 environment variables, markdown, patches, or prose outside the schema.
 Each generated path must be generated/test_*.py, language python, framework pytest.
+Prefix every claim ID and test ID with nemotron., every test function with test_nemotron_,
+and every file basename with test_nemotron_. These names are reserved for model evidence.
 Use CHANGE_WITNESS for behavior that should fail by assertion on base and pass on candidate;
 use INVARIANT for behavior that must pass on both. Link every claim and test by stable IDs.
 """
@@ -316,6 +318,8 @@ def _validate_payload(
     claim_by_id = {claim.claim_id: claim for claim in payload.claims}
     if len(claim_by_id) != len(payload.claims):
         raise NemotronResponseError("Nemotron returned duplicate claim IDs")
+    if any(not claim_id.startswith("nemotron.") for claim_id in claim_by_id):
+        raise NemotronResponseError("Nemotron claim IDs must use the reserved prefix")
 
     seen_test_ids: set[str] = set()
     seen_paths: set[str] = set()
@@ -340,8 +344,12 @@ def _validate_payload(
         _validate_generated_path(proposed.path)
         if proposed.language != "python" or proposed.framework != "pytest":
             raise NemotronResponseError("generated tests must use Python and pytest")
-        if not proposed.test_name.startswith("test_"):
-            raise NemotronResponseError("generated pytest names must start with 'test_'")
+        if (
+            not proposed.test_id.startswith("nemotron.")
+            or not proposed.test_name.startswith("test_nemotron_")
+            or not PurePosixPath(proposed.path).name.startswith("test_nemotron_")
+        ):
+            raise NemotronResponseError("generated tests must use the reserved model prefix")
         content = _encode_bounded(proposed.content, "generated test", MAX_TEST_BYTES)
         if b"\x00" in content:
             raise NemotronResponseError("generated test content contains a NUL byte")
@@ -370,6 +378,8 @@ def _validate_payload(
     linked = {test_id for claim in payload.claims for test_id in claim.linked_test_ids}
     if linked != seen_test_ids:
         raise NemotronResponseError("claim links do not exactly match generated test IDs")
+    if set(claim_by_id) != {test.claim_id for test in generated}:
+        raise NemotronResponseError("every claim must own at least one generated test")
     return tuple(generated)
 
 

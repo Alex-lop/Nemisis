@@ -10,6 +10,8 @@ Nemisis has one authority path:
    or mode-changing patches, unsupported files, malformed tests, and exceeded count/size limits.
 4. One canonical bundle contains base-owned regression tests, generated tests, the trusted pytest
    annotation plugin, runner argv/version, parser digest, and environment identity.
+   For the packaged hero, the checked-in duplicate and crash-window claims/tests are mandatory;
+   model-generated evidence is additional and uses reserved names so it cannot replace them.
 5. Local mode copies one prepared source into base and candidate directories. Live mode derives
    persistent base and candidate images from one common ConTree image.
 6. Both worlds receive the same bundle. Pytest JUnit XML plus trusted per-test annotations

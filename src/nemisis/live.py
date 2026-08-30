@@ -257,9 +257,9 @@ def _live_bundle(
 ) -> VerificationBundle:
     try:
         return build_bundle(
-            claims=(fixture.claims[0], *generation.claims),
+            claims=(*fixture.claims, *generation.claims),
             baseline_tests=fixture.baseline_tests,
-            generated_tests=generation.generated_tests,
+            generated_tests=(*fixture.generated_tests, *generation.generated_tests),
             harness_files=fixture.harness_files,
             runner_version=f"pytest@contree-image:{root_image}",
             parser_digest=sha256_bytes(

@@ -26,27 +26,29 @@ from nemisis.nemotron import (
 
 
 def _payload(
-    *, path: str = "generated/test_retry.py", content: str = "def test_retry():\n    assert True\n"
+    *,
+    path: str = "generated/test_nemotron_retry.py",
+    content: str = "def test_nemotron_retry():\n    assert True\n",
 ) -> dict[str, object]:
     return {
         "claims": [
             {
-                "claim_id": "retry-idempotency",
+                "claim_id": "nemotron.retry-idempotency",
                 "statement": "A crashed reservation retry does not decrement twice.",
                 "rationale": "The marker may lag the inventory side effect.",
                 "risk_category": "idempotency",
                 "expected_relation": "CHANGE_WITNESS",
                 "referenced_files": ["inventory.py"],
                 "referenced_symbols": ["reserve_inventory"],
-                "linked_test_ids": ["crash-retry"],
+                "linked_test_ids": ["nemotron.crash-retry"],
             }
         ],
         "generated_tests": [
             {
-                "test_id": "crash-retry",
-                "claim_id": "retry-idempotency",
+                "test_id": "nemotron.crash-retry",
+                "claim_id": "nemotron.retry-idempotency",
                 "path": path,
-                "test_name": "test_retry",
+                "test_name": "test_nemotron_retry",
                 "language": "python",
                 "framework": "pytest",
                 "content": content,
@@ -128,9 +130,9 @@ def test_generate_returns_validated_tests_and_sanitized_receipt() -> None:
     )
 
     assert result.generated_tests[0].content_hash == sha256_text(
-        "def test_retry():\n    assert True\n"
+        "def test_nemotron_retry():\n    assert True\n"
     )
-    assert result.claims[0].linked_test_ids == ("crash-retry",)
+    assert result.claims[0].linked_test_ids == ("nemotron.crash-retry",)
     assert result.receipt.truth_label is TruthLabel.MOCKED
     assert result.receipt.model_id == DEFAULT_MODEL_ID
     assert result.receipt.endpoint_region == "global"
@@ -202,25 +204,36 @@ def test_rejects_extra_command_field_and_malformed_json() -> None:
         _adapter(_FakeClient("not json")).generate(ticket="ticket", candidate_diff="diff")
 
 
+def test_rejects_model_output_without_reserved_names() -> None:
+    payload = _payload()
+    claim = cast(dict[str, object], cast(list[object], payload["claims"])[0])
+    test = cast(dict[str, object], cast(list[object], payload["generated_tests"])[0])
+    claim["claim_id"] = "unreserved"
+    test["claim_id"] = "unreserved"
+
+    with pytest.raises(NemotronResponseError, match="reserved prefix"):
+        _adapter(_FakeClient(payload)).generate(ticket="ticket", candidate_diff="diff")
+
+
 @pytest.mark.parametrize(
     "content,error",
     [
-        ("def test_retry(:\n    pass\n", "invalid Python"),
+        ("def test_nemotron_retry(:\n    pass\n", "invalid Python"),
         (
-            "def test_retry():\n    assert True\n\ndef test_extra():\n    assert True\n",
+            "def test_nemotron_retry():\n    assert True\n\ndef test_extra():\n    assert True\n",
             "exactly its declared test",
         ),
         (
-            "import atexit\n\ndef test_retry():\n    assert True\n",
+            "import atexit\n\ndef test_nemotron_retry():\n    assert True\n",
             "import is not allowed",
         ),
         (
-            "def test_retry():\n"
+            "def test_nemotron_retry():\n"
             "    open('__nemisis_results__/junit.xml', 'w').write('<testsuite/>')\n",
             "dangerous builtin",
         ),
         (
-            "from inventory import _private_state\n\ndef test_retry():\n"
+            "from inventory import _private_state\n\ndef test_nemotron_retry():\n"
             "    assert _private_state\n",
             "private name",
         ),

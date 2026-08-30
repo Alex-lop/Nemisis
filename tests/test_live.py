@@ -105,3 +105,33 @@ def test_invalid_generated_bundle_is_a_nemotron_response_error(
 
     with pytest.raises(NemotronResponseError, match="trusted verification bundle"):
         live._live_bundle(fixture, generation, "image")
+
+
+def test_live_bundle_always_includes_required_fixture_claims() -> None:
+    fixture = load_fixture()
+    receipt = ModelCallReceipt(
+        truth_label=TruthLabel.LIVE,
+        timestamp=datetime.now(UTC),
+        endpoint_region="global",
+        model_id="model",
+        input_digest="0" * 64,
+        prompt_template_digest="1" * 64,
+        outcome="success",
+        schema_valid=True,
+        response_digest="2" * 64,
+    )
+    bundle = live._live_bundle(
+        fixture,
+        NemotronGeneration(claims=(), generated_tests=(), receipt=receipt),
+        "image",
+    )
+
+    assert {claim.claim_id for claim in bundle.claims} >= {
+        "regression-suite",
+        "duplicate-retry",
+        "crash-retry",
+    }
+    assert {test.test_id for test in bundle.generated_tests} >= {
+        "adversarial.duplicate",
+        "adversarial.crash-retry",
+    }
