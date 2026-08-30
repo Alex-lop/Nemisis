@@ -2,26 +2,102 @@
 
 > Don't ask whether the coding agent says it is done. Make the exact patch prove each claim.
 
-Nemisis is an adversarial differential-verification agent for AI-generated patches.
-Nemotron converts a ticket and candidate diff into typed executable claims; Token Factory
-Sandboxes run one immutable verification bundle against exact base and candidate snapshots;
-deterministic evidence, not model confidence, decides whether the patch survives.
+Nemisis CrashCheck turns a green-looking retry-safety patch into an executed counterexample: it
+kills a real worker after a durable side effect, starts a fresh worker, replays the identical event,
+and determines whether the exact patch stopped the duplicate effect. The verdict comes from durable
+state and process receipts—not model confidence.
 
-The first fixture is an inventory reservation patch that passes the repository's existing tests
-and handles an ordinary duplicate request, but still decrements inventory twice when the first
-attempt crashes after its side effect.
+CrashCheck is the narrow crash/retry product built on Nemisis's broader deterministic differential
+verification foundation. Both surfaces remain available; neither claims universal patch safety.
 
-## Run the local hero
+## CrashCheck quickstart
 
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync --dev
+uv sync --frozen --dev
+uv run nemisis init \
+  --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
+  --target app.credits:apply_credit \
+  --base fixture:sqlite-credit-v1/buggy
+uv run nemisis check \
+  --base fixture:sqlite-credit-v1/buggy \
+  --candidate fixture:sqlite-credit-v1/misleading-green \
+  --corrected fixture:sqlite-credit-v1/atomic \
+  --mode local
+```
+
+The packaged SQLite case applies event `evt_1042`, which should grant one `$25` credit. The
+misleading-green revision passes its small existing suite and an ordinary sequential duplicate
+check, yet still reaches `$50` after a real `SIGKILL` and retry. The atomic revision ends at `$25`,
+one ledger effect, and one processed marker under the same capsule. The measured comparison is
+published by `uv run nemisis benchmark`; CrashCheck receipts themselves remain limited to the
+kill/restart/replay evidence.
+
+`PATCH_FAILED_STILL_REPRODUCES` and exit `1` are the expected result. Before reading the candidate,
+the run executes two fixed base-only hypotheses in parallel and selects the reproducing
+`effect-commit` boundary. It then records five fresh proof worlds per supplied tree, exact source
+bindings, durable probes, confirmed worker exits, new worker nonces, and final snapshots.
+CrashCheck does not run the fixture's ordinary repository tests; the benchmark measures those
+separately as context for the counterexample.
+
+Replay the atomic revision using the exact `capsule:` path printed by `check`:
+
+```bash
+CAPSULE_PATH=.nemisis/repros/double-credit/PASTE_PRINTED_DIGEST/capsule.json
+uv run nemisis replay "$CAPSULE_PATH" \
+  --source fixture:sqlite-credit-v1/atomic --role corrected --mode local
+```
+
+CrashCheck uses `LOCAL` as the execution transport. The packaged audited contract and capsule carry
+the separate `FIXTURE` truth label in the manifest and report. Neither label means `LIVE`.
+
+### Use CrashCheck in a repository
+
+`init` writes strict JSON at `.nemisis/config.json`. A non-packaged contract remains `DRAFT` until
+the exact printed digest is accepted.
+
+```bash
+uv run nemisis init --issue issue.md --target app.credits:apply_credit --base main \
+  --scenario sqlite-credit-v1
+uv run nemisis init --issue issue.md --target app.credits:apply_credit --base main \
+  --scenario sqlite-credit-v1 --accept-contract PASTE_PRINTED_DIGEST
+uv run nemisis check --base main --candidate HEAD \
+  --scenario .nemisis/config.json --mode local
+```
+
+Passing the reviewed config explicitly supports this pre-commit first run. Once the config is
+committed on the base ref, the scenario ID loads only that exact base-owned copy; cwd and candidate
+copies cannot override it.
+
+Git refs are resolved to full commit SHAs. Fixture refs retain their exact fixture identity; local
+directories are identified by their copied tree digest. Each `AnchorBinding` records the supplied
+ref, resolved identity, and tree digest. `.git`, `.nemisis`, bytecode, and local pytest/mypy caches
+are excluded from source materialization and cannot perturb the bound source tree.
+
+CrashCheck commands support `--json`; progress stays on stderr. Their exit policy is:
+
+| Exit | Meaning |
+| ---: | --- |
+| `0` | `FIX_PROVEN_FOR_THIS_CAPSULE` |
+| `1` | `BUG_REPRODUCED` or `PATCH_FAILED_STILL_REPRODUCES` |
+| `2` | `EVIDENCE_INCOMPLETE`, `UNSUPPORTED_TARGET`, invalid input, or infrastructure failure |
+
+Per-run artifacts are written beneath `.nemisis/runs/<run-id>/`. Immutable repro assets live under
+`.nemisis/repros/double-credit/<capsule-digest>/`: capsule, accepted contract, canonical event,
+stable hunt metadata, engine metadata, and the executable integration/fault regression. Stored
+paths are artifact-root-relative, so the bundle can move without retaining a host path.
+
+## Differential verifier
+
+The original verifier remains available:
+
+```bash
 uv run nemisis verify --fixture idempotency-retry --mode local
 ```
 
-The command performs real subprocess executions in separate temporary filesystem worlds and
-writes a JSON manifest plus a static HTML report under `.nemisis/runs/`. Its expected matrix is:
+It runs real subprocesses in separate temporary base and candidate worlds. The same trusted
+baseline tests, adversarial tests, runner definition, parser, and bundle bytes run in both worlds.
 
 | Claim | Relation | Base | Candidate | Verdict |
 | --- | --- | --- | --- | --- |
@@ -30,41 +106,40 @@ writes a JSON manifest plus a static HTML report under `.nemisis/runs/`. Its exp
 | Ordinary duplicate retry | `CHANGE_WITNESS` | `ASSERTION_FAIL` | `PASS` | `SUPPORTED` |
 | Crash then retry | `CHANGE_WITNESS` | `ASSERTION_FAIL` | `ASSERTION_FAIL` | `UNRESOLVED` |
 
-`LOCAL FIXTURE` is development evidence, not Token Factory evidence. A rejected candidate still
-returns a successful CLI process because Nemisis completed its job; the artifact receipt carries
-the acceptance decision.
+`LOCAL FIXTURE` means observed local execution of checked-in inputs, not Token Factory evidence.
 
-## Run the live path
+## GitHub pull requests
 
-Live mode never falls back to local execution. It requires:
+Copy [the hardened example](.github/examples/crashcheck.yml) to
+`.github/workflows/crashcheck.yml`, replace the placeholder Nemisis ref with a reviewed full commit
+SHA, and commit the accepted base-owned configuration. The example uses `pull_request`, read-only
+contents permission, credential-free checkout, a new runner-temporary artifact directory, a job
+summary, and uploaded evidence. It refuses untrusted forks because local mode is not a hostile-code
+sandbox; those candidates require ConTree isolation.
 
-- `NEBIUS_API_KEY` for Token Factory inference;
-- a configured ConTree profile (`CONTREE_PROFILE` or `~/.config/contree/auth.ini`);
-- `NEMISIS_CONTREE_ROOT_IMAGE`, set to an immutable ConTree image UUID containing `/bin/sh`,
-  `/bin/tar`, `/usr/bin/env`, `python` and `git` on the fixed system `PATH`, and an importable
-  `pytest` package.
+## Live boundaries
 
-Then run:
+The original differential verifier has a fixture-only live path:
 
 ```bash
 uv run nemisis verify --fixture idempotency-retry --mode live
 ```
 
-The current default is the global Token Factory endpoint and
-`nvidia/nemotron-3-super-120b-a12b`. Nemisis validates that exact model and structured-output
-capability through the live model catalog before generation. The Sandbox path uploads the source,
-validated patch, and one byte-identical bundle; creates persistent common/base/candidate images;
-checks exact tree digests; and derives granular outcomes from trusted JUnit annotations.
-The packaged duplicate and crash-window claims remain mandatory acceptance gates in every live
-bundle; Nemotron-generated claims add adversarial evidence but cannot omit those ticket promises.
+It requires `NEBIUS_API_KEY`, a valid ConTree profile, and an immutable UUID in
+`NEMISIS_CONTREE_ROOT_IMAGE`. Token Factory defaults to the official global endpoint
+`https://api.tokenfactory.nebius.com/v1/` and model
+`nvidia/nemotron-3-super-120b-a12b`; an override must still be an official Nebius global or regional
+HTTPS `/v1` endpoint. ConTree is constructed from the official client profile.
 
-That JUnit channel is limited to the audited packaged fixture/candidate and validated generated-test
-subset, with Sandbox networking disabled. ConTree client 0.3.0 exposes guest-written files and
-stdout, not a provider-owned result stream, so arbitrary repositories are unsupported until such a
-channel exists.
+This live verifier is intentionally limited to the audited `idempotency-retry` fixture and its
+validated generated-test subset. Its JUnit report is guest-produced evidence returned through
+bounded Sandbox output, not a provider-owned test attestation; arbitrary repositories are not
+supported by that trust channel. Networking is disabled during execution.
 
-See the official [Token Factory quickstart](https://docs.tokenfactory.nebius.com/quickstart) and
-[ConTree authentication guide](https://docs.tokenfactory.nebius.com/sandboxes/cli/tutorial/installation).
+CrashCheck's `--mode live` provider transport is not yet connected and fails closed. The current
+environment also lacks the Token Factory key, usable ConTree profile, and immutable root image, so
+there is no current-tree `LIVE` or `RECORDED_LIVE` receipt. Neither surface falls back to local mode.
+Run `uv run nemisis doctor --mode live` for the independent prerequisite checks.
 
 ## Verify the project
 
@@ -76,11 +151,8 @@ uv run pytest
 uv build
 ```
 
-The code is intentionally narrow: one fixture, one model, one local backend, one ConTree backend,
-and one CLI/HTML evidence surface. Repair automation and a web server remain gated on a genuine
-current-tree live run.
-
-Truth labels are not interchangeable: `LIVE`, `RECORDED_LIVE`, `LOCAL`, `FIXTURE`, `MOCKED`,
-`PLANNED`, and `BLOCKED` retain their literal meanings in evidence records.
+See [product scope](docs/PRODUCT.md), [architecture](docs/ARCHITECTURE.md),
+[security boundary](docs/SECURITY.md), [proof ledger](docs/PROOF.md), and the
+[pending benchmark protocol](docs/BENCHMARK.md).
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE).

@@ -1,0 +1,137 @@
+name: Nemisis CrashCheck
+description: Kill a worker, replay the same event, and test an exact crash/retry fix.
+
+inputs:
+  base:
+    description: Exact base Git ref or supported fixture ref.
+    required: true
+  candidate:
+    description: Exact candidate Git ref or supported fixture ref.
+    required: false
+    default: HEAD
+  corrected:
+    description: Optional known-good ref used by the bundled proof.
+    required: false
+    default: ""
+  mode:
+    description: Execution transport, local or live.
+    required: false
+    default: local
+  working-directory:
+    description: Checked-out target repository.
+    required: false
+    default: .
+  runner-temp:
+    description: Trusted runner temporary directory.
+    required: false
+    default: ""
+
+outputs:
+  artifact-path:
+    description: Directory containing the manifest, report, and repro capsule.
+    value: ${{ steps.prepare.outputs.artifact-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python and uv
+      uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+      with:
+        version: "0.11.29"
+        python-version: "3.12"
+
+    - name: Prepare trusted artifact directory
+      id: prepare
+      shell: bash
+      env:
+        INPUT_RUNNER_TEMP: ${{ inputs.runner-temp }}
+      run: |
+        runner_temp="${INPUT_RUNNER_TEMP:-${RUNNER_TEMP:-}}"
+        if [[ -z "$runner_temp" || ! -d "$runner_temp" ]]; then
+          echo "Nemisis requires an existing runner temporary directory." >&2
+          exit 2
+        fi
+        artifact_path="$(mktemp -d "${runner_temp%/}/nemisis.XXXXXX")"
+        echo "artifact-path=$artifact_path" >> "$GITHUB_OUTPUT"
+
+    - name: Run CrashCheck
+      shell: bash
+      env:
+        ARTIFACT_PATH: ${{ steps.prepare.outputs.artifact-path }}
+        INPUT_BASE: ${{ inputs.base }}
+        INPUT_CANDIDATE: ${{ inputs.candidate }}
+        INPUT_CORRECTED: ${{ inputs.corrected }}
+        INPUT_MODE: ${{ inputs.mode }}
+        INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        NEMISIS_ENGINE_SOURCE_COMMIT: ${{ github.action_ref }}
+      run: |
+        incomplete() {
+          echo "$1" >&2
+          {
+            echo "## Nemisis CrashCheck"
+            echo
+            printf '    EVIDENCE_INCOMPLETE — %s\n' "$1"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 2
+        }
+
+        if [[ ! -d "$INPUT_WORKING_DIRECTORY" ]]; then
+          incomplete "Target working directory does not exist."
+        fi
+        if [[ "$INPUT_MODE" != "local" && "$INPUT_MODE" != "live" ]]; then
+          incomplete "Mode must be local or live."
+        fi
+        cd "$INPUT_WORKING_DIRECTORY"
+
+        scenario=sqlite-credit-v1
+        if [[ "$INPUT_BASE" != fixture:sqlite-credit-v1/* ]]; then
+          if ! resolved_base="$(
+            git rev-parse --verify --end-of-options "${INPUT_BASE}^{commit}" 2>/dev/null
+          )" || [[ ! "$resolved_base" =~ ^[0-9a-f]{40}$ ]]; then
+            incomplete "Base ref could not be resolved to one exact commit."
+          fi
+          scenario="$ARTIFACT_PATH/base-config.json"
+          if ! git cat-file blob "${resolved_base}:.nemisis/config.json" \
+            >"$scenario" 2>/dev/null; then
+            incomplete "The merge base has no accepted .nemisis/config.json."
+          fi
+        fi
+
+        args=(
+          check
+          --base "$INPUT_BASE"
+          --candidate "$INPUT_CANDIDATE"
+          --scenario "$scenario"
+          --mode "$INPUT_MODE"
+          --output-dir "$ARTIFACT_PATH"
+        )
+        if [[ -n "$INPUT_CORRECTED" ]]; then
+          args+=(--corrected "$INPUT_CORRECTED")
+        fi
+
+        set +e
+        uv run --project "$GITHUB_ACTION_PATH" --frozen nemisis "${args[@]}" \
+          >"$ARTIFACT_PATH/summary.txt" \
+          2> >(tee "$ARTIFACT_PATH/progress.log" >&2)
+        status=$?
+        set -e
+
+        cat "$ARTIFACT_PATH/summary.txt"
+        {
+          echo "## Nemisis CrashCheck"
+          echo
+          if [[ -s "$ARTIFACT_PATH/summary.txt" ]]; then
+            sed 's/^/    /' "$ARTIFACT_PATH/summary.txt"
+          else
+            echo "    EVIDENCE_INCOMPLETE"
+          fi
+          echo
+          echo "Artifact directory:"
+          echo
+          printf '    %s\n' "$ARTIFACT_PATH"
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        if [[ "$status" != 0 && "$status" != 1 && "$status" != 2 ]]; then
+          status=2
+        fi
+        exit "$status"

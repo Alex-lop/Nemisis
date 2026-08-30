@@ -1,0 +1,1 @@
+"""SQLite credit hero application."""

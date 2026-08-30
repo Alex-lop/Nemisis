@@ -1,35 +1,124 @@
 # Architecture
 
-Nemisis has one authority path:
+Nemisis has two deliberately bounded, additive execution surfaces with shared evidence rules.
+Models may propose bounded inputs; deterministic code owns validation, execution, classification,
+and final artifacts.
 
-1. Strict Pydantic contracts bind the ticket, source tree, candidate patch, prompt, model,
-   generated tests, runner, parser, worlds, executions, matrix, and artifact by SHA-256.
-2. The model may emit claims and Python/pytest test files only. It cannot choose commands or mark
-   an artifact accepted.
-3. Patch and generated-file validators reject traversal, protected harness/config paths, binary
-   or mode-changing patches, unsupported files, malformed tests, and exceeded count/size limits.
-4. One canonical bundle contains base-owned regression tests, generated tests, the trusted pytest
-   annotation plugin, runner argv/version, parser digest, and environment identity.
-   For the packaged hero, the checked-in duplicate and crash-window claims/tests are mandatory;
-   model-generated evidence is additional and uses reserved names so it cannot replace them.
-5. Local mode copies one prepared source into base and candidate directories. Live mode derives
-   persistent base and candidate images from one common ConTree image.
-6. Both worlds receive the same bundle. Pytest JUnit XML plus trusted per-test annotations
-   distinguishes `PASS`, `ASSERTION_FAIL`, `ERROR`, `TIMEOUT`, and `NOT_RUN`.
-7. Deterministic code builds the matrix and validates every receipt binding before writing an
-   artifact receipt or report.
+## Differential verifier
 
-The CLI and generated HTML are projections of the same manifest. There is no database, queue,
-repair loop, generic provider framework, or separate frontend.
+`nemisis verify` implements the original claim-matrix workflow:
 
-## Important boundaries
+1. `VerificationRequest` binds ticket, base, candidate patch, runtime mode, and limits.
+2. `VerificationBundle` binds baseline and adversarial tests, trusted harness files, Pytest command,
+   parser digest, dependency identity, model/prompt identity, and one bundle digest.
+3. Local or ConTree orchestration derives base and candidate worlds from one prepared source. Only
+   the candidate world receives the validated patch.
+4. The same bundle bytes run in both worlds. A bounded JUnit parser maps each expected test to
+   `PASS`, `ASSERTION_FAIL`, `ERROR`, `TIMEOUT`, or `NOT_RUN`.
+5. Matrix code alone evaluates `CHANGE_WITNESS` and `INVARIANT`; incomplete outcomes fail closed.
+6. `RunManifest` binds the request, worlds, receipts, matrix, artifact decision, and source commit.
 
-- Local execution is restricted to the packaged fixture and is labelled `FIXTURE`.
-- Live generated code executes only inside Token Factory Sandboxes with networking disabled.
-- The live slice accepts only the immutable packaged fixture/candidate and AST-constrained
-  generated tests. Arbitrary repositories require a provider-owned result channel that ConTree
-  client 0.3.0 does not expose.
-- Candidate repository tests and pytest configuration are never selected as acceptance evidence.
-- ConTree image and operation UUIDs are provider evidence; mutable tags are rejected as root input.
-- A finite bundle supports a claim only within its observed scope. Nemisis does not claim formal
-  correctness, safety, or vulnerability freedom.
+Local verification uses real temporary filesystem copies and subprocesses but checked-in claims and
+tests, so its truth label is `FIXTURE`. The live adapter performs a Nemotron call and derives
+persistent common/base/candidate ConTree images for the same audited fixture.
+
+## CrashCheck
+
+CrashCheck is a second, narrower projection for stateful crash/retry evidence, not a replacement for
+the claim matrix. Its Python surface is:
+
+```python
+initialize(issue, target, base, scenario_id) -> Path
+check(base, candidate, scenario, corrected=None, mode="local") -> CrashCheckResult
+replay(capsule, source, role="candidate", mode="local") -> CrashCheckResult
+```
+
+The core records are:
+
+- `RetryContract`: accepted issue/base/target binding and trusted event, fault, probe, and predicate
+  catalog IDs.
+- `AnchorBinding`: handler mapping plus supplied source ref, resolved source identity, and exact tree
+  digest.
+- `HypothesisReceipt`: one candidate-blind base attempt, its fixed crash boundary and canonical
+  rank, exact contract/base/provisional-capsule bindings, observation, and selection decision.
+- `AttemptReceipt`: transport, integrity, process-group kill, two worker spawns, nonces, IPC
+  sessions, durable snapshots, logs, and optional provider identifiers.
+- `ReproCapsule`: stable contract, event, selected semantic fault boundary, predicates, environment,
+  trusted-engine code digest, and deterministic minimization trace; volatile PIDs, paths,
+  timestamps, full hunt attempts, and per-tree anchors stay outside it.
+- `CrashCheckResult`: both hypothesis receipts, exact role bindings and confirmations, independent
+  execution/integrity axes, scoped verdict, engine digest, and root-relative artifacts.
+
+For ordinary Git refs, the resolved identity is the full commit SHA. Fixture refs retain their
+fixture identity. A local directory is copied and identified by its tree digest. `.git`, `.nemisis`,
+`__pycache__`, `.pytest_cache`, and `.mypy_cache` are excluded consistently from local copies and Git
+archives before hashing.
+
+## Candidate-blind hunt and confirmation
+
+`check` materializes and binds the accepted base before it reads or materializes the candidate. It
+then runs exactly two fixed hypotheses in parallel base-only worlds:
+
+1. `effect-commit-v1` pauses at the first probe showing one durable credit effect.
+2. `marker-commit-v1` continues past earlier commits until one durable effect and one marker are
+   visible.
+
+Each world produces a real `AttemptReceipt`, wrapped by a canonically ranked
+`HypothesisReceipt`. Completed valid reproduction wins first, followed by smaller trusted operation
+count, rank, and digest; parallel completion order is irrelevant. In the packaged buggy base,
+`effect-commit-v1` reproduces and `marker-commit-v1` does not. The selected boundary and a stable
+semantic trace of both tried hypotheses freeze the capsule. Volatile hunt receipt data remains
+outside that content address. Only then is the candidate materialized.
+
+The hunt receipts are discovery evidence, not confirmation runs. A conclusive verdict separately
+requires five fresh attempts for every claimed role, with globally unique database, execution,
+worker, and IPC identities. The three-tree hero therefore records two hunt attempts followed by
+five base, five candidate, and five corrected confirmations.
+
+## CrashCheck kernel
+
+The current adapter accepts one synchronous two-argument Python handler using the trusted
+`CreditStore` API:
+
+1. Prepare a closed SQLite seed using integer cents, WAL, and `synchronous=FULL`.
+2. Spawn the handler in a controller-owned process group and IPC session.
+3. Pause at the capsule's selected semantic boundary and independently probe the durable effect and
+   marker state.
+4. Send `SIGKILL`, wait for `-SIGKILL`, and confirm durable state did not change.
+5. Spawn a fresh worker with a new nonce/session and replay identical event bytes.
+6. Probe the final balance, ledger count, and marker count. Any missing or contradictory evidence
+   makes the attempt incomplete.
+
+At `effect-commit`, the buggy and misleading-green trees expose one effect with no marker and reach
+`$50` after replay. The atomic tree reaches the same semantic effect boundary with its marker
+already durable and remains at `$25` with one effect and marker.
+
+## Provider boundary
+
+Token Factory inference defaults to the official global endpoint
+`https://api.tokenfactory.nebius.com/v1/` and
+`nvidia/nemotron-3-super-120b-a12b`. URL validation permits only official Nebius global/regional
+HTTPS `/v1` endpoints. ConTree is constructed from its official saved profile, uses an immutable
+root-image UUID, fixed commands/arguments, disabled networking, bounded streams, and persistent
+image receipts.
+
+The live differential verifier currently supports only `idempotency-retry`. Its JUnit XML is
+written inside the guest and returned through bounded stdout; the parser and exact bundle binding
+detect malformed or incomplete results, but this is not a provider-owned test attestation. That
+trust boundary is not advertised for arbitrary repositories.
+
+CrashCheck's local kernel is integrated; its ConTree provider transport is explicitly unimplemented.
+A requested CrashCheck live run returns `EVIDENCE_INCOMPLETE`/`UNSUPPORTED`, names the doctor
+blockers, and never substitutes local execution—even if credentials are present.
+
+## Artifacts and projections
+
+Differential manifests/reports live beneath `.nemisis/runs/`. CrashCheck stores root-relative
+artifact references and adds `.nemisis/repros/double-credit/<capsule-digest>/` for the immutable
+capsule, event, accepted contract, hunt metadata, and regression asset. The directory name is the
+capsule's canonical content digest, so the repro can be moved with its artifact root without
+embedding host paths. Per-run manifests/reports remain under `runs/`; the CLI, static reports, and
+composite action display stored evidence and do not derive independent verdicts.
+
+There is no repair generator, plugin framework, arbitrary assertion language, executable config,
+web server, or provider fallback in the current tree.
