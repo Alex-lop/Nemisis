@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nemisis"
+version = "0.1.0"
+description = "Adversarial differential verification for AI-generated patches"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { file = "LICENSE" }
+dependencies = [
+  "contree-client[httpx]==0.3.0",
+  "openai>=1,<3",
+  "pydantic>=2.11,<3",
+  "pytest>=8.4,<9",
+]
+
+[project.scripts]
+nemisis = "nemisis.cli:main"
+
+[dependency-groups]
+dev = [
+  "mypy>=1.17,<2",
+  "ruff>=0.12,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nemisis"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+exclude = ["src/nemisis/fixtures/"]

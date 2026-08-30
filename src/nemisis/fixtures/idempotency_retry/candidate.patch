@@ -1,0 +1,18 @@
+diff --git a/inventory.py b/inventory.py
+index d26ab3f..a98d225 100644
+--- a/inventory.py
++++ b/inventory.py
+@@ -10,6 +10,8 @@ def reserve_inventory(
+     *,
+     crash_after_decrement: bool = False,
+ ) -> None:
++    if order_id in processed_orders:
++        return
+     if quantity <= 0:
+         raise ValueError("quantity must be positive")
+     if stock.get(sku, 0) < quantity:
+@@ -18,3 +20,4 @@ def reserve_inventory(
+     stock[sku] -= quantity
+     if crash_after_decrement:
+         raise RuntimeError("simulated crash after inventory decrement")
++    processed_orders.add(order_id)
