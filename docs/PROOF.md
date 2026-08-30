@@ -18,5 +18,5 @@
 
 No fixture, mock, or historical result is represented as live evidence.
 
-Latest verified source: `ebec6d4aa898cb491908d127aac8bdd37f9ac12c`. Latest local bundle:
+Latest verified source: `03b58607add660c9da470488eacd74189c34c6c3`. Latest local bundle:
 `70e10c52e50c143b526af020c37aee2ee4bce0da85453bb1470d42736895b725`.

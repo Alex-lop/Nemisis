@@ -3,10 +3,8 @@
 - Updated: 2026-08-30 UTC
 - Repository: `Alex-lop/Nemisis`, branch `main`
 - Remote `main` at build start: `0fbb8b37f6961ea1d0ca87fabdec42b34d0696d1`
-- Remote `main` at status authoring: `ebec6d4aa898cb491908d127aac8bdd37f9ac12c`
-- Source SHA most recently tested: `ebec6d4aa898cb491908d127aac8bdd37f9ac12c`
-- Latest pushed milestone: `ebec6d4aa898cb491908d127aac8bdd37f9ac12c` — runnable
-  differential-verification foundation
+- Remote `main` at status authoring: `03b58607add660c9da470488eacd74189c34c6c3`
+- Source SHA most recently tested: `03b58607add660c9da470488eacd74189c34c6c3`
 - Thesis: exact base/candidate worlds must survive one immutable adversarial bundle before an AI
   patch is trusted.
 
@@ -38,10 +36,17 @@ uv run nemisis verify --fixture idempotency-retry --mode local
 ```
 
 On the source SHA above: locked sync passed; Ruff format and lint passed; strict mypy passed;
-110 tests passed; sdist/wheel build passed; the installed wheel ran from an unrelated Git
+113 tests passed; sdist/wheel build passed; the installed wheel ran from an unrelated Git
 repository without claiming that repository's SHA; HTML structure validation passed. Live mode
 failed closed without fallback and reported the missing API key, immutable root image, and ConTree
 profile. No genuine provider call was possible in this environment.
+
+## Recent pushed milestones
+
+- `ebec6d4aa898cb491908d127aac8bdd37f9ac12c` — runnable differential foundation
+- `a32290f238d7df68fde5244a88999bcd5c5177da` — status, architecture, proof, and demo docs
+- `fad51dbd2fb615dc7895a34c9ef2eea02f6842ec` — Node 24 checkout action pin
+- `03b58607add660c9da470488eacd74189c34c6c3` — mandatory live claims and truth-label binding
 
 ## Known limitations
 
