@@ -16,10 +16,6 @@ Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync --frozen --dev
-uv run nemisis init \
-  --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
-  --target app.credits:apply_credit \
-  --base fixture:sqlite-credit-v1/buggy
 uv run nemisis check \
   --base fixture:sqlite-credit-v1/buggy \
   --candidate fixture:sqlite-credit-v1/misleading-green \
@@ -36,8 +32,11 @@ kill/restart/replay evidence.
 
 `PATCH_FAILED_STILL_REPRODUCES` and exit `1` are the expected result. Before reading the candidate,
 the run executes two fixed base-only hypotheses in parallel and selects the reproducing
-`effect-commit` boundary. It then records five fresh proof worlds per supplied tree, exact source
-bindings, durable probes, confirmed worker exits, new worker nonces, and final snapshots.
+`effect-commit` boundary. CrashCheck deletes that sole fault action and runs the empty schedule in
+two fresh base worlds; both end exactly once, so deletion is rejected and this one-action schedule
+is necessary for the fixture witness. This is not a general minimizer. It then records five fresh
+proof worlds per supplied tree, exact source bindings, durable probes, confirmed worker exits, new
+worker nonces, and final snapshots.
 CrashCheck does not run the fixture's ordinary repository tests; the benchmark measures those
 separately as context for the counterexample.
 
@@ -52,10 +51,11 @@ uv run nemisis replay "$CAPSULE_PATH" \
 CrashCheck uses `LOCAL` as the execution transport. The packaged audited contract and capsule carry
 the separate `FIXTURE` truth label in the manifest and report. Neither label means `LIVE`.
 
-### Use CrashCheck in a repository
+### Use the audited SQLite adapter in a trusted repository
 
 `init` writes strict JSON at `.nemisis/config.json`. A non-packaged contract remains `DRAFT` until
-the exact printed digest is accepted.
+the exact printed digest is accepted. This alpha does not analyze arbitrary handlers, databases, or
+languages; it accepts only `sqlite-credit-v1` and the fixed two-argument `CreditStore` contract.
 
 ```bash
 uv run nemisis init --issue issue.md --target app.credits:apply_credit --base main \
@@ -83,10 +83,12 @@ CrashCheck commands support `--json`; progress stays on stderr. Their exit polic
 | `1` | `BUG_REPRODUCED` or `PATCH_FAILED_STILL_REPRODUCES` |
 | `2` | `EVIDENCE_INCOMPLETE`, `UNSUPPORTED_TARGET`, invalid input, or infrastructure failure |
 
-Per-run artifacts are written beneath `.nemisis/runs/<run-id>/`. Immutable repro assets live under
-`.nemisis/repros/double-credit/<capsule-digest>/`: capsule, accepted contract, canonical event,
-stable hunt metadata, engine metadata, and the executable integration/fault regression. Stored
-paths are artifact-root-relative, so the bundle can move without retaining a host path.
+Every run writes a manifest beneath `.nemisis/runs/<run-id>/`. Attempt-bearing runs add a report;
+the golden path also records the full single-action deletion receipt. A pre-execution mapping
+failure instead adds `anchor-resolution.json`. Immutable repro assets live under
+`.nemisis/repros/double-credit/<capsule-digest>/`; completed runs add the executable integration/fault
+regression. Stored paths are artifact-root-relative, so the bundle can move without retaining a
+host path.
 
 ## Differential verifier
 
@@ -115,7 +117,7 @@ Copy [the hardened example](.github/examples/crashcheck.yml) to
 pins Nemisis to a reviewed full commit SHA and uses `pull_request`, read-only contents permission,
 credential-free checkout, a bounded job, a new runner-temporary artifact directory, a job summary,
 and uploaded evidence. It refuses untrusted forks because local mode is not a hostile-code sandbox;
-those candidates require ConTree isolation.
+those candidates remain blocked until CrashCheck's ConTree transport exists.
 
 ## Live boundaries
 
@@ -153,6 +155,7 @@ uv build
 
 See [product scope](docs/PRODUCT.md), [architecture](docs/ARCHITECTURE.md),
 [security boundary](docs/SECURITY.md), [proof ledger](docs/PROOF.md), and the
-[pending benchmark protocol](docs/BENCHMARK.md).
+[benchmark protocol](docs/BENCHMARK.md). The [live runbook](docs/LIVE_RUNBOOK.md) records exact
+provider prerequisites and current blockers without substituting local evidence.
 
 Licensed under Apache-2.0; see [LICENSE](LICENSE).

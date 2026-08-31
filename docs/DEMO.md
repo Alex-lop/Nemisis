@@ -30,8 +30,10 @@ sequence:
 1. Exact fixture source identities and tree digests are bound.
 2. Exactly two candidate-blind base hypotheses run: `effect-commit-v1` reproduces, while
    `marker-commit-v1` reaches exactly-once state. Their full attempt receipts remain visible.
-3. Deterministic selection chooses `effect-commit`; the capsule's minimization trace records both
-   tried semantic hypotheses without candidate input or volatile host identity.
+3. Deterministic selection chooses `effect-commit`. CrashCheck deletes that sole fault action in
+   two fresh base worlds; both empty-schedule replays are `EXACTLY_ONCE`, so deletion is rejected
+   and the one-action schedule is necessity-proven for this fixture. Hunt outcomes remain in
+   `hunt.json`; only the stable deletion decision enters the capsule trace.
 4. In each confirmation, `evt_1042` reaches a durable `+$25` effect, the controller sends
    process-group `SIGKILL` and confirms exit `-9`, and a new worker nonce/session replays the
    byte-identical event.
@@ -39,9 +41,10 @@ sequence:
    control at `$25`, one ledger row,
    and one marker under the same capsule semantics.
 
-The two hunt worlds are separate from the five fresh worlds per supplied role. CrashCheck receipts
-cover only hunt and kill/restart/replay evidence. The benchmark—not CrashCheck—runs the fixture's
-ordinary Pytest suite and sequential duplicate check as measured context:
+The two hunt worlds, two deletion-confirmation worlds, and five fresh worlds per supplied role are
+all distinct. CrashCheck receipts cover only hunt, necessity, and kill/restart/replay evidence. The
+benchmark—not CrashCheck—runs the fixture's ordinary Pytest suite and sequential duplicate check as
+measured context:
 
 ```bash
 uv run nemisis benchmark --output .nemisis/benchmark.json
@@ -51,7 +54,7 @@ Present those ordinary green checks as benchmark measurements, never as CrashChe
 
 The CLI transport label is `LOCAL`; the manifest/report identifies the audited capsule as
 `FIXTURE`. Open the printed `manifest.json` and `report.html` for both hunt receipts, the selected
-boundary and minimization trace, five confirmations per role, source bindings,
+boundary and one-action deletion trace, five confirmations per role, source bindings,
 capsule/event/environment/engine digests, database IDs, worker receipts, nonces, probes, kills, and
 final snapshots. Artifact references are relative to the selected output root.
 
@@ -77,7 +80,8 @@ the same scoped requirement and depends on the installed Nemisis package.
 
 ## Live demonstration
 
-The only integrated live execution is the fixture-limited differential verifier:
+The only implemented provider path is the fixture-limited differential verifier; it has no
+current-tree live receipt:
 
 ```bash
 uv run nemisis doctor --mode live

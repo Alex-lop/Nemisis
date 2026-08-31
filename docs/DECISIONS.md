@@ -24,7 +24,9 @@ receipts.
 
 The capsule freezes semantic event/fault/predicate/runner identities, not a source line. Each
 `AnchorBinding` separately records the supplied ref, resolved full commit/fixture identity, tree
-digest, and one trusted handler mapping. Zero or multiple mappings make the source unsupported.
+digest, and one trusted handler mapping. A source outside the catalog is `UNSUPPORTED_TARGET`; an
+accepted catalog target whose exact tree yields zero, multiple, or invalid mappings publishes
+structured `EVIDENCE_INCOMPLETE` evidence instead of guessing.
 
 Run output, `.git`, `.nemisis`, bytecode, and local pytest/mypy caches are excluded before source
 hashing. This prevents local evidence from changing the source it claims to evaluate and avoids a
@@ -36,8 +38,10 @@ CrashCheck binds the accepted issue/base contract and runs exactly two parallel,
 crash-boundary hypotheses before it materializes the candidate: `effect-commit-v1` and
 `marker-commit-v1`. Full attempt receipts are preserved. Selection is deterministic after both are
 terminal: reproduction, smaller trusted operation count, canonical rank, then digest. The selected
-semantic boundary and stable minimization projection freeze the capsule; candidate content cannot
-change the search, event, fault schedule, probes, parser, harness, or verdict.
+semantic boundary and stable one-action deletion decision freeze the capsule; candidate content
+cannot change the hypothesis ranking, event, fault schedule, probes, parser, harness, or verdict.
+The deletion check proves necessity only for this fixture witness; it is not a general schedule
+minimizer.
 
 The hunt does not count as proof replay. After selection, five new base worlds must reproduce before
 candidate materialization; each later claimed candidate or corrected role also requires five fresh

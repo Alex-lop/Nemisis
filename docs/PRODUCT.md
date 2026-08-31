@@ -1,94 +1,104 @@
-# Product
+# Product contract
 
-## Product boundary
+Nemisis CrashCheck is counterexample CI for stateful Python patches. It gives a backend developer
+or reviewer deterministic evidence before trusting a retry/idempotency patch produced by a human or
+coding agent.
 
-Nemisis is a deterministic evidence gate after a coding agent proposes a patch and before a human
-trusts it. Natural-language intent may guide model-generated claims, but exact executions and
-fixed classification rules decide what the evidence supports.
+The alpha answers one scoped question:
 
-The current product has two bounded surfaces:
+> Did this exact Python/SQLite revision defeat this frozen kill/restart/replay capsule while the
+> independently observed durable invariants held?
 
-- `verify` is the original differential verifier. It runs an immutable trusted test bundle in exact
-  base and candidate worlds and renders a claim-by-world matrix.
-- CrashCheck (`init`, `check`, and `replay`) adds one deep counterexample for crash/retry safety. It
-  binds a reviewed contract, kills and restarts a real worker, and exports a replayable capsule.
+The original `nemisis verify` differential fixture remains available as a secondary foundation.
+CrashCheck is the primary product surface.
 
-CrashCheck sharpens one failure mode; it does not replace the differential-verification thesis.
+## Alpha inputs and authority
 
-## Users and jobs
+- Input: issue text, one synchronous `module:function` target, exact base and candidate sources,
+  and an optional corrected control.
+- Contract: accepted, base-owned JSON selecting only the fixed `sqlite-credit-v1` event, fault,
+  probe, predicate, and adapter catalog.
+- Output: every run publishes a JSON manifest. Attempt-bearing runs add a static report; completed
+  golden-path checks add a content-addressed Repro Capsule and executable regression. A
+  pre-execution anchor failure instead adds a structured anchor-resolution receipt.
+- Authority: models may propose bounded catalog choices and scalar values. Strict schemas, digests,
+  parent-owned execution, read-only probes, and fixed classification rules alone decide the result.
 
-A developer receiving AI patches needs evidence that a promised behavior changed without breaking
-protected behavior. The differential verifier answers that with `CHANGE_WITNESS` and `INVARIANT`
-relations.
+`LOCAL` is an execution transport. `FIXTURE` identifies audited checked-in inputs. `LIVE` requires
+genuine current-tree provider receipts. None of these labels is interchangeable.
 
-A backend developer facing an intermittent retry bug needs a durable counterexample stronger than
-an ordinary green test. CrashCheck answers the narrower question:
+The repository workflow is one sequence: run `init`, review its draft and printed digest, rerun
+`init --accept-contract <digest>`, commit the base-owned `.nemisis/config.json`, then run `check`.
+The packaged fixture command is the audited shortcut because its contract is already accepted.
 
-> Did this exact revision defeat this frozen kill/restart/replay capsule while the observed durable
-> invariants held?
+## Five-beat CrashCheck story
 
-## Current workflows
+1. Bind the accepted issue, target, exact base tree, canonical event, and trusted catalog IDs.
+2. Before candidate materialization, run two fixed base hypotheses, select the canonical
+   reproducer, then delete its sole fault action in two fresh worlds. Proceed only when both
+   no-fault replays finish exactly once, proving this one-action schedule necessary for the
+   counterexample.
+3. In every proof world, observe the durable `$25` effect, send process-group `SIGKILL`, confirm
+   exit `-9`, start a fresh worker, and replay the byte-identical event.
+4. Require five fresh base and candidate worlds, plus five corrected worlds when supplied. Fixed
+   rules emit the verdict from independently probed durable state.
+5. For the complete path, publish capsule, contract, event, hunt, single-action necessity receipt,
+   metadata, regression, manifest, and report. `replay` evaluates the unchanged capsule against
+   another exact tree.
 
-### Differential verification
+## Verdict contract
 
-1. Load the audited inventory ticket, base tree, candidate patch, baseline tests, and adversarial
-   tests.
-2. Build one immutable bundle containing tests, trusted harness, runner, parser, and digests.
-3. Execute byte-identical bundle bytes in separate base and candidate worlds.
-4. Parse bounded JUnit outcomes and classify each declared relation deterministically.
-5. Write one JSON manifest and static HTML matrix.
+| Verdict | Exit | Exact meaning |
+| --- | ---: | --- |
+| `BUG_REPRODUCED` | 1 | The exact base reproduced the capsule's duplicate effect. |
+| `PATCH_FAILED_STILL_REPRODUCES` | 1 | The exact candidate reproduced the same duplicate effect. |
+| `FIX_PROVEN_FOR_THIS_CAPSULE` | 0 | The exact candidate completed exactly once in every required world for this capsule only. |
+| `EVIDENCE_INCOMPLETE` | 2 | Required execution, mapping, integrity, or provenance evidence is missing or contradictory. |
+| `UNSUPPORTED_TARGET` | 2 | Deterministic preflight proves the scenario, catalog ID, adapter, or target shape is outside the alpha. |
 
-Local mode uses checked-in test content and is labeled `FIXTURE`. The credentialed live path uses a
-genuine Nemotron request and persistent ConTree worlds, but remains limited to this audited fixture.
+Transport success is not execution success. Completed execution with invalid provenance is not a
+behavioral claim. Model prose cannot upgrade either case.
+An accepted catalog target whose exact-tree anchor has zero, multiple, or invalid mappings is
+`EVIDENCE_INCOMPLETE`, not `UNSUPPORTED_TARGET`; CrashCheck publishes the failed mapping receipt.
 
-### CrashCheck
+## Model and isolation roles
 
-1. `init` binds issue text, exact base content, target, audited catalog IDs, and an accepted contract
-   digest. Non-packaged contracts require explicit acceptance.
-2. `check` runs two fixed base-only crash-boundary hypotheses in parallel, deterministically selects
-   the reproducing boundary, and freezes a stable semantic trace before materializing the candidate.
-3. Five new worlds reconfirm the base witness; five fresh worlds then evaluate every supplied
-   candidate or corrected role against the same capsule.
-4. `replay` evaluates the unchanged capsule against one exact source role.
-5. The run exports capsule, contract, event, hunt/engine metadata, an executable regression,
-   manifest, and static HTML report.
-6. The composite action projects the same CLI result into a job summary and evidence artifact.
+For CrashCheck's future live contract role, Nemotron may turn bounded base-only context into typed
+catalog proposals; that call may not emit commands, probes, SQL, assertions, or verdicts.
+CrashCheck does not yet call Nemotron in its CLI, and its contract adapter is contract-tested with
+injected clients only. The inherited differential live path has a separate generator that may emit
+schema-, path-, import-, and assertion-restricted Pytest files, but no current-tree live receipt
+exists.
 
-CrashCheck records its own kill/restart/replay evidence. It does not execute or claim the ordinary
-repository-test and sequential-duplicate context around the packaged example.
+ConTree supplies isolated prepared and branched worlds for the inherited differential live path.
+CrashCheck's ConTree transport is not implemented, so untrusted candidates and CrashCheck live mode
+remain blocked even when credentials exist. A provider operation ID never substitutes for guest
+tree, event, database, worker, execution, and capsule identities.
 
-## Supported slices
+## Alpha boundary
 
-The differential verifier supports only the packaged Python `idempotency-retry` fixture locally and
-through its current live adapter. Live JUnit is bounded guest-produced evidence, so it is not yet an
-arbitrary-repository verification channel.
+Supported: Python 3.12+, POSIX process groups and `SIGKILL`, SQLite WAL with
+`synchronous=FULL`, the fixed trusted `CreditStore` adapter, `sqlite-credit-v1`, exact fixture/local
+directory/Git sources, and trusted owner checkouts.
 
-CrashCheck supports Python 3.12 on POSIX, process groups and `SIGKILL`, SQLite through the fixed
-trusted `CreditStore` adapter, `sqlite-credit-v1`, fixture refs, local directories, and exact Git
-commit resolution. Local execution is for trusted checkouts. CrashCheck live execution remains
-blocked until its provider transport is connected and credentials are available.
+Unsupported: arbitrary languages, databases, side effects, handlers outside the fixed adapter
+shape, hostile local fork execution, generalized schedule or interleaving search, model-authored
+code, repair generation, PR comments, and a hosted control plane.
 
-## Evidence language
+## Claim ledger
 
-`LOCAL` is an execution transport; `FIXTURE` identifies audited checked-in inputs. `LIVE` requires
-genuine current-tree provider receipts. A finite matrix or capsule supports only its declared and
-observed claims—it is not formal verification, vulnerability freedom, or a universal merge score.
+| Claim | Implementation | Executable check | Truth / exact evidence |
+| --- | --- | --- | --- |
+| Real durable checkpoint, process-group kill, fresh replay worker, identical event | `sqlite_credit.py`, `crashcheck.py` | `test_sqlite_credit.py`, `test_crashcheck.py` | `LOCAL` / `FIXTURE`; [successful workflow at exact `f05ae921cf3d866f69adf8415d6d7bd52071bf37`](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355) |
+| Candidate-blind two-hypothesis selection before candidate materialization | `crashcheck.py` | candidate-invariance and hunt tests | Same exact workflow above |
+| Sole crash action is necessary for this capsule | `crashcheck.py`, `crash_models.py` | deletion, freshness, and tamper tests | Two fresh no-fault confirmations; not a general minimizer |
+| Five fresh worlds per claimed tree and scoped verdicts | `crash_models.py`, `crashcheck.py` | role and verdict model/integration tests | Same exact workflow above |
+| Portable capsule, manifest, report, regression, and replay | `_publish`, `report.py` | artifact relocation/export/replay tests | Same workflow includes installed-wheel replay |
+| Composite GitHub Action | `action.yml` | local Action job plus release tests | GitHub-hosted at the same exact SHA; expected candidate rejection is exit 1 |
+| Benchmark runner | `benchmark.py` | benchmark schema, determinism, and dirty-source tests | `LOCAL` / `FIXTURE`; committed result waits for exact final-SHA generation |
+| Nemotron and ConTree adapters | `nemotron.py`, `contree.py`, `live.py` | injected-client contract tests | `MOCKED`; genuine current-tree path is `BLOCKED` |
 
-## Success measures
-
-- Differential base/candidate worlds use one bundle digest and produce deterministic relations.
-- CrashCheck reproduces the duplicate in five fresh buggy and misleading-green worlds and observes
-  exactly-once state in five fresh atomic worlds.
-- Its two candidate-blind hunt worlds deterministically select one minimized semantic boundary and
-  remain disjoint from every later confirmation identity.
-- Every CrashCheck binding records the supplied ref, resolved commit or fixture identity, and tree
-  digest; volatile run/database/worker identities remain separate.
-- The exported regression fails on misleading-green and passes on atomic from an installed wheel.
-- Human, JSON, HTML, and GitHub projections agree with the same underlying result.
-- Live claims remain blocked unless bound to genuine current-tree receipts.
-
-## Explicit non-goals
-
-The alpha does not support arbitrary languages or databases, production side effects, public-PR URL
-intake, safe local execution of untrusted forks, generalized chaos engineering, repair generation,
-multiple model providers, a web server, PR comments, a hosted control plane, or a universal score.
+No fixture, mock, historical result, or local run may be relabeled as live evidence. Genuine live
+claims require sanitized receipts bound to the exact source SHA, capsule digest, model, endpoint,
+provider worlds and operations, and guest execution identities, with transport, execution,
+provenance/integrity, and behavioral verdict reported independently.

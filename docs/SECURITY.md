@@ -10,7 +10,8 @@ than a general hostile-code sandbox.
 - Candidates cannot choose commands, parsers, truth labels, environment variables, mounts, network
   destinations, state probes, or verdict logic.
 - Strict models reject extra fields; canonical SHA-256 digests bind accepted content and evidence.
-- Secrets are checked only for presence/capability and are not written to logs, manifests, reports,
+- Diagnostics inspect only credential presence/capability. Live adapters may send credentials only
+  to their configured official service; neither path persists them in logs, manifests, reports,
   fixtures, or committed receipts.
 - Missing, malformed, timed-out, or contradictory evidence fails closed and never triggers a live to
   local fallback.
@@ -52,18 +53,21 @@ incomplete.
 Exactly one trusted, tree-bound `AnchorBinding` must validate. Candidate output cannot acknowledge
 success or authorize an anchor.
 
-The candidate is not materialized until the base hunt, deterministic selection, minimization trace,
-and five fresh base confirmations have frozen the witness. The hunt accepts exactly the fixed
-`effect-commit-v1` and `marker-commit-v1` base-only hypotheses. Each `HypothesisReceipt` is bound to
+The candidate is not materialized until the base hunt, deterministic selection, one-action
+necessity check, and five fresh base confirmations have frozen the witness. The hunt accepts exactly
+the fixed `effect-commit-v1` and `marker-commit-v1` base-only hypotheses. Each `HypothesisReceipt` is bound to
 the contract, originating base tree, provisional capsule, and a real base attempt; ranks, boundary,
 operation count, reproduction flag, and selection must match the catalog. Hunt database, execution,
 worker, and IPC identities must be disjoint from later confirmation identities. Candidate bytes,
 refs, digests, paths, mappings, receipts, and cache keys have no input seam into this phase.
 
-Full hunt receipts include volatile execution facts and therefore remain outside the capsule's
-content address. The capsule binds the selected semantic boundary and a deterministic minimization
-projection. A conclusive result still requires five completed, valid, globally fresh confirmation
-attempts for every claimed role; hunt attempts cannot be reused to satisfy that count.
+Full hunt and deletion-confirmation receipts include volatile execution facts and therefore remain
+outside the capsule's content address. After selection, CrashCheck removes the schedule's sole
+fault action and runs the empty schedule in two fresh base worlds. Exactly-once twice rejects that
+deletion and proves only that the one action is necessary for this fixture witness; it is not a
+general minimizer. The capsule binds the stable decision digest while the result retains the full
+receipts. A conclusive result still requires five completed, valid, globally fresh confirmation
+attempts for every claimed role; hunt and deletion attempts cannot satisfy that count.
 
 ## Source and artifact containment
 
@@ -84,8 +88,9 @@ escapes untrusted text; GitHub summaries indent command output.
 
 Local execution is only for a trusted owner checkout. The example workflow uses `pull_request`,
 read-only contents permission, credential-free checkout, a fresh `${{ runner.temp }}` directory, and
-no PR comments. It refuses untrusted forks before checkout/execution. An untrusted public candidate
-requires ConTree isolation; if unavailable, the result is `EVIDENCE_INCOMPLETE`.
+no PR comments. It refuses untrusted forks before checkout/execution, exits `2`, and writes an
+`EVIDENCE_INCOMPLETE` job summary without creating a CrashCheck manifest. Running an untrusted
+public candidate requires CrashCheck ConTree isolation, which is not implemented.
 
 Pin the Nemisis composite action and all third-party actions to reviewed full commit SHAs. Accepted
 configuration is loaded from the exact base commit, not a candidate replacement.

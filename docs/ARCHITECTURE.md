@@ -41,10 +41,12 @@ The core records are:
   digest.
 - `HypothesisReceipt`: one candidate-blind base attempt, its fixed crash boundary and canonical
   rank, exact contract/base/provisional-capsule bindings, observation, and selection decision.
+- `MinimizationReceipt`: one fixed deletion trial for the selected one-action schedule, including
+  two fresh empty-schedule base confirmations and the stable necessity decision.
 - `AttemptReceipt`: transport, integrity, process-group kill, two worker spawns, nonces, IPC
   sessions, durable snapshots, logs, and optional provider identifiers.
 - `ReproCapsule`: stable contract, event, selected semantic fault boundary, predicates, environment,
-  trusted-engine code digest, and deterministic minimization trace; volatile PIDs, paths,
+  trusted-engine code digest, and the single-action deletion trace; volatile PIDs, paths,
   timestamps, full hunt attempts, and per-tree anchors stay outside it.
 - `CrashCheckResult`: both hypothesis receipts, exact role bindings and confirmations, independent
   execution/integrity axes, scoped verdict, engine digest, and root-relative artifacts.
@@ -64,16 +66,19 @@ then runs exactly two fixed hypotheses in parallel base-only worlds:
    visible.
 
 Each world produces a real `AttemptReceipt`, wrapped by a canonically ranked
-`HypothesisReceipt`. Completed valid reproduction wins first, followed by smaller trusted operation
-count, rank, and digest; parallel completion order is irrelevant. In the packaged buggy base,
-`effect-commit-v1` reproduces and `marker-commit-v1` does not. The selected boundary and a stable
-semantic trace of both tried hypotheses freeze the capsule. Volatile hunt receipt data remains
-outside that content address. Only then is the candidate materialized.
+`HypothesisReceipt`. After filtering to completed, integrity-valid duplicate observations, the
+smallest fixed catalog rank wins; parallel completion order is irrelevant. In the packaged buggy base,
+`effect-commit-v1` reproduces and `marker-commit-v1` does not. Their stable projections are stored
+in `hunt.json`, not in the capsule trace. CrashCheck then deletes the selected schedule's sole fault
+action in two fresh base worlds. Both empty-schedule replays finish exactly once, so deletion is
+rejected and the capsule binds only that stable one-action necessity decision. Volatile hunt and
+deletion receipts remain outside the content address. Five new base worlds reconfirm the retained
+witness before the candidate is materialized.
 
 The hunt receipts are discovery evidence, not confirmation runs. A conclusive verdict separately
 requires five fresh attempts for every claimed role, with globally unique database, execution,
-worker, and IPC identities. The three-tree hero therefore records two hunt attempts followed by
-five base, five candidate, and five corrected confirmations.
+worker, and IPC identities. The three-tree hero therefore records two hunt attempts, two deletion
+confirmations, then five base, five candidate, and five corrected confirmations.
 
 ## CrashCheck kernel
 
@@ -117,8 +122,9 @@ Differential manifests/reports live beneath `.nemisis/runs/`. CrashCheck stores 
 artifact references and adds `.nemisis/repros/double-credit/<capsule-digest>/` for the immutable
 capsule, event, accepted contract, hunt metadata, and regression asset. The directory name is the
 capsule's canonical content digest, so the repro can be moved with its artifact root without
-embedding host paths. Per-run manifests/reports remain under `runs/`; the CLI, static reports, and
-composite action display stored evidence and do not derive independent verdicts.
+embedding host paths. Every run has a manifest under `runs/`; attempt-bearing runs also have a
+report, while pre-execution anchor failures have `anchor-resolution.json`. The CLI, static reports,
+and composite action display stored evidence and do not derive independent verdicts.
 
 There is no repair generator, plugin framework, arbitrary assertion language, executable config,
 web server, or provider fallback in the current tree.
