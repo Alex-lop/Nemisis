@@ -1,7 +1,8 @@
 .DS_Store
 .env
 .mypy_cache/
-.nemisis/
+.nemisis/*
+!.nemisis/config.json
 .pytest_cache/
 .ruff_cache/
 .venv/

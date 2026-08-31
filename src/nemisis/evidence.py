@@ -5,7 +5,16 @@ from __future__ import annotations
 from nemisis.bundle import verify_bundle_digest
 from nemisis.hashing import sha256_json
 from nemisis.matrix import candidate_is_accepted, classify, summarize_claim
-from nemisis.models import ArtifactStatus, Outcome, RunManifest, RuntimeMode, TruthLabel, WorldKind
+from nemisis.models import (
+    ArtifactStatus,
+    Classification,
+    Outcome,
+    RunManifest,
+    RunState,
+    RuntimeMode,
+    TruthLabel,
+    WorldKind,
+)
 
 
 def validate_manifest(manifest: RunManifest) -> None:
@@ -71,6 +80,8 @@ def validate_manifest(manifest: RunManifest) -> None:
             raise ValueError("model call does not match manifest model")
         if manifest.model_call.truth_label is not TruthLabel.LIVE:
             raise ValueError("live model evidence is not labelled LIVE")
+        if not manifest.model_call.schema_valid or manifest.model_call.outcome != "success":
+            raise ValueError("live model call did not produce schema-valid success evidence")
         if manifest.model_call.endpoint_region != manifest.endpoint_region:
             raise ValueError("model call endpoint does not match manifest endpoint")
         if manifest.model_call.prompt_template_digest != manifest.prompt_template_digest:
@@ -132,6 +143,26 @@ def validate_manifest(manifest: RunManifest) -> None:
             or receipt.collection_status is not Outcome.PASS
         ):
             raise ValueError(f"execution runner binding mismatch: {receipt.receipt_id}")
+    for world in manifest.worlds:
+        receipts = [receipt for receipt in active_receipts if receipt.world_id == world.world_id]
+        first = receipts[0]
+        varying_fields = {"receipt_id", "test_id", "outcome"}
+        common = first.model_dump(exclude=varying_fields)
+        if any(receipt.model_dump(exclude=varying_fields) != common for receipt in receipts[1:]):
+            raise ValueError(f"execution suite metadata differs within world: {world.world_id}")
+        failed = any(
+            receipt.outcome in {Outcome.ASSERTION_FAIL, Outcome.ERROR} for receipt in receipts
+        )
+        if (
+            first.exit_code not in {0, 1}
+            or (first.exit_code == 0 and failed)
+            or (first.exit_code == 1 and not failed)
+        ):
+            raise ValueError(f"execution exit code contradicts outcomes: {world.world_id}")
+
+    matrix_test_ids = [cell.test_id for cell in manifest.matrix]
+    if len(matrix_test_ids) != len(test_specs) or set(matrix_test_ids) != set(test_specs):
+        raise ValueError("matrix does not cover each verification-bundle test exactly once")
     for cell in manifest.matrix:
         test = test_specs.get(cell.test_id)
         if (
@@ -164,9 +195,9 @@ def validate_manifest(manifest: RunManifest) -> None:
             is not cell.classification
         ):
             raise ValueError(f"matrix classification mismatch: {cell.test_id}")
+        if cell.evidence_complete is not (cell.classification is not Classification.INCOMPLETE):
+            raise ValueError(f"matrix evidence completeness mismatch: {cell.test_id}")
 
-    if {cell.test_id for cell in manifest.matrix} != {test.test_id for test in bundled_tests}:
-        raise ValueError("matrix does not cover the exact verification bundle")
     claim_results = tuple(
         summarize_claim(claim.claim_id, manifest.matrix) for claim in manifest.bundle.claims
     )
@@ -188,6 +219,8 @@ def validate_manifest(manifest: RunManifest) -> None:
     )
     if not all(artifact_bindings):
         raise ValueError("artifact evidence binding mismatch")
+    if artifact.source_commit != manifest.source_commit:
+        raise ValueError("artifact source commit differs from the producing manifest")
     artifact_receipts = [
         executions.get(receipt_id) for receipt_id in artifact.verification_receipt_ids
     ]
@@ -205,3 +238,5 @@ def validate_manifest(manifest: RunManifest) -> None:
     accepted = candidate_is_accepted(manifest.claims)
     if (artifact.status is ArtifactStatus.ACCEPTED) is not accepted:
         raise ValueError("artifact status disagrees with deterministic claim results")
+    if manifest.state is not RunState.COMPLETE or manifest.terminal_reason != artifact.reason:
+        raise ValueError("terminal run state does not match the artifact result")

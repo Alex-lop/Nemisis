@@ -80,6 +80,8 @@ def build_bundle(
     claim_map = {claim.claim_id: claim for claim in claims}
     if len(claim_map) != len(claims):
         raise ValueError("claim IDs must be unique")
+    if any(len(claim.linked_test_ids) != len(set(claim.linked_test_ids)) for claim in claims):
+        raise ValueError("claim test links must be unique")
     for test in baseline_tests:
         _validate_test(test, root="baseline")
     for test in generated_tests:
@@ -94,6 +96,9 @@ def build_bundle(
         linked = {test.test_id for test in all_tests if test.claim_id == claim.claim_id}
         if linked != set(claim.linked_test_ids):
             raise ValueError(f"claim links do not match bundle tests: {claim.claim_id}")
+    harness_paths = [file.path for file in harness_files]
+    if len(harness_paths) != len(set(harness_paths)):
+        raise ValueError("harness paths must be unique")
     for file in harness_files:
         safe_relative_path(file.path, required_root="harness")
         if file.content_hash != sha256_text(file.content):

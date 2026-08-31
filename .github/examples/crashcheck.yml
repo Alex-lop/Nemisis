@@ -1,0 +1,59 @@
+# Copy this file to .github/workflows/crashcheck.yml in the target repository.
+# The Nemisis action is pinned to a reviewed release commit.
+name: CrashCheck
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  crashcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Refuse untrusted fork execution without isolation
+        if: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+        shell: bash
+        run: |
+          {
+            echo "## Nemisis CrashCheck"
+            echo
+            echo "EVIDENCE_INCOMPLETE"
+            echo
+            echo "Local execution of an untrusted fork is refused. Configure ConTree isolation."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 2
+
+      - name: Check out the exact candidate
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run CrashCheck
+        if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
+        id: crashcheck
+        uses: Alex-lop/Nemisis@f05ae921cf3d866f69adf8415d6d7bd52071bf37
+        with:
+          base: ${{ github.event.pull_request.base.sha }}
+          candidate: ${{ github.event.pull_request.head.sha }}
+          mode: local
+          working-directory: ${{ github.workspace }}
+          runner-temp: ${{ runner.temp }}
+
+      - name: Upload CrashCheck evidence
+        if: >-
+          ${{ always() &&
+              github.event.pull_request.head.repo.full_name == github.repository &&
+              steps.crashcheck.outputs.artifact-path != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nemisis-crashcheck-${{ github.event.pull_request.number }}-${{ github.run_attempt }}
+          path: ${{ steps.crashcheck.outputs.artifact-path }}
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 7

@@ -5,10 +5,12 @@ from __future__ import annotations
 import importlib.metadata
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib import resources
@@ -221,23 +223,9 @@ def _execute_world(
         "PYTHONPATH": os.pathsep.join((str(bundle_path / "harness"), str(world))),
     }
     started_at = datetime.now(UTC)
-    timed_out = False
-    try:
-        process = subprocess.run(
-            argv,
-            cwd=world,
-            env=environment,
-            capture_output=True,
-            text=True,
-            timeout=RUN_TIMEOUT_SECONDS,
-            check=False,
-        )
-        exit_code: int | None = process.returncode
-        stdout, stderr = process.stdout, process.stderr
-    except subprocess.TimeoutExpired as error:
-        timed_out = True
-        exit_code = None
-        stdout, stderr = _timeout_text(error.stdout), _timeout_text(error.stderr)
+    exit_code, stdout, stderr, timed_out = _run_process(
+        argv, cwd=world, env=environment, timeout_seconds=RUN_TIMEOUT_SECONDS
+    )
     ended_at = datetime.now(UTC)
     expected = {test.test_name for test in (*bundle.baseline_tests, *bundle.generated_tests)}
     parse_exit = exit_code if exit_code in {0, 1} else 2
@@ -295,10 +283,31 @@ def _execute_world(
     return world_receipt, receipts
 
 
-def _timeout_text(value: str | bytes | None) -> str:
-    if value is None:
-        return ""
-    return value.decode(errors="replace") if isinstance(value, bytes) else value
+def _run_process(
+    argv: list[str], *, cwd: Path, env: dict[str, str], timeout_seconds: float
+) -> tuple[int | None, str, str, bool]:
+    process = subprocess.Popen(
+        argv,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        with suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
+        stdout, stderr = process.communicate()
+        return None, stdout, stderr, True
+    except BaseException:
+        with suppress(ProcessLookupError):
+            os.killpg(process.pid, signal.SIGKILL)
+        process.communicate()
+        raise
+    return process.returncode, stdout, stderr, False
 
 
 def _environment_digest() -> str:

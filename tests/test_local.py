@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -47,3 +50,46 @@ def test_installed_wheel_does_not_claim_the_callers_repository(
     fake_module = tmp_path / "site-packages" / "nemisis" / "local.py"
     monkeypatch.setattr(local_module, "__file__", str(fake_module))
     assert source_commit() is None
+
+
+@pytest.mark.skipif(os.name != "posix", reason="process-group isolation requires POSIX")
+def test_local_runner_timeout_kills_and_reaps_its_private_process_group(tmp_path: Path) -> None:
+    child_pid_path = tmp_path / "child.pid"
+    script = """
+import os
+import subprocess
+import sys
+import time
+
+child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)"])
+with open(sys.argv[1], "w", encoding="utf-8") as output:
+    output.write(str(child.pid))
+print(os.getpid(), os.getpgrp(), os.getsid(0), flush=True)
+time.sleep(60)
+"""
+
+    exit_code, stdout, stderr, timed_out = local_module._run_process(
+        [sys.executable, "-c", script, str(child_pid_path)],
+        cwd=tmp_path,
+        env={"PATH": os.environ.get("PATH", "")},
+        timeout_seconds=1,
+    )
+
+    runner_pid, process_group, session = map(int, stdout.splitlines()[0].split())
+    child_pid = int(child_pid_path.read_text())
+    assert timed_out is True
+    assert exit_code is None
+    assert stderr == ""
+    assert runner_pid == process_group == session
+    deadline = time.monotonic() + 3
+    while _pid_exists(child_pid) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert not _pid_exists(child_pid)
+
+
+def _pid_exists(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True

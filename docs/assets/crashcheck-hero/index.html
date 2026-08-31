@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="Nemisis CrashCheck LOCAL fixture evidence receipt">
+<title>Nemisis CrashCheck — loading bound fixture evidence</title>
+<style>
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  --ink: #f4f1e9;
+  --muted: #aaa79f;
+  --line: #34332f;
+  --panel: #171714;
+  --orange: #ff9d5c;
+  --red: #ff676f;
+  --green: #71d6a2;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: #0d0d0c;
+  color: var(--ink);
+  line-height: 1.5;
+}
+a { color: inherit; }
+.skip { position: absolute; left: -9999px; }
+.skip:focus { left: 1rem; top: 1rem; z-index: 2; background: var(--ink); color: #111; padding: .5rem; }
+main { width: min(1120px, calc(100% - 2rem)); margin: auto; padding: 1rem 0 5rem; }
+nav, .eyebrow, .badges, .actions { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+nav { justify-content: space-between; padding: .7rem 0 2.5rem; }
+.wordmark { font-weight: 850; letter-spacing: -.04em; font-size: 1.25rem; }
+.muted, small { color: var(--muted); }
+.badge { border: 1px solid currentColor; padding: .22rem .55rem; font: 700 .72rem/1.2 ui-monospace, monospace; letter-spacing: .08em; }
+.local { color: var(--orange); }
+.fixture { color: #c7b5ff; }
+.hero { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, .6fr); gap: 2rem; align-items: end; padding: 2.5rem 0 3rem; }
+.eyebrow { color: var(--orange); font: 700 .76rem ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
+.hero h2 { max-width: 13ch; margin: .7rem 0 1rem; font-size: clamp(2.7rem, 7.5vw, 6.5rem); line-height: .94; letter-spacing: -.065em; }
+.lede { max-width: 59ch; font-size: clamp(1.05rem, 2vw, 1.28rem); color: #cecbc4; }
+.source { border-left: 2px solid var(--line); padding-left: 1rem; min-width: 0; }
+code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; }
+.source code { display: block; margin-top: .35rem; color: #dedad1; font-size: .78rem; }
+.button { border: 0; background: var(--ink); color: #111; padding: .9rem 1.1rem; font: inherit; font-size: .92rem; font-weight: 800; cursor: pointer; text-decoration: none; }
+.button:hover, .button:focus-visible { background: var(--orange); }
+.button.secondary { color: var(--ink); background: transparent; border: 1px solid var(--line); }
+.button.secondary:hover, .button.secondary:focus-visible { border-color: var(--ink); }
+.button:disabled { cursor: not-allowed; opacity: .55; }
+.verdict-first { border: 1px solid var(--red); background: #251215; padding: clamp(1rem, 3vw, 1.7rem); }
+.verdict-first p { margin: 0 0 .35rem; }
+.verdict-first h1 { max-width: none; margin: 0; color: var(--red); font: 800 clamp(1.1rem, 3vw, 2rem) ui-monospace, monospace; letter-spacing: 0; overflow-wrap: anywhere; }
+.axes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 0; border: 1px solid var(--line); border-top: 0; }
+.axis { min-width: 0; padding: .8rem; border-right: 1px solid var(--line); }
+.axis:last-child { border: 0; }
+.axis dt { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
+.axis dd { margin: .3rem 0 0; font: 750 .82rem ui-monospace, monospace; overflow-wrap: anywhere; }
+.story { border-top: 1px solid var(--line); }
+.beat { display: grid; grid-template-columns: 3.5rem minmax(0, .9fr) minmax(280px, 1.5fr); gap: 1.2rem; padding: 2rem 0; border-bottom: 1px solid var(--line); }
+.number { color: var(--muted); font: 700 .78rem ui-monospace, monospace; }
+.beat h2 { margin: 0; font-size: clamp(1.4rem, 3vw, 2.2rem); letter-spacing: -.035em; }
+.beat p { margin-top: .45rem; }
+.panel { background: var(--panel); border: 1px solid var(--line); padding: 1rem; }
+.checks, .worlds, .timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: .65rem; }
+.checks li, .worlds li { display: flex; justify-content: space-between; gap: .75rem; align-items: baseline; border-bottom: 1px solid #2c2b28; padding-bottom: .65rem; }
+.checks li:last-child, .worlds li:last-child { border: 0; padding-bottom: 0; }
+.pass { color: var(--green); font-weight: 800; }
+.fail { color: var(--red); font-weight: 800; }
+.worlds span:first-child { min-width: 0; }
+.worlds code { display: block; color: var(--muted); font-size: .72rem; }
+.timeline li { position: relative; padding: .65rem .75rem .65rem 2.2rem; border-left: 2px solid var(--orange); background: #11110f; }
+.timeline li::before { content: ""; position: absolute; left: -.38rem; top: 1rem; width: .65rem; height: .65rem; border-radius: 50%; background: var(--orange); }
+.timeline .kill { border-color: var(--red); color: #ffd2d5; }
+.timeline .kill::before { background: var(--red); }
+.money { display: grid; grid-template-columns: 1fr auto 1fr; gap: .75rem; align-items: center; }
+.money div { border: 1px solid var(--line); padding: 1rem; }
+.money strong { display: block; font-size: clamp(2.2rem, 7vw, 4.7rem); line-height: 1; letter-spacing: -.06em; }
+.money .observed { border-color: var(--red); color: var(--red); }
+.arrow { color: var(--muted); }
+.verdicts { display: grid; gap: .65rem; }
+.verdict { padding: .85rem; border-left: 4px solid var(--red); background: #221214; }
+.verdict.fixed { border-color: var(--green); background: #102019; }
+.verdict b { display: block; }
+.replay-note { margin: .8rem 0 0; font-size: .82rem; color: var(--muted); }
+#receipt[hidden] { display: none; }
+#receipt { margin-top: 1.5rem; border: 1px solid var(--orange); background: #15120f; padding: clamp(1rem, 3vw, 2rem); }
+#receipt h2 { margin-top: 0; }
+.evidence-status { margin: 18vh auto 0; max-width: 48rem; border: 1px solid var(--line); padding: clamp(1rem, 4vw, 2rem); }
+.evidence-status h1 { margin: .4rem 0; font-size: clamp(2rem, 6vw, 4rem); line-height: 1; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .7rem; margin: 1.2rem 0; }
+.fact { border: 1px solid var(--line); padding: .8rem; }
+.fact span { display: block; color: var(--muted); font-size: .78rem; }
+.fact strong { display: block; margin-top: .25rem; }
+.bindings { display: grid; gap: .65rem; }
+.binding { border-left: 2px solid var(--line); padding-left: .7rem; }
+.binding span, .binding code { display: block; }
+.binding span { color: var(--muted); font-size: .78rem; }
+.binding code { margin-top: .2rem; font-size: .75rem; }
+.links { display: flex; gap: .8rem; flex-wrap: wrap; }
+details { margin-top: 1rem; }
+summary { cursor: pointer; font-weight: 750; }
+@media (max-width: 760px) {
+  main { width: min(100% - 1.25rem, 1120px); }
+  nav { padding-bottom: 1.4rem; }
+  .hero { grid-template-columns: 1fr; gap: 1rem; }
+  .axes { grid-template-columns: 1fr 1fr; }
+  .beat { grid-template-columns: 2.2rem 1fr; }
+  .beat > .panel { grid-column: 1 / -1; }
+  .money { grid-template-columns: 1fr; }
+  .arrow { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<a class="skip" id="skip-link" href="#evidence-status">Skip to evidence status</a>
+<main>
+<section class="evidence-status" id="evidence-status" aria-live="polite" aria-atomic="true">
+  <p class="eyebrow">Evidence binding</p>
+  <h1 id="evidence-status-title">Loading exact receipt…</h1>
+  <p class="muted" id="evidence-status-detail">No behavioral claim is shown until the benchmark and run manifest validate against each other.</p>
+</section>
+<div id="bound-evidence" hidden>
+<nav aria-label="Receipt identity">
+  <span class="wordmark">Nemisis / CrashCheck</span>
+  <span class="badges"><span class="badge local">LOCAL</span><span class="badge fixture">FIXTURE</span></span>
+</nav>
+
+<section class="verdict-first" aria-labelledby="verdict-heading">
+  <p class="eyebrow">CrashCheck verdict</p>
+  <h1 id="verdict-heading" data-field="candidate-verdict">Loading bound verdict…</h1>
+  <p>The incomplete patch still produces a durable duplicate after kill and replay.</p>
+</section>
+<dl class="axes" aria-label="Independent evidence axes">
+  <div class="axis"><dt>Transport</dt><dd data-field="transport">—</dd></div>
+  <div class="axis"><dt>Execution</dt><dd data-field="execution">—</dd></div>
+  <div class="axis"><dt>Provenance</dt><dd data-field="provenance">—</dd></div>
+  <div class="axis"><dt>Integrity</dt><dd data-field="integrity">—</dd></div>
+  <div class="axis"><dt>Verdict</dt><dd data-field="candidate-verdict">—</dd></div>
+</dl>
+
+<header class="hero">
+  <div>
+    <p class="eyebrow">Exact committed receipt · sqlite-credit-v1</p>
+    <h2>The patch was green. The money moved twice.</h2>
+    <p class="lede">A plausible idempotency patch passed its existing test and an ordinary duplicate retry. Nemisis killed the worker inside the commit window, replayed the identical event in a fresh process, and observed a durable double credit.</p>
+    <div class="actions">
+      <button class="button" id="replay" type="button" aria-controls="receipt" aria-expanded="false">Replay fixture evidence</button>
+      <a class="button secondary" data-link="report">Open full receipt</a>
+    </div>
+    <p class="replay-note" id="replay-note">Reveals the recorded <b>LOCAL</b> fixture receipt. The browser does not run code or contact Token Factory.</p>
+  </div>
+  <div class="source">
+    <span class="muted">Bound engine source SHA</span>
+    <code data-field="source-commit">loading exact receipt…</code>
+    <span class="muted">Benchmark result digest</span>
+    <code data-field="benchmark-digest">loading exact receipt…</code>
+  </div>
+</header>
+
+<section class="story" id="story" aria-label="Five-beat evidence story">
+  <article class="beat">
+    <span class="number">01</span>
+    <div><h2>Event delivered</h2><p class="muted">The exact fixture event enters a patch that looks green under ordinary checks.</p></div>
+    <div class="panel">
+      <ul class="checks">
+        <li><span>Existing pytest suite</span><span class="pass" data-field="existing">loading…</span></li>
+        <li><span>Ordinary sequential duplicate</span><span class="pass" data-field="ordinary">loading…</span></li>
+        <li><span>Delivered event</span><code data-field="event-id">loading…</code></li>
+      </ul>
+      <small data-field="green-durations">Loading measured durations…</small>
+    </div>
+  </article>
+
+  <article class="beat">
+    <span class="number">02</span>
+    <div><h2>Durable checkpoint</h2><p class="muted">The side effect is durable while the processed marker is still absent.</p></div>
+    <div class="panel">
+      <ul class="worlds">
+        <li><span>effect-commit-v1<code>1 trusted operation</code></span><span class="fail">REPRODUCED</span></li>
+        <li><span>marker-commit-v1<code>2 trusted operations</code></span><span class="pass">NOT REPRODUCED</span></li>
+      </ul>
+      <small data-field="hunt">Loading measured hunt receipt…</small>
+      <p class="replay-note"><b>Single-action deletion / necessity check:</b> after selecting the one-action <code>effect-commit</code> witness, CrashCheck deleted that sole fault action. The empty schedule was <code>EXACTLY_ONCE</code> in two fresh base worlds, so deletion was rejected and the one fault action is necessary for this fixture's duplicate predicate. This receipt makes no general minimizer claim.</p>
+    </div>
+  </article>
+
+  <article class="beat">
+    <span class="number">03</span>
+    <div><h2>Worker killed</h2><p class="muted">The process group dies after the durable effect and before the marker.</p></div>
+    <div class="panel">
+      <p class="fail" data-field="worker-kill">Loading kill receipt…</p>
+      <p data-field="post-kill">Loading post-kill durable probe…</p>
+    </div>
+  </article>
+
+  <article class="beat">
+    <span class="number">04</span>
+    <div><h2>Fresh worker replay</h2><p class="muted"><span data-field="fresh-worker">A distinct worker and IPC session</span> replay the identical event.</p></div>
+    <div class="panel money" aria-label="Expected versus observed credit">
+      <div><span class="muted">Expected one effect</span><strong data-field="expected">—</strong><small>1 ledger row</small></div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="observed"><span>Observed after retry</span><strong data-field="observed">—</strong><small data-field="candidate-proof">Loading proof worlds…</small></div>
+    </div>
+  </article>
+
+  <article class="beat">
+    <span class="number">05</span>
+    <div><h2>Verdict</h2><p class="muted">The frozen capsule rejects the incomplete patch and survives the corrected atomic revision.</p></div>
+    <div class="panel">
+      <div class="verdicts">
+        <div class="verdict"><b>Incomplete AI candidate</b><code data-field="candidate-verdict">—</code></div>
+        <div class="verdict fixed"><b>Corrected atomic revision</b><code data-field="corrected-verdict">—</code></div>
+      </div>
+    </div>
+  </article>
+</section>
+
+<section id="receipt" hidden aria-live="polite" aria-labelledby="receipt-title">
+  <p class="eyebrow">Recorded evidence · LOCAL · FIXTURE</p>
+  <h2 id="receipt-title">Fixture receipt ready to inspect</h2>
+  <p>This action revealed already-recorded evidence bound to the source SHA above. It did not start a local process, a cloud Sandbox, or a model request.</p>
+  <div class="facts">
+    <div class="fact"><span>Hunt worlds</span><strong data-field="hunt-worlds">—</strong></div>
+    <div class="fact"><span>Proof worlds</span><strong data-field="proof-worlds">—</strong></div>
+    <div class="fact"><span>Candidate result</span><strong class="fail" data-field="candidate-result">—</strong></div>
+    <div class="fact"><span>Corrected result</span><strong class="pass" data-field="corrected-result">—</strong></div>
+    <div class="fact"><span>CrashCheck wall time</span><strong data-field="crash-wall">—</strong></div>
+    <div class="fact"><span>Total benchmark</span><strong data-field="total-wall">—</strong></div>
+  </div>
+  <details>
+    <summary>Exact evidence bindings</summary>
+    <div class="bindings">
+      <div class="binding"><span>Engine source SHA</span><code data-field="source-commit">loading…</code></div>
+      <div class="binding"><span>Candidate tree digest</span><code data-field="candidate-tree">loading…</code></div>
+      <div class="binding"><span>Capsule digest</span><code data-field="capsule-digest">loading…</code></div>
+      <div class="binding"><span>Event digest</span><code data-field="event-digest">loading…</code></div>
+    </div>
+  </details>
+  <div class="links">
+    <a data-link="report">Full HTML receipt</a>
+    <a data-link="capsule" download>Download capsule</a>
+    <a data-link="regression" download>Download regression test</a>
+    <a href="../../../benchmarks/results/crashcheck-v1.json">Machine benchmark</a>
+  </div>
+</section>
+</div>
+</main>
+<script id="receipt-config" type="application/json">
+{"run_id":"local-20260831T020037-73e97ef2"}
+</script>
+<script>
+const button = document.querySelector("#replay");
+const receipt = document.querySelector("#receipt");
+const boundEvidence = document.querySelector("#bound-evidence");
+const evidenceStatus = document.querySelector("#evidence-status");
+const evidenceStatusTitle = document.querySelector("#evidence-status-title");
+const evidenceStatusDetail = document.querySelector("#evidence-status-detail");
+const skipLink = document.querySelector("#skip-link");
+const config = JSON.parse(document.querySelector("#receipt-config").textContent);
+const benchmarkPath = "../../../benchmarks/results/crashcheck-v1.json";
+const manifestPath = `runs/${config.run_id}/manifest.json`;
+const field = (name, value) => {
+  document.querySelectorAll(`[data-field="${name}"]`).forEach((node) => { node.textContent = value; });
+};
+const money = (cents) => `$${(cents / 100).toFixed(2)}`;
+const milliseconds = (nanoseconds) => `${(nanoseconds / 1e6).toFixed(2)} ms`;
+
+Promise.all([
+  fetch(benchmarkPath).then((response) => {
+    if (!response.ok) throw new Error("benchmark receipt is unavailable");
+    return response.json();
+  }),
+  fetch(manifestPath).then((response) => {
+    if (!response.ok) throw new Error("run manifest is unavailable");
+    return response.json();
+  }),
+]).then(([benchmark, manifest]) => {
+  const result = manifest.result;
+  const capsule = manifest.capsule;
+  const cases = Object.fromEntries(benchmark.cases.map((item) => [item.variant, item]));
+  const candidate = cases["misleading-green"];
+  const corrected = cases.atomic;
+  const candidateAttempt = result.attempts.find((item) => item.role === "candidate");
+  const firstWorker = candidateAttempt?.spawns.find((item) => item.phase === "first");
+  const replayWorker = candidateAttempt?.spawns.find((item) => item.phase === "replay");
+  const boundTrees = new Set(result.bindings.map((item) => item.tree_digest));
+  const completeCase = (item, observation) => item
+    && item.crashcheck.observation === observation
+    && item.crashcheck.attempted_world_count === 5
+    && item.crashcheck.completed_world_count === 5
+    && item.crashcheck.valid_world_count === 5
+    && item.crashcheck.attempts.every((attempt) => (
+      attempt.execution_status === "COMPLETED"
+      && attempt.integrity_status === "VALID"
+      && attempt.observation === observation
+      && attempt.final_state.balance_cents === (
+        observation === "DUPLICATE_EFFECT" ? capsule.amount_cents * 2 : capsule.amount_cents
+      )
+      && attempt.final_state.ledger_count === (
+        observation === "DUPLICATE_EFFECT" ? 2 : 1
+      )
+      && attempt.final_state.marker_count === 1
+    ));
+  const correctedVerdict = completeCase(corrected, "EXACTLY_ONCE")
+    ? "FIX_PROVEN_FOR_THIS_CAPSULE"
+    : null;
+  const bound = benchmark.capsule_digest === capsule.digest
+    && result.capsule_digest === capsule.digest
+    && benchmark.engine_code_digest === result.engine_code_digest
+    && benchmark.source_commit === result.engine_source_commit
+    && result.transport === "LOCAL"
+    && result.execution_status === "COMPLETED"
+    && result.integrity_status === "VALID"
+    && result.verdict === "PATCH_FAILED_STILL_REPRODUCES"
+    && benchmark.crashcheck_verdict === result.verdict
+    && capsule.truth_label === "FIXTURE"
+    && candidate?.pytest.outcome === "PASS"
+    && candidate?.sequential.outcome === "PASS"
+    && completeCase(candidate, "DUPLICATE_EFFECT")
+    && correctedVerdict === "FIX_PROVEN_FOR_THIS_CAPSULE"
+    && benchmark.hunt.fault_action_deletion_trial_count === 1
+    && benchmark.hunt.deletion_confirmation_world_count === 2
+    && benchmark.hunt.initial_fault_action_count === 1
+    && benchmark.hunt.final_fault_action_count === 1
+    && benchmark.hunt.fault_action_retention_ratio === 1
+    && candidateAttempt
+    && firstWorker
+    && replayWorker
+    && candidateAttempt.kill_signal === 9
+    && firstWorker.exit_code === -9
+    && firstWorker.event_digest === capsule.event_digest
+    && replayWorker.event_digest === capsule.event_digest
+    && firstWorker.worker_nonce !== replayWorker.worker_nonce
+    && firstWorker.ipc_session_id !== replayWorker.ipc_session_id
+    && boundTrees.size === 3
+    && benchmark.cases.every((item) => boundTrees.has(item.tree_digest));
+  if (!bound) throw new Error("benchmark and run receipts are not bound to the same evidence");
+
+  field("source-commit", benchmark.source_commit);
+  field("benchmark-digest", benchmark.result_digest);
+  field("transport", result.transport);
+  field("execution", result.execution_status);
+  field("provenance", capsule.truth_label);
+  field("integrity", result.integrity_status);
+  field("existing", `${candidate.pytest.passed_count} / ${candidate.pytest.test_count} ${candidate.pytest.outcome}`);
+  field("ordinary", `${candidate.sequential.outcome} · ${candidate.sequential.observation.toLowerCase().replace("_", " ")}`);
+  field("event-id", capsule.event_id);
+  field("green-durations", `Measured durations: ${milliseconds(candidate.pytest.wall_time_ns)} pytest; ${milliseconds(candidate.sequential.wall_time_ns)} sequential.`);
+  field("hunt", `${benchmark.hunt.valid_world_count} / ${benchmark.hunt.attempted_world_count} boundary checks valid · deletion trial: empty schedule EXACTLY_ONCE in ${benchmark.hunt.deletion_confirmation_world_count} / ${benchmark.hunt.deletion_confirmation_world_count} fresh base worlds · final fault actions ${benchmark.hunt.final_fault_action_count} / ${benchmark.hunt.initial_fault_action_count} · witness in ${milliseconds(benchmark.hunt.time_to_first_witness_ns)}`);
+  field("worker-kill", `SIGKILL · worker PID ${firstWorker.pid} · process group ${firstWorker.process_group_id} · exit ${firstWorker.exit_code}`);
+  field("post-kill", `Post-kill probe: ${money(candidateAttempt.post_kill_snapshot.account_balance_cents)} durable balance · ${candidateAttempt.post_kill_snapshot.event_ledger_count} ledger row · ${candidateAttempt.post_kill_snapshot.event_marker_count} marker`);
+  field("fresh-worker", `Fresh worker PID ${replayWorker.pid}, distinct worker nonce and IPC session,`);
+  field("expected", money(capsule.amount_cents));
+  field("observed", money(candidate.crashcheck.attempts[0].final_state.balance_cents));
+  field("candidate-proof", `2 ledger rows · ${candidate.crashcheck.valid_world_count} / ${candidate.crashcheck.attempted_world_count} worlds`);
+  field("candidate-verdict", result.verdict);
+  field("corrected-verdict", correctedVerdict);
+  field("capsule-digest", capsule.digest);
+  field("candidate-tree", candidate.tree_digest);
+  field("event-digest", capsule.event_digest);
+  field("hunt-worlds", `${benchmark.hunt.valid_world_count} / ${benchmark.hunt.attempted_world_count} valid`);
+  const proofAttempted = benchmark.cases.reduce((total, item) => total + item.crashcheck.attempted_world_count, 0);
+  const proofValid = benchmark.cases.reduce((total, item) => total + item.crashcheck.valid_world_count, 0);
+  field("proof-worlds", `${proofValid} / ${proofAttempted} valid`);
+  field("candidate-result", `${candidate.crashcheck.valid_world_count} / ${candidate.crashcheck.attempted_world_count} duplicate`);
+  field("corrected-result", `${corrected.crashcheck.valid_world_count} / ${corrected.crashcheck.attempted_world_count} exactly once`);
+  field("crash-wall", `${(benchmark.crashcheck_wall_time_ns / 1e9).toFixed(3)} s`);
+  field("total-wall", `${(benchmark.wall_time_ns / 1e9).toFixed(3)} s`);
+
+  document.querySelectorAll('[data-link="report"]').forEach((link) => {
+    link.href = `runs/${config.run_id}/report.html`;
+  });
+  const repro = `repros/double-credit/${capsule.digest}`;
+  document.querySelector('[data-link="capsule"]').href = `${repro}/capsule.json`;
+  document.querySelector('[data-link="regression"]').href = `${repro}/test_repro.py`;
+  evidenceStatus.hidden = true;
+  boundEvidence.hidden = false;
+  document.title = "Nemisis CrashCheck — the green patch that still double-credits";
+  skipLink.href = "#story";
+  skipLink.textContent = "Skip to evidence story";
+  button.disabled = false;
+}).catch((error) => {
+  button.disabled = true;
+  boundEvidence.hidden = true;
+  document.title = "Nemisis CrashCheck — evidence unavailable";
+  evidenceStatusTitle.textContent = "Evidence unavailable";
+  evidenceStatusDetail.textContent = `No claim rendered: ${error.message}`;
+});
+
+button.disabled = true;
+button.addEventListener("click", () => {
+  const reveal = receipt.hidden;
+  receipt.hidden = !reveal;
+  button.setAttribute("aria-expanded", String(reveal));
+  button.textContent = reveal ? "Hide fixture evidence" : "Replay fixture evidence";
+  if (reveal) receipt.scrollIntoView({ block: "start" });
+});
+</script>
+</body>
+</html>

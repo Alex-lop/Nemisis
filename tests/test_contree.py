@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from base64 import b64encode
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -23,11 +25,16 @@ from contree_client import (
 )
 
 from nemisis.contree import (
+    _RUNNER_SHELL,
+    _TREE_CODE,
     BUNDLE_ARCHIVE,
+    EXECUTION_NONCE_ENV,
     ContreeBackend,
+    ContreeBatchError,
     ContreeConfigurationError,
     ContreeExecution,
     ContreeExecutionError,
+    ContreeInvocation,
     ContreeProtocolError,
 )
 from nemisis.hashing import sha256_bytes
@@ -51,9 +58,14 @@ class SpawnCall:
 class FakeClient:
     def __init__(self) -> None:
         self.calls: list[SpawnCall] = []
+        self.calls_by_operation: dict[str, SpawnCall] = {}
+        self.events: list[str] = []
+        self.spawn_attempts = 0
+        self.spawn_error_at: int | None = None
         self.status = OperationStatus.SUCCESS
         self.problem: str | None = None
         self.wait_error: Exception | None = None
+        self.wait_error_operations: set[str] = set()
         self.upload_mismatch = False
         self.upload_size_unknown = False
         self.permissions = {"spawn": True}
@@ -80,29 +92,37 @@ class FakeClient:
         truncate_output_at: int,
         files: dict[str, FileSpec],
     ) -> InstanceSpawnResponse:
-        self.calls.append(
-            SpawnCall(
-                command,
-                image,
-                disposable,
-                tuple(args),
-                shell,
-                env,
-                cwd,
-                networking,
-                timeout,
-                truncate_output_at,
-                files,
-            )
+        self.spawn_attempts += 1
+        self.events.append(f"spawn:{self.spawn_attempts}")
+        if self.spawn_error_at == self.spawn_attempts:
+            raise TimeoutError("secret provider detail")
+        call = SpawnCall(
+            command,
+            image,
+            disposable,
+            tuple(args),
+            shell,
+            env,
+            cwd,
+            networking,
+            timeout,
+            truncate_output_at,
+            files,
         )
-        return InstanceSpawnResponse(uuid=f"operation-{len(self.calls)}")
+        self.calls.append(call)
+        operation_id = f"operation-{len(self.calls)}"
+        self.calls_by_operation[operation_id] = call
+        return InstanceSpawnResponse(uuid=operation_id)
 
     def wait_operation(
         self, operation_id: str, *, timeout: float | None = None
     ) -> OperationResponse:
+        self.events.append(f"wait:{operation_id}")
         if self.wait_error is not None:
             raise self.wait_error
-        call = self.calls[-1]
+        if operation_id in self.wait_error_operations:
+            raise TimeoutError("secret provider detail")
+        call = self.calls_by_operation[operation_id]
         result = InstanceResult(
             state=InstanceResultState(exit_code=7, timed_out=self.problem == "timeout"),
             stdout=StreamRepr("NEBIUS_API_KEY=private output", "ascii", False),
@@ -124,7 +144,7 @@ class FakeClient:
         )
         if self.problem == "metadata":
             metadata = ...
-        result_image: str | None | EllipsisType = f"image-{len(self.calls)}"
+        result_image: str | None | EllipsisType = f"image-{operation_id.removeprefix('operation-')}"
         if self.problem == "image":
             result_image = None
         return OperationResponse(
@@ -175,6 +195,112 @@ def test_persistent_lineage_and_same_fixed_runner_accept_nonzero_exit() -> None:
         "consumed_cpu": 0.5,
         "consumed_memory": 2048,
     }
+
+
+def test_source_digest_excludes_runner_paths_and_detects_source_mutation(tmp_path: Path) -> None:
+    source = tmp_path / "inventory.py"
+    source.write_text("stock = 10\n")
+    bundle_file = tmp_path / "__nemisis_bundle__" / "generated" / "test_retry.py"
+    result_file = tmp_path / "__nemisis_results__" / "junit.xml"
+    bundle_file.parent.mkdir(parents=True)
+    result_file.parent.mkdir()
+    bundle_file.write_text("def test_retry(): pass\n")
+    result_file.write_text("<testsuite />\n")
+
+    def digest() -> str:
+        return subprocess.run(
+            [
+                sys.executable,
+                "-I",
+                "-c",
+                _TREE_CODE,
+                str(tmp_path),
+                "__nemisis_bundle__",
+                "__nemisis_results__",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+    before = digest()
+    bundle_file.write_text("changed bundle bytes\n")
+    result_file.write_text("changed result bytes\n")
+    assert digest() == before
+
+    source.write_text("stock = 8\n")
+    assert digest() != before
+    source_digest = '$(python -I -c "$3" /workspace __nemisis_bundle__ __nemisis_results__)'
+    assert f"source_before={source_digest}" in _RUNNER_SHELL
+    assert f"source_after={source_digest}" in _RUNNER_SHELL
+    assert '[ "$source_before" = "$source_after" ] ||' in _RUNNER_SHELL
+    assert "NEMISIS_BUNDLE_ERROR=source-mutated" in _RUNNER_SHELL
+
+
+def _invocation(image: str, nonce: str) -> ContreeInvocation:
+    return ContreeInvocation(
+        image_uuid=image,
+        command="/bin/true",
+        args=(),
+        files={},
+        execution_nonce=nonce,
+    )
+
+
+def test_execute_many_submits_all_before_wait_and_preserves_input_order() -> None:
+    client = FakeClient()
+    executions = ContreeBackend(client).execute_many(
+        (_invocation("image-a", "a" * 32), _invocation("image-b", "b" * 32))
+    )
+
+    assert client.events == [
+        "spawn:1",
+        "spawn:2",
+        "wait:operation-1",
+        "wait:operation-2",
+    ]
+    assert [execution.source_image_uuid for execution in executions] == ["image-a", "image-b"]
+    assert [execution.execution_nonce for execution in executions] == ["a" * 32, "b" * 32]
+    assert [call.env[EXECUTION_NONCE_ENV] for call in client.calls] == ["a" * 32, "b" * 32]
+
+
+def test_execute_many_validates_the_whole_batch_before_submission() -> None:
+    client = FakeClient()
+    backend = ContreeBackend(client)
+
+    with pytest.raises(ValueError, match="execution nonce"):
+        backend.execute_many((_invocation("image-a", "a" * 32), _invocation("image-b", "bad")))
+    assert client.events == []
+
+    with pytest.raises(ValueError, match="unique"):
+        backend.execute_many((_invocation("image-a", "a" * 32), _invocation("image-b", "a" * 32)))
+    assert client.events == []
+
+
+def test_execute_many_partial_submission_awaits_and_exposes_started_operations() -> None:
+    client = FakeClient()
+    client.spawn_error_at = 2
+
+    with pytest.raises(ContreeBatchError) as raised:
+        ContreeBackend(client).execute_many(
+            (_invocation("image-a", "a" * 32), _invocation("image-b", "b" * 32))
+        )
+
+    assert raised.value.operation_ids == raised.value.started_operation_ids == ("operation-1",)
+    assert client.events == ["spawn:1", "spawn:2", "wait:operation-1"]
+
+
+def test_execute_many_awaits_every_operation_after_completion_failure() -> None:
+    client = FakeClient()
+    client.wait_error_operations = {"operation-1"}
+
+    with pytest.raises(ContreeBatchError) as raised:
+        ContreeBackend(client).execute_many(
+            (_invocation("image-a", "a" * 32), _invocation("image-b", "b" * 32))
+        )
+
+    assert raised.value.operation_ids == ("operation-1", "operation-2")
+    assert client.events[-2:] == ["wait:operation-1", "wait:operation-2"]
 
 
 @pytest.mark.parametrize("problem", ["metadata", "result", "image", "source", "timeout"])
