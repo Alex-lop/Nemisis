@@ -14,6 +14,7 @@ import pytest
 
 from nemisis.crash_fixture import ATOMIC_REF, BUGGY_REF, materialize_fixture
 from nemisis.crash_models import (
+    AnchorResolutionStatus,
     AttemptReceipt,
     CrashObservation,
     ExecutionStatus,
@@ -25,6 +26,7 @@ from nemisis.crash_models import (
 from nemisis.crashcheck import _audited_contract, _seal_capsule
 from nemisis.hashing import canonical_json, sha256_bytes
 from nemisis.sqlite_credit import (
+    AnchorResolutionError,
     _AttemptFailure,
     _cleanup,
     _collect,
@@ -34,6 +36,70 @@ from nemisis.sqlite_credit import (
     bind_anchor,
     execute_attempt,
 )
+
+
+def test_anchor_resolution_distinguishes_zero_one_and_multiple(tmp_path: Path) -> None:
+    contract = _audited_contract()
+    zero = tmp_path / "zero"
+    zero.mkdir()
+    with pytest.raises(AnchorResolutionError) as missing:
+        bind_anchor(contract, zero)
+    assert missing.value.status is AnchorResolutionStatus.ZERO_MATCHES
+    assert missing.value.matched_paths == ()
+
+    one = materialize_fixture(BUGGY_REF, tmp_path / "one").path
+    assert bind_anchor(contract, one).handler_path == "app/credits.py"
+
+    multiple = materialize_fixture(BUGGY_REF, tmp_path / "multiple").path
+    package = multiple / "app/credits"
+    package.mkdir()
+    (package / "__init__.py").write_bytes((multiple / "app/credits.py").read_bytes())
+    with pytest.raises(AnchorResolutionError) as ambiguous:
+        bind_anchor(contract, multiple)
+    assert ambiguous.value.status is AnchorResolutionStatus.MULTIPLE_MATCHES
+    assert ambiguous.value.matched_paths == ("app/credits.py", "app/credits/__init__.py")
+
+
+def test_anchor_resolution_marks_an_async_handler_invalid(tmp_path: Path) -> None:
+    contract = _audited_contract()
+    source = materialize_fixture(BUGGY_REF, tmp_path / "async-handler").path
+    (source / "app/credits.py").write_text(
+        "async def apply_credit(store, event):\n    return None\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(AnchorResolutionError) as invalid:
+        bind_anchor(contract, source)
+
+    assert invalid.value.status is AnchorResolutionStatus.INVALID_MATCH
+    assert invalid.value.matched_paths == ("app/credits.py",)
+
+
+def test_anchor_resolution_counts_handler_definitions(tmp_path: Path) -> None:
+    contract = _audited_contract()
+    missing = materialize_fixture(BUGGY_REF, tmp_path / "missing-handler").path
+    (missing / "app/credits.py").write_text(
+        "def another_handler(store, event):\n    return None\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(AnchorResolutionError) as zero:
+        bind_anchor(contract, missing)
+    assert zero.value.status is AnchorResolutionStatus.ZERO_MATCHES
+    assert zero.value.matched_paths == ()
+
+    duplicate = materialize_fixture(BUGGY_REF, tmp_path / "duplicate-handler").path
+    with (duplicate / "app/credits.py").open("a", encoding="utf-8") as source:
+        source.write(
+            "\n"
+            + "\n".join(
+                "def apply_credit(store, event):\n    return None" for _duplicate in range(8)
+            )
+            + "\n"
+        )
+    with pytest.raises(AnchorResolutionError) as multiple:
+        bind_anchor(contract, duplicate)
+    assert multiple.value.status is AnchorResolutionStatus.MULTIPLE_MATCHES
+    assert multiple.value.matched_paths == ("app/credits.py", "app/credits.py")
 
 
 def test_receive_preserves_a_coalesced_second_frame() -> None:

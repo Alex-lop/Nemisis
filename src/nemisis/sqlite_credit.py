@@ -26,6 +26,7 @@ from urllib.parse import quote
 
 from nemisis.crash_models import (
     AnchorBinding,
+    AnchorResolutionStatus,
     AttemptReceipt,
     CrashObservation,
     CreditSnapshot,
@@ -52,6 +53,7 @@ _ADAPTER_ID = "credit-store-v1"
 _FAULT_ID = "first-credit-effect-commit-v1"
 _PROBE_ID = "credit-state-v1"
 _PREDICATE_ID = "single-credit-and-marker-v1"
+_TARGET = "app.credits:apply_credit"
 _SCHEMA = """
 CREATE TABLE accounts(
     account_id TEXT PRIMARY KEY,
@@ -79,6 +81,20 @@ class _AttemptFailure(RuntimeError):
         self.status = status
         self.detail = detail[:1_000]
         self.integrity = integrity
+
+
+class AnchorResolutionError(ValueError):
+    """An accepted supported target did not map uniquely in one exact tree."""
+
+    def __init__(
+        self,
+        status: AnchorResolutionStatus,
+        matched_paths: tuple[str, ...],
+        detail: str,
+    ) -> None:
+        super().__init__(detail)
+        self.status = status
+        self.matched_paths = matched_paths
 
 
 @dataclass
@@ -143,6 +159,7 @@ def bind_anchor(
         or contract.fault_intent_id != _FAULT_ID
         or contract.probe_id != _PROBE_ID
         or contract.predicate_ids != (_PREDICATE_ID,)
+        or contract.target != _TARGET
     ):
         raise ValueError("retry contract uses an unsupported trusted catalog binding")
     root = source_tree.resolve()
@@ -150,20 +167,51 @@ def bind_anchor(
     module_path = Path(*module_name.split("."))
     candidates = (root / module_path.with_suffix(".py"), root / module_path / "__init__.py")
     matches = [path for path in candidates if path.is_file() and not path.is_symlink()]
-    if len(matches) != 1:
-        raise ValueError("target must have exactly one file binding in the exact tree")
+    relative_matches = tuple(path.relative_to(root).as_posix() for path in matches)
+    if not matches:
+        raise AnchorResolutionError(
+            AnchorResolutionStatus.ZERO_MATCHES,
+            (),
+            "supported target has no file binding in the exact tree",
+        )
+    if len(matches) > 1:
+        raise AnchorResolutionError(
+            AnchorResolutionStatus.MULTIPLE_MATCHES,
+            relative_matches,
+            "supported target has multiple file bindings in the exact tree",
+        )
     path = matches[0]
     try:
         tree = ast.parse(path.read_bytes(), filename=str(path))
     except (OSError, SyntaxError, UnicodeDecodeError) as error:
-        raise ValueError("target handler is not valid UTF-8 Python") from error
+        raise AnchorResolutionError(
+            AnchorResolutionStatus.INVALID_MATCH,
+            relative_matches,
+            "target handler is not valid UTF-8 Python",
+        ) from error
     definitions = [
         node
         for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == symbol
     ]
-    if len(definitions) != 1 or isinstance(definitions[0], ast.AsyncFunctionDef):
-        raise ValueError("target must bind exactly one synchronous top-level handler")
+    if not definitions:
+        raise AnchorResolutionError(
+            AnchorResolutionStatus.ZERO_MATCHES,
+            (),
+            "supported target has no top-level handler binding in the exact tree",
+        )
+    if len(definitions) > 1:
+        raise AnchorResolutionError(
+            AnchorResolutionStatus.MULTIPLE_MATCHES,
+            (relative_matches[0], relative_matches[0]),
+            "supported target has multiple top-level handler bindings in the exact tree",
+        )
+    if isinstance(definitions[0], ast.AsyncFunctionDef):
+        raise AnchorResolutionError(
+            AnchorResolutionStatus.INVALID_MATCH,
+            relative_matches,
+            "target handler must be synchronous",
+        )
     arguments = definitions[0].args
     if (
         len(arguments.posonlyargs) + len(arguments.args) != 2
@@ -172,7 +220,11 @@ def bind_anchor(
         or arguments.kwonlyargs
         or arguments.defaults
     ):
-        raise ValueError("target handler must accept exactly (store, event)")
+        raise AnchorResolutionError(
+            AnchorResolutionStatus.INVALID_MATCH,
+            relative_matches,
+            "target handler must accept exactly (store, event)",
+        )
     relative = path.relative_to(root).as_posix()
     safe_relative_path(relative)
     binding_tree_digest = sha256_tree(root, ignored_names=frozenset({"__pycache__"}))

@@ -22,6 +22,10 @@ from nemisis.crash_fixture import (
     materialize_fixture,
 )
 from nemisis.crash_models import (
+    REQUIRED_CONFIRMATIONS,
+    AnchorResolutionReceipt,
+    AnchorResolutionStatus,
+    AttemptReceipt,
     CrashCheckResult,
     CrashObservation,
     CrashVerdict,
@@ -126,7 +130,7 @@ def test_hero_artifacts_and_digests_are_exact(
         "contract": repro / "contract.json",
         "event": repro / "event.json",
         "hunt": repro / "hunt.json",
-        "minimization": repro / "minimization.json",
+        "minimization": root / f"runs/{result.run_id}/minimization.json",
         "manifest": root / f"runs/{result.run_id}/manifest.json",
         "metadata": repro / "metadata.json",
         "regression_test": repro / "test_repro.py",
@@ -169,7 +173,6 @@ def test_hero_artifacts_and_digests_are_exact(
         "engine_code_digest": capsule.engine_code_digest,
         "fault_boundary": capsule.fault_boundary.value,
         "minimization_trace": list(capsule.minimization_trace),
-        "regression_kind": "integration/fault",
         "schema_version": "nemisis.crashcheck.repro.v1",
         "truth_label": capsule.truth_label.value,
     }
@@ -314,7 +317,6 @@ def test_distinct_contract_capsules_publish_without_overwriting(
         "contract.json",
         "event.json",
         "hunt.json",
-        "minimization.json",
         "metadata.json",
         "test_repro.py",
     }
@@ -440,9 +442,195 @@ def test_anchor_binding_failure_is_a_scoped_crashcheck_error(
 
     with pytest.raises(
         CrashCheckError,
-        match=r"^UNSUPPORTED_TARGET: target must have exactly one file binding",
+        match=r"^UNSUPPORTED_TARGET: retry contract uses an unsupported trusted catalog binding",
     ):
         check(BUGGY_REF, MISLEADING_GREEN_REF, config)
+
+
+@pytest.mark.parametrize(
+    ("variant", "expected_status", "expected_matches"),
+    [
+        ("zero", AnchorResolutionStatus.ZERO_MATCHES, ()),
+        (
+            "multiple",
+            AnchorResolutionStatus.MULTIPLE_MATCHES,
+            ("app/credits.py", "app/credits/__init__.py"),
+        ),
+    ],
+)
+def test_supported_non_unique_anchor_publishes_incomplete_evidence(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    variant: str,
+    expected_status: AnchorResolutionStatus,
+    expected_matches: tuple[str, ...],
+) -> None:
+    source = materialize_fixture(BUGGY_REF, tmp_path / f"{variant}-source").path
+    handler = source / "app/credits.py"
+    if variant == "zero":
+        handler.unlink()
+    else:
+        package = source / "app/credits"
+        package.mkdir()
+        (package / "__init__.py").write_bytes(handler.read_bytes())
+    config_bytes, _ = _accepted_config(tmp_path / f"{variant}-config-workspace", source, variant)
+    (source / _CONFIG_PATH.parent).mkdir()
+    (source / _CONFIG_PATH).write_bytes(config_bytes)
+    artifacts = tmp_path / f"{variant}-artifacts"
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(artifacts))
+
+    result = check(source, MISLEADING_GREEN_REF, SCENARIO_ID)
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert result.execution_status is ExecutionStatus.SETUP_ERROR
+    assert result.integrity_status is IntegrityStatus.INCOMPLETE
+    assert result.bindings == ()
+    assert result.attempts == ()
+    assert len(result.anchor_resolutions) == 1
+    receipt = result.anchor_resolutions[0]
+    assert receipt.role is WorldRole.BASE
+    assert receipt.transport is TruthLabel.LOCAL
+    assert receipt.capsule_digest == result.capsule_digest
+    assert receipt.status is expected_status
+    assert receipt.matched_paths == expected_matches
+    assert receipt.target == "app.credits:apply_credit"
+    assert receipt.tree_digest == receipt.resolved_source_identity
+    assert (
+        AnchorResolutionReceipt.model_validate_json(
+            _artifact(artifacts, result, "anchor_resolution").read_bytes()
+        )
+        == receipt
+    )
+    manifest = json.loads(_artifact(artifacts, result, "manifest").read_bytes())
+    assert manifest["result"] == result.model_dump(mode="json")
+    assert "report" not in result.artifacts
+    assert "regression_test" not in result.artifacts
+
+
+def test_candidate_anchor_failure_preserves_only_completed_base_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate = materialize_fixture(MISLEADING_GREEN_REF, tmp_path / "candidate").path
+    (candidate / "app/credits.py").unlink()
+    artifacts = tmp_path / "candidate-anchor-artifacts"
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(artifacts))
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID)
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert result.execution_status is ExecutionStatus.SETUP_ERROR
+    assert result.integrity_status is IntegrityStatus.INCOMPLETE
+    assert len(result.bindings) == 1
+    assert len(result.attempts) == 5
+    assert {attempt.role for attempt in result.attempts} == {WorldRole.BASE}
+    assert all(attempt.execution_status is ExecutionStatus.COMPLETED for attempt in result.attempts)
+    assert result.anchor_resolutions[0].status is AnchorResolutionStatus.ZERO_MATCHES
+    assert result.anchor_resolutions[0].role is WorldRole.CANDIDATE
+    assert result.anchor_resolutions[0].transport is TruthLabel.LOCAL
+    assert result.anchor_resolutions[0].capsule_digest == result.capsule_digest
+    assert "candidate target mapping" in result.summary
+    assert "report" in result.artifacts
+    manifest = json.loads(_artifact(artifacts, result, "manifest").read_bytes())
+    assert CrashCheckResult.model_validate_json(canonical_json(manifest["result"])) == result
+
+
+def test_anchor_resolution_artifacts_are_run_scoped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = materialize_fixture(MISLEADING_GREEN_REF, tmp_path / "first-candidate").path
+    (first / "app/credits.py").unlink()
+    second = materialize_fixture(MISLEADING_GREEN_REF, tmp_path / "second-candidate").path
+    package = second / "app/credits"
+    package.mkdir()
+    (package / "__init__.py").write_bytes((second / "app/credits.py").read_bytes())
+    artifacts = tmp_path / "shared-anchor-artifacts"
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(artifacts))
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+
+    first_result = check(BUGGY_REF, first, SCENARIO_ID)
+    second_result = check(BUGGY_REF, second, SCENARIO_ID)
+
+    assert first_result.capsule_digest == second_result.capsule_digest
+    first_path = Path(first_result.artifacts["anchor_resolution"])
+    second_path = Path(second_result.artifacts["anchor_resolution"])
+    assert first_path != second_path
+    assert first_path.parts[0] == second_path.parts[0] == "runs"
+    assert (artifacts / first_path).is_file()
+    assert (artifacts / second_path).is_file()
+
+
+def test_bad_anchor_replay_reuses_capsule_scoped_metadata(
+    hero: tuple[Path, CrashCheckResult],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root, successful = hero
+    source = materialize_fixture(MISLEADING_GREEN_REF, tmp_path / "bad-replay-source").path
+    (source / "app/credits.py").unlink()
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(root))
+
+    failed = replay(
+        _artifact(root, successful, "capsule"),
+        source,
+        role="candidate",
+        mode="local",
+    )
+
+    assert failed.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert failed.capsule_digest == successful.capsule_digest
+    assert failed.anchor_resolutions[0].role is WorldRole.CANDIDATE
+    assert _artifact(root, failed, "anchor_resolution").is_file()
+
+
+def test_corrected_anchor_failure_preserves_exact_prior_roles(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    corrected = materialize_fixture(ATOMIC_REF, tmp_path / "corrected").path
+    (corrected / "app/credits.py").unlink()
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "corrected-anchor-artifacts"))
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+
+    result = check(BUGGY_REF, MISLEADING_GREEN_REF, SCENARIO_ID, corrected=corrected)
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert result.anchor_resolutions[0].role is WorldRole.CORRECTED
+    assert Counter(attempt.role for attempt in result.attempts) == {
+        WorldRole.BASE: REQUIRED_CONFIRMATIONS,
+        WorldRole.CANDIDATE: REQUIRED_CONFIRMATIONS,
+    }
+    assert all(
+        attempt.execution_status is ExecutionStatus.COMPLETED
+        and attempt.integrity_status is IntegrityStatus.VALID
+        for attempt in result.attempts
+    )
+
+
+def test_inconclusive_candidate_stops_before_corrected_mapping(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original = crashcheck_module._confirmed_observation
+
+    def classify(attempts: tuple[AttemptReceipt, ...], capsule: ReproCapsule) -> CrashObservation:
+        if attempts[0].role is WorldRole.CANDIDATE:
+            return CrashObservation.NOT_OBSERVED
+        return original(attempts, capsule)
+
+    monkeypatch.setattr(crashcheck_module, "_confirmed_observation", classify)
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "inconclusive-artifacts"))
+    monkeypatch.delenv("GITHUB_EVENT_NAME", raising=False)
+
+    result = check(
+        BUGGY_REF,
+        MISLEADING_GREEN_REF,
+        SCENARIO_ID,
+        corrected=tmp_path / "must-not-be-materialized",
+    )
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert result.anchor_resolutions == ()
+    assert result.execution_status is ExecutionStatus.COMPLETED
+    assert result.integrity_status is IntegrityStatus.VALID
 
 
 def test_git_ref_ignores_base_owned_config_committed_after_contract_generation(

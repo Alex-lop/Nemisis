@@ -65,6 +65,12 @@ class FaultBoundary(StrEnum):
     MARKER_COMMIT = "marker-commit"
 
 
+class AnchorResolutionStatus(StrEnum):
+    ZERO_MATCHES = "ZERO_MATCHES"
+    MULTIPLE_MATCHES = "MULTIPLE_MATCHES"
+    INVALID_MATCH = "INVALID_MATCH"
+
+
 class TimelineState(StrEnum):
     PREFLIGHT = "PREFLIGHT"
     DATABASE_SEEDED = "DATABASE_SEEDED"
@@ -151,6 +157,41 @@ class AnchorBinding(_DigestedModel):
     @model_validator(mode="after")
     def handler_path_is_safe(self) -> AnchorBinding:
         safe_relative_path(self.handler_path)
+        return self
+
+
+class AnchorResolutionReceipt(_DigestedModel):
+    """Fail-closed evidence for a supported target that did not map uniquely."""
+
+    schema_version: Literal["1"] = "1"
+    role: WorldRole
+    transport: TruthLabel
+    status: AnchorResolutionStatus
+    capsule_digest: Sha256
+    contract_digest: Sha256
+    scenario_id: SafeId
+    source_ref: str = Field(min_length=1, max_length=500)
+    resolved_source_identity: str = Field(min_length=1, max_length=500)
+    tree_digest: Sha256
+    target: str = Field(
+        min_length=3,
+        max_length=240,
+        pattern=r"^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$",
+    )
+    matched_paths: tuple[str, ...] = Field(max_length=8)
+    detail: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def resolution_is_coherent(self) -> AnchorResolutionReceipt:
+        for path in self.matched_paths:
+            safe_relative_path(path)
+        count = len(self.matched_paths)
+        if (
+            (self.status is AnchorResolutionStatus.ZERO_MATCHES and count != 0)
+            or (self.status is AnchorResolutionStatus.MULTIPLE_MATCHES and count < 2)
+            or (self.status is AnchorResolutionStatus.INVALID_MATCH and count != 1)
+        ):
+            raise ValueError("anchor resolution status contradicts its matched paths")
         return self
 
 
@@ -607,10 +648,11 @@ class CrashCheckResult(_DigestedModel):
     verdict: CrashVerdict
     capsule_digest: Sha256
     engine_code_digest: Sha256
+    anchor_resolutions: tuple[AnchorResolutionReceipt, ...] = Field(default=(), max_length=1)
     hypothesis_receipts: tuple[HypothesisReceipt, ...] = Field(default=(), max_length=2)
     minimization_receipts: tuple[MinimizationReceipt, ...] = Field(default=(), max_length=1)
-    bindings: tuple[AnchorBinding, ...] = Field(min_length=1, max_length=3)
-    attempts: tuple[AttemptReceipt, ...] = Field(min_length=1, max_length=24)
+    bindings: tuple[AnchorBinding, ...] = Field(default=(), max_length=3)
+    attempts: tuple[AttemptReceipt, ...] = Field(default=(), max_length=24)
     started_at: datetime
     ended_at: datetime
     summary: str = Field(min_length=1, max_length=1_000)
@@ -631,8 +673,13 @@ class CrashCheckResult(_DigestedModel):
             hypothesis._require_canonical_digest()
         for reduction in self.minimization_receipts:
             reduction._require_canonical_digest()
+        for anchor_resolution in self.anchor_resolutions:
+            anchor_resolution._require_canonical_digest()
         for artifact_path in self.artifacts.values():
             safe_relative_path(artifact_path)
+        _validate_anchor_resolution_context(self)
+        if not self.attempts:
+            return self
         binding_digests = [binding.digest for binding in self.bindings]
         if len(binding_digests) != len(set(binding_digests)):
             raise ValueError("anchor binding digests must be unique")
@@ -673,10 +720,16 @@ class CrashCheckResult(_DigestedModel):
         completed = all(
             attempt.execution_status is ExecutionStatus.COMPLETED for attempt in self.attempts
         )
-        if (self.execution_status is ExecutionStatus.COMPLETED) is not completed or (
-            not completed
-            and self.execution_status not in {attempt.execution_status for attempt in self.attempts}
-        ):
+        execution_matches = (
+            self.execution_status is ExecutionStatus.SETUP_ERROR
+            if self.anchor_resolutions
+            else (self.execution_status is ExecutionStatus.COMPLETED) is completed
+            and (
+                completed
+                or self.execution_status in {attempt.execution_status for attempt in self.attempts}
+            )
+        )
+        if not execution_matches:
             raise ValueError("result execution status contradicts its attempts")
         expected_integrity = (
             IntegrityStatus.INVALID
@@ -689,6 +742,8 @@ class CrashCheckResult(_DigestedModel):
                 else IntegrityStatus.INCOMPLETE
             )
         )
+        if self.anchor_resolutions:
+            expected_integrity = IntegrityStatus.INCOMPLETE
         if self.integrity_status is not expected_integrity:
             raise ValueError("result integrity status contradicts its attempts")
         if self.verdict in {
@@ -718,6 +773,53 @@ class CrashCheckResult(_DigestedModel):
         ):
             raise ValueError("unsupported verdict contradicts its attempts")
         return self
+
+
+def _validate_anchor_resolution_context(result: CrashCheckResult) -> None:
+    resolution = result.anchor_resolutions[0] if result.anchor_resolutions else None
+    if resolution is not None and (
+        resolution.capsule_digest != result.capsule_digest
+        or resolution.transport is not result.transport
+    ):
+        raise ValueError("anchor resolution differs from the result capsule or transport")
+    if not result.attempts:
+        if (
+            result.bindings
+            or resolution is None
+            or result.hypothesis_receipts
+            or result.minimization_receipts
+            or result.verdict is not CrashVerdict.EVIDENCE_INCOMPLETE
+            or result.execution_status is not ExecutionStatus.SETUP_ERROR
+            or result.integrity_status is not IntegrityStatus.INCOMPLETE
+        ):
+            raise ValueError("attempt-free result requires one failed anchor resolution")
+        return
+    if resolution is None:
+        return
+    prior_roles = {attempt.role for attempt in result.attempts}
+    expected_roles = {
+        WorldRole.BASE: set(),
+        WorldRole.CANDIDATE: {WorldRole.BASE},
+        WorldRole.CORRECTED: {WorldRole.BASE, WorldRole.CANDIDATE},
+    }[resolution.role]
+    if (
+        result.verdict is not CrashVerdict.EVIDENCE_INCOMPLETE
+        or result.execution_status is not ExecutionStatus.SETUP_ERROR
+        or result.integrity_status is not IntegrityStatus.INCOMPLETE
+        or prior_roles != expected_roles
+        or len(result.hypothesis_receipts) != 2
+        or len(result.minimization_receipts) != 1
+        or any(
+            sum(attempt.role is role for attempt in result.attempts) != REQUIRED_CONFIRMATIONS
+            for role in expected_roles
+        )
+        or any(
+            attempt.execution_status is not ExecutionStatus.COMPLETED
+            or attempt.integrity_status is not IntegrityStatus.VALID
+            for attempt in result.attempts
+        )
+    ):
+        raise ValueError("failed anchor resolution requires exact valid prior-role evidence")
 
 
 def _validate_minimization_receipts(
@@ -935,6 +1037,8 @@ def _validate_conclusive_verdict(
 
 __all__ = [
     "AnchorBinding",
+    "AnchorResolutionReceipt",
+    "AnchorResolutionStatus",
     "AttemptReceipt",
     "CrashCheckResult",
     "CrashObservation",

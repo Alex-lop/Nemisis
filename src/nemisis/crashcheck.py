@@ -30,6 +30,7 @@ from nemisis.crash_fixture import (
 from nemisis.crash_models import (
     REQUIRED_CONFIRMATIONS,
     AnchorBinding,
+    AnchorResolutionReceipt,
     AttemptReceipt,
     CrashCheckResult,
     CrashObservation,
@@ -55,6 +56,7 @@ from nemisis.safety import safe_destination, safe_relative_path
 from nemisis.sqlite_credit import (
     RUNNER_ID,
     RUNNER_VERSION,
+    AnchorResolutionError,
     bind_anchor,
     execute_attempt,
     execute_no_fault_replay,
@@ -190,9 +192,33 @@ def check(
         root = Path(temporary)
         base_source = _materialize_source(base, root / "source-base")
         contract = _contract_for_check(scenario, base_source)
-        base_binding = _bind_anchor(contract, base_source)
+        if mode not in {"local", "live"}:
+            raise CrashCheckError("mode must be 'local' or 'live'")
+        requested_transport = TruthLabel.LIVE if mode == "live" else TruthLabel.LOCAL
+        preflight_capsule = _seal_capsule(contract)
+        base_anchor = _bind_anchor(
+            contract,
+            base_source,
+            WorldRole.BASE,
+            requested_transport,
+            preflight_capsule.digest,
+        )
+        if isinstance(base_anchor, AnchorResolutionReceipt):
+            return _publish(
+                run_id,
+                started_at,
+                preflight_capsule,
+                contract,
+                (),
+                (),
+                CrashVerdict.EVIDENCE_INCOMPLETE,
+                _anchor_failure_summary(base_anchor),
+                anchor_resolutions=(base_anchor,),
+                transport=requested_transport,
+            )
+        base_binding = base_anchor
         if mode == "live":
-            capsule = _seal_capsule(contract)
+            capsule = preflight_capsule
             detail = _live_blocker()
             attempt = _failed_attempt(
                 capsule, base_binding, WorldRole.BASE, TruthLabel.LIVE, detail
@@ -298,7 +324,28 @@ def check(
 
         # Candidate materialization deliberately begins only after the base witness is frozen.
         candidate_source = _materialize_source(candidate, root / "source-candidate")
-        candidate_binding = _bind_anchor(contract, candidate_source)
+        candidate_anchor = _bind_anchor(
+            contract,
+            candidate_source,
+            WorldRole.CANDIDATE,
+            requested_transport,
+            capsule.digest,
+        )
+        if isinstance(candidate_anchor, AnchorResolutionReceipt):
+            return _publish(
+                run_id,
+                started_at,
+                capsule,
+                contract,
+                (base_binding,),
+                base_attempts,
+                CrashVerdict.EVIDENCE_INCOMPLETE,
+                _anchor_failure_summary(candidate_anchor),
+                hypothesis_receipts=hypothesis_receipts,
+                minimization_receipts=minimization_receipts,
+                anchor_resolutions=(candidate_anchor,),
+            )
+        candidate_binding = candidate_anchor
         candidate_attempts = _execute_confirmations(
             capsule,
             candidate_binding,
@@ -309,10 +356,47 @@ def check(
         bindings = [base_binding, candidate_binding]
         attempts = [*base_attempts, *candidate_attempts]
         candidate_observation = _confirmed_observation(candidate_attempts, capsule)
+        if candidate_observation not in {
+            CrashObservation.DUPLICATE_EFFECT,
+            CrashObservation.EXACTLY_ONCE,
+        }:
+            return _publish(
+                run_id,
+                started_at,
+                capsule,
+                contract,
+                tuple(bindings),
+                tuple(attempts),
+                CrashVerdict.EVIDENCE_INCOMPLETE,
+                "Candidate execution completed without one stable supported observation.",
+                hypothesis_receipts=hypothesis_receipts,
+                minimization_receipts=minimization_receipts,
+            )
         corrected_observation: CrashObservation | None = None
         if corrected is not None:
             corrected_source = _materialize_source(corrected, root / "source-corrected")
-            corrected_binding = _bind_anchor(contract, corrected_source)
+            corrected_anchor = _bind_anchor(
+                contract,
+                corrected_source,
+                WorldRole.CORRECTED,
+                requested_transport,
+                capsule.digest,
+            )
+            if isinstance(corrected_anchor, AnchorResolutionReceipt):
+                return _publish(
+                    run_id,
+                    started_at,
+                    capsule,
+                    contract,
+                    tuple(bindings),
+                    tuple(attempts),
+                    CrashVerdict.EVIDENCE_INCOMPLETE,
+                    _anchor_failure_summary(corrected_anchor),
+                    hypothesis_receipts=hypothesis_receipts,
+                    minimization_receipts=minimization_receipts,
+                    anchor_resolutions=(corrected_anchor,),
+                )
+            corrected_binding = corrected_anchor
             corrected_attempts = _execute_confirmations(
                 capsule,
                 corrected_binding,
@@ -372,7 +456,30 @@ def replay(
     with tempfile.TemporaryDirectory(prefix="nemisis-replay-") as temporary:
         root = Path(temporary)
         materialized = _materialize_source(source, root / "source")
-        binding = _bind_anchor(contract, materialized)
+        if mode not in {"local", "live"}:
+            raise CrashCheckError("mode must be 'local' or 'live'")
+        requested_transport = TruthLabel.LIVE if mode == "live" else TruthLabel.LOCAL
+        anchor = _bind_anchor(
+            contract,
+            materialized,
+            world_role,
+            requested_transport,
+            sealed.digest,
+        )
+        if isinstance(anchor, AnchorResolutionReceipt):
+            return _publish(
+                run_id,
+                started_at,
+                sealed,
+                contract,
+                (),
+                (),
+                CrashVerdict.EVIDENCE_INCOMPLETE,
+                _anchor_failure_summary(anchor),
+                anchor_resolutions=(anchor,),
+                transport=requested_transport,
+            )
+        binding = anchor
         attempts: tuple[AttemptReceipt, ...]
         if mode == "live":
             detail = _live_blocker()
@@ -529,7 +636,13 @@ def _validate_capsule_contract(capsule: ReproCapsule, contract: RetryContract) -
         raise CrashCheckError("capsule fields differ from its accepted contract or trusted engine")
 
 
-def _bind_anchor(contract: RetryContract, source: _Source) -> AnchorBinding:
+def _bind_anchor(
+    contract: RetryContract,
+    source: _Source,
+    role: WorldRole,
+    transport: TruthLabel,
+    capsule_digest: str,
+) -> AnchorBinding | AnchorResolutionReceipt:
     try:
         return bind_anchor(
             contract,
@@ -537,8 +650,30 @@ def _bind_anchor(contract: RetryContract, source: _Source) -> AnchorBinding:
             source_ref=source.ref,
             resolved_source_identity=source.resolved_identity,
         )
+    except AnchorResolutionError as error:
+        return AnchorResolutionReceipt.with_digest(
+            role=role,
+            transport=transport,
+            status=error.status,
+            capsule_digest=capsule_digest,
+            contract_digest=contract.digest,
+            scenario_id=contract.scenario_id,
+            source_ref=source.ref,
+            resolved_source_identity=source.resolved_identity,
+            tree_digest=source.tree_digest,
+            target=contract.target,
+            matched_paths=error.matched_paths,
+            detail=str(error),
+        )
     except ValueError as error:
         raise CrashCheckError(f"UNSUPPORTED_TARGET: {error}") from error
+
+
+def _anchor_failure_summary(receipt: AnchorResolutionReceipt) -> str:
+    return (
+        f"The accepted {receipt.role.value} target mapping was {receipt.status.value}: "
+        f"{receipt.detail}. No unbound source was executed."
+    )
 
 
 def _seal_capsule(
@@ -910,8 +1045,10 @@ def _publish(
     verdict: CrashVerdict,
     summary: str,
     *,
+    anchor_resolutions: tuple[AnchorResolutionReceipt, ...] = (),
     hypothesis_receipts: tuple[HypothesisReceipt, ...] = (),
     minimization_receipts: tuple[MinimizationReceipt, ...] = (),
+    transport: TruthLabel | None = None,
 ) -> CrashCheckResult:
     if capsule.engine_code_digest != engine_code_digest():
         raise CrashCheckError("capsule engine digest differs from the installed engine")
@@ -930,40 +1067,53 @@ def _publish(
         "event": (repro_relative / "event.json").as_posix(),
         "manifest": (run_relative / "manifest.json").as_posix(),
         "metadata": (repro_relative / "metadata.json").as_posix(),
-        "regression_test": (repro_relative / "test_repro.py").as_posix(),
-        "report": (run_relative / "report.html").as_posix(),
     }
+    if attempts:
+        artifacts["regression_test"] = (repro_relative / "test_repro.py").as_posix()
+        artifacts["report"] = (run_relative / "report.html").as_posix()
+    if anchor_resolutions:
+        artifacts["anchor_resolution"] = (run_relative / "anchor-resolution.json").as_posix()
     if hypothesis_receipts:
         artifacts["hunt"] = (repro_relative / "hunt.json").as_posix()
     if minimization_receipts:
-        artifacts["minimization"] = (repro_relative / "minimization.json").as_posix()
-    execution = (
-        ExecutionStatus.COMPLETED
-        if all(item.execution_status is ExecutionStatus.COMPLETED for item in attempts)
-        else next(
-            item.execution_status
-            for item in attempts
-            if item.execution_status is not ExecutionStatus.COMPLETED
+        artifacts["minimization"] = (run_relative / "minimization.json").as_posix()
+    if anchor_resolutions:
+        execution = ExecutionStatus.SETUP_ERROR
+        integrity = IntegrityStatus.INCOMPLETE
+    else:
+        execution = (
+            ExecutionStatus.COMPLETED
+            if all(item.execution_status is ExecutionStatus.COMPLETED for item in attempts)
+            else next(
+                item.execution_status
+                for item in attempts
+                if item.execution_status is not ExecutionStatus.COMPLETED
+            )
         )
-    )
-    integrity = (
-        IntegrityStatus.VALID
-        if all(item.integrity_status is IntegrityStatus.VALID for item in attempts)
-        else (
-            IntegrityStatus.INVALID
-            if any(item.integrity_status is IntegrityStatus.INVALID for item in attempts)
-            else IntegrityStatus.INCOMPLETE
+        integrity = (
+            IntegrityStatus.VALID
+            if all(item.integrity_status is IntegrityStatus.VALID for item in attempts)
+            else (
+                IntegrityStatus.INVALID
+                if any(item.integrity_status is IntegrityStatus.INVALID for item in attempts)
+                else IntegrityStatus.INCOMPLETE
+            )
         )
-    )
-    transport = attempts[0].transport
+    if transport is None:
+        if not attempts:
+            raise CrashCheckError("attempt-free publication requires an explicit transport")
+        result_transport = attempts[0].transport
+    else:
+        result_transport = transport
     result = CrashCheckResult.with_digest(
         run_id=run_id,
-        transport=transport,
+        transport=result_transport,
         execution_status=execution,
         integrity_status=integrity,
         verdict=verdict,
         capsule_digest=capsule.digest,
         engine_code_digest=capsule.engine_code_digest,
+        anchor_resolutions=anchor_resolutions,
         hypothesis_receipts=hypothesis_receipts,
         minimization_receipts=minimization_receipts,
         bindings=bindings,
@@ -985,12 +1135,17 @@ def _publish(
         "engine_code_digest": capsule.engine_code_digest,
         "fault_boundary": capsule.fault_boundary,
         "minimization_trace": capsule.minimization_trace,
-        "regression_kind": "integration/fault",
         "schema_version": "nemisis.crashcheck.repro.v1",
         "truth_label": capsule.truth_label,
     }
     _write_exact(repro_dir / "metadata.json", canonical_json(metadata) + b"\n")
-    _write_exact(repro_dir / "test_repro.py", _regression_asset(capsule))
+    if attempts:
+        _write_exact(repro_dir / "test_repro.py", _regression_asset(capsule))
+    if anchor_resolutions:
+        _write_exact(
+            run_dir / "anchor-resolution.json",
+            canonical_json(anchor_resolutions[0]) + b"\n",
+        )
     if hypothesis_receipts:
         hypothesis_trace = _hypothesis_trace(hypothesis_receipts)
         hunt = {
@@ -1012,7 +1167,7 @@ def _publish(
         _write_exact(repro_dir / "hunt.json", canonical_json(hunt) + b"\n")
     if minimization_receipts:
         _write_exact(
-            repro_dir / "minimization.json",
+            run_dir / "minimization.json",
             canonical_json(minimization_receipts[0]) + b"\n",
         )
     manifest = {
@@ -1023,10 +1178,11 @@ def _publish(
         "schema_version": "nemisis.crashcheck.run.v1",
     }
     _write_exact(run_dir / "manifest.json", canonical_json(manifest) + b"\n")
-    with tempfile.TemporaryDirectory(prefix="nemisis-report-") as temporary:
-        rendered = Path(temporary) / "report.html"
-        write_crash_report(result, capsule, rendered)
-        _write_exact(run_dir / "report.html", rendered.read_bytes())
+    if attempts:
+        with tempfile.TemporaryDirectory(prefix="nemisis-report-") as temporary:
+            rendered = Path(temporary) / "report.html"
+            write_crash_report(result, capsule, rendered)
+            _write_exact(run_dir / "report.html", rendered.read_bytes())
     return result
 
 
