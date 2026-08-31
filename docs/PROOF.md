@@ -2,7 +2,7 @@
 
 | Capability | Status | Evidence |
 | --- | --- | --- |
-| Strict domain and digest bindings | `VERIFIED_LOCAL` | 113-test suite and manifest validation |
+| Strict domain and digest bindings | `VERIFIED_LOCAL` | The full test suite and manifest validation |
 | Safe patch/generated-file boundaries | `VERIFIED_LOCAL` | Safety and adapter contract tests |
 | Differential fixture worlds | `VERIFIED_LOCAL` | Real temporary filesystems and subprocesses |
 | Immutable full-bundle equality | `VERIFIED_LOCAL` | Matching bundle digest on both world/execution receipts |

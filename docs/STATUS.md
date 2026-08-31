@@ -36,7 +36,7 @@ uv run nemisis verify --fixture idempotency-retry --mode local
 ```
 
 On the source SHA above: locked sync passed; Ruff format and lint passed; strict mypy passed;
-113 tests passed; sdist/wheel build passed; the installed wheel ran from an unrelated Git
+the full test suite passed; sdist/wheel build passed; the installed wheel ran from an unrelated Git
 repository without claiming that repository's SHA; HTML structure validation passed. Live mode
 failed closed without fallback and reported the missing API key, immutable root image, and ConTree
 profile. No genuine provider call was possible in this environment.
