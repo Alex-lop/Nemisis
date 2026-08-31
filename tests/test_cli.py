@@ -355,6 +355,6 @@ def test_action_example_pins_a_real_release_and_bounds_runtime() -> None:
         encoding="utf-8"
     )
 
-    assert "Alex-lop/Nemisis@f377df0016957691e3a473a0d6f9528ef85bf972" in workflow
+    assert "Alex-lop/Nemisis@0fb4bc27e787b4749af27e79377dbcff0f98060b" in workflow
     assert "0123456789abcdef" not in workflow
     assert "timeout-minutes: 15" in workflow
