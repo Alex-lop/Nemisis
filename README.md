@@ -51,6 +51,19 @@ uv run nemisis replay "$CAPSULE_PATH" \
 CrashCheck uses `LOCAL` as the execution transport. The packaged audited contract and capsule carry
 the separate `FIXTURE` truth label in the manifest and report. Neither label means `LIVE`.
 
+### Open the one-minute evidence viewer
+
+From the repository root, serve the committed static evidence:
+
+```bash
+uv run python -m http.server 8000
+```
+
+Open <http://127.0.0.1:8000/docs/assets/crashcheck-hero/> and select **Replay fixture evidence**.
+The control reveals the committed, digest-bound `LOCAL` / `FIXTURE` receipt; it does not execute
+repository code, call a model, or start a provider run. If either JSON binding fails, the viewer
+shows no behavioral claim.
+
 ### Use the audited SQLite adapter in a trusted repository
 
 `init` writes strict JSON at `.nemisis/config.json`. A non-packaged contract remains `DRAFT` until

@@ -36,10 +36,11 @@ self-referential committed configuration digest.
 
 CrashCheck binds the accepted issue/base contract and runs exactly two parallel, fixed, base-only
 crash-boundary hypotheses before it materializes the candidate: `effect-commit-v1` and
-`marker-commit-v1`. Full attempt receipts are preserved. Selection is deterministic after both are
-terminal: reproduction, smaller trusted operation count, canonical rank, then digest. The selected
-semantic boundary and stable one-action deletion decision freeze the capsule; candidate content
-cannot change the hypothesis ranking, event, fault schedule, probes, parser, harness, or verdict.
+`marker-commit-v1`. Full attempt receipts are preserved. After both are terminal, selection filters
+to completed, integrity-valid duplicate observations and chooses the smallest fixed catalog rank.
+The selected semantic boundary and stable one-action deletion decision freeze the capsule;
+candidate content cannot change the hypothesis ranking, event, fault schedule, probes, parser,
+harness, or verdict.
 The deletion check proves necessity only for this fixture witness; it is not a general schedule
 minimizer.
 

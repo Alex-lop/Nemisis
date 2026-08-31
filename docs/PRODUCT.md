@@ -95,7 +95,7 @@ code, repair generation, PR comments, and a hosted control plane.
 | Five fresh worlds per claimed tree and scoped verdicts | `crash_models.py`, `crashcheck.py` | role and verdict model/integration tests | Same exact workflow above |
 | Portable capsule, manifest, report, regression, and replay | `_publish`, `report.py` | artifact relocation/export/replay tests | Same workflow includes installed-wheel replay |
 | Composite GitHub Action | `action.yml` | local Action job plus release tests | GitHub-hosted at the same exact SHA; expected candidate rejection is exit 1 |
-| Benchmark runner | `benchmark.py` | benchmark schema, determinism, and dirty-source tests | `LOCAL` / `FIXTURE`; committed result waits for exact final-SHA generation |
+| Measured benchmark and one-minute viewer | `benchmark.py`, `docs/assets/crashcheck-hero/` | benchmark and static evidence-binding tests | `LOCAL` / `FIXTURE`; source `ddaf186aa81b8a7ebd442da1f2dfeee6878e7dce`, capsule `1025d9c6…` |
 | Nemotron and ConTree adapters | `nemotron.py`, `contree.py`, `live.py` | injected-client contract tests | `MOCKED`; genuine current-tree path is `BLOCKED` |
 
 No fixture, mock, historical result, or local run may be relabeled as live evidence. Genuine live

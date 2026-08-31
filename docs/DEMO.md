@@ -69,6 +69,17 @@ uv run nemisis replay "$CAPSULE_PATH" \
 That replay must exit `0` with `FIX_PROVEN_FOR_THIS_CAPSULE`. The generated regression asset expresses
 the same scoped requirement and depends on the installed Nemisis package.
 
+## 3. One-minute evidence viewer
+
+```bash
+uv run python -m http.server 8000
+```
+
+Open <http://127.0.0.1:8000/docs/assets/crashcheck-hero/> and click **Replay fixture evidence**.
+Lead with the verdict and five beats, then expand the exact SHA/tree/capsule/event bindings. This
+button reveals committed `LOCAL` / `FIXTURE` evidence only; it does not execute code or contact
+Token Factory. A failed benchmark/manifest binding hides the story instead of retaining claims.
+
 ## Sub-three-minute CrashCheck sequence
 
 1. Show the benchmark's green Pytest and sequential checks as context.
