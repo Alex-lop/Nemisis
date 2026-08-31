@@ -301,3 +301,13 @@ def test_ci_smoke_covers_both_surfaces_and_discovers_the_bound_capsule() -> None
     assert "nemisis replay" in workflow
     assert "-mindepth 2 -maxdepth 2" in workflow
     assert "repros/double-credit/capsule.json" not in workflow
+
+
+def test_action_example_pins_a_real_release_and_bounds_runtime() -> None:
+    workflow = (Path(__file__).parents[1] / ".github/examples/crashcheck.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Alex-lop/Nemisis@f377df0016957691e3a473a0d6f9528ef85bf972" in workflow
+    assert "0123456789abcdef" not in workflow
+    assert "timeout-minutes: 15" in workflow

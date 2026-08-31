@@ -1,5 +1,5 @@
 # Copy this file to .github/workflows/crashcheck.yml in the target repository.
-# Replace the example ref below with the full SHA of a Nemisis release commit.
+# The Nemisis action is pinned to a reviewed release commit.
 name: CrashCheck
 
 on:
@@ -11,6 +11,7 @@ permissions:
 jobs:
   crashcheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Refuse untrusted fork execution without isolation
         if: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
@@ -36,7 +37,7 @@ jobs:
       - name: Run CrashCheck
         if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         id: crashcheck
-        uses: Alex-lop/Nemisis@0123456789abcdef0123456789abcdef01234567
+        uses: Alex-lop/Nemisis@f377df0016957691e3a473a0d6f9528ef85bf972
         with:
           base: ${{ github.event.pull_request.base.sha }}
           candidate: ${{ github.event.pull_request.head.sha }}

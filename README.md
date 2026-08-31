@@ -111,11 +111,11 @@ baseline tests, adversarial tests, runner definition, parser, and bundle bytes r
 ## GitHub pull requests
 
 Copy [the hardened example](.github/examples/crashcheck.yml) to
-`.github/workflows/crashcheck.yml`, replace the placeholder Nemisis ref with a reviewed full commit
-SHA, and commit the accepted base-owned configuration. The example uses `pull_request`, read-only
-contents permission, credential-free checkout, a new runner-temporary artifact directory, a job
-summary, and uploaded evidence. It refuses untrusted forks because local mode is not a hostile-code
-sandbox; those candidates require ConTree isolation.
+`.github/workflows/crashcheck.yml` and commit the accepted base-owned configuration. The example
+pins Nemisis to a reviewed full commit SHA and uses `pull_request`, read-only contents permission,
+credential-free checkout, a bounded job, a new runner-temporary artifact directory, a job summary,
+and uploaded evidence. It refuses untrusted forks because local mode is not a hostile-code sandbox;
+those candidates require ConTree isolation.
 
 ## Live boundaries
 
