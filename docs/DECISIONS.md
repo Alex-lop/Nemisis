@@ -86,6 +86,12 @@ The packaged CrashCheck proof supplies an exact atomic revision so one capsule c
 negative and positive outcomes. Nemisis exports the regression asset but does not generate or apply
 a repair in this slice.
 
+## Preserve one supported scenario after the viewer
+
+Choose Option A for this sprint: keep `sqlite-credit-v1` as the single supported CrashCheck slice.
+A second adapter would not close the missing live transport, exact sponsor receipt, public hosting,
+or demo-video gates, and would add a new trust surface before a second consumer is justified.
+
 ## Official live endpoints and narrow trust
 
 Inference defaults to `https://api.tokenfactory.nebius.com/v1/` and

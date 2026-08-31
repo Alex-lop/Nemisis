@@ -1,22 +1,51 @@
 # Proof ledger
 
-| Capability | Status | Evidence |
+This ledger separates observed behavior from transport and product claims. The committed evidence
+was executed from clean source `ddaf186aa81b8a7ebd442da1f2dfeee6878e7dce` and published by
+`3d66ccd4499fae5f1d6fbe5beee4b097d3ce3949`.
+
+| Capability | Truth state | Exact evidence |
 | --- | --- | --- |
-| Strict domain and digest bindings | `VERIFIED_LOCAL` | 113-test suite and manifest validation |
-| Safe patch/generated-file boundaries | `VERIFIED_LOCAL` | Safety and adapter contract tests |
-| Differential fixture worlds | `VERIFIED_LOCAL` | Real temporary filesystems and subprocesses |
-| Immutable full-bundle equality | `VERIFIED_LOCAL` | Matching bundle digest on both world/execution receipts |
-| Expected incomplete-candidate matrix | `VERIFIED_LOCAL` | `2 PASS/PASS`, `ASSERTION_FAIL/PASS`, `ASSERTION_FAIL/ASSERTION_FAIL` |
-| Token Factory Nemotron adapter | `MOCKED_TEST_ONLY` | Structured-output/error contract tests |
-| Genuine current-tree Nemotron call | `BLOCKED` | `NEBIUS_API_KEY` missing |
-| ConTree persistent-world adapter | `MOCKED_TEST_ONLY` | Official-client operation contract tests |
-| Genuine current-tree ConTree run | `BLOCKED` | Profile and immutable root image not configured |
-| Provider-owned result channel for arbitrary repositories | `NOT_PROVEN` | ConTree 0.3.0 exposes guest-written files/stdout; first slice is packaged-fixture-only |
-| Bounded repair | `NOT_PROVEN` | Conditional milestone intentionally not started |
-| FastAPI judge surface | `NOT_PROVEN` | Static HTML report covers the first-run surface |
-| Hosted demo and video | `NOT_PROVEN` | Requires a genuine live run first |
+| Real process-group kill and confirmed death | `LOCAL` / `FIXTURE` / `VALID` | Manifest attempt receipts record parent signal `9`, first-worker exit `-9`, and unchanged post-kill durable state. |
+| Fresh replay of the identical event | `LOCAL` / `FIXTURE` / `VALID` | Every proof attempt has two distinct worker and IPC nonces with event digest `4ad9ce16…`. |
+| Candidate-blind witness selection | `VERIFIED` | Candidate-invariance and ordering tests; two base-only receipts precede candidate materialization. |
+| Exact anchor mapping | `VERIFIED` | Unique mappings bind exact tree digests; zero/multiple/invalid supported mappings publish `EVIDENCE_INCOMPLETE` plus `anchor-resolution.json`. |
+| Fixture-scoped fault-action necessity | `VERIFIED` | One deletion trial; 2/2 fresh empty-schedule base worlds are `EXACTLY_ONCE`; schema-v2 field is `sole_fault_action_necessary_for_fixture`. |
+| Base/candidate/corrected verdicts | `LOCAL` / `FIXTURE` / `VALID` | Five fresh valid worlds per role: buggy and misleading-green duplicate; atomic completes exactly once. |
+| Repro Capsule | `VERIFIED` | Capsule `1025d9c6e014394cf80629d180e7cb4fb1a77a4b7b26934980b5f5ea975069a8`, engine digest `47d78405…`, exact event/environment/seed/tree identities. |
+| Installed-wheel replay and regression | `VERIFIED` | External temp install: base/candidate/corrected replay exits `1`/`1`/`0`; exported regression fails candidate and passes atomic. |
+| Measured benchmark | `LOCAL` / `FIXTURE` | Result `11016ce964b88961c246c91eb1ae437cf0ff9e9547a794ad845776af52af864a`; strict schema/digest validation passes. |
+| Static one-minute viewer | `LOCAL` / `FIXTURE` | Verdict-first five-beat viewer, exact receipt bindings, fail-closed runtime, and explicit “Replay fixture evidence” control. |
+| Project gates | `VERIFIED` | Locked sync, formatting, Ruff, mypy, 267 local tests, sdist, and wheel pass. |
+| GitHub composite Action | `VERIFIED_WITH_BOUNDARY` | Exact-SHA CI executes `uses: ./`, expected candidate rejection, artifact validation, installed-wheel smoke, and corrected replay. The copyable workflow pins engine `f05ae921…`; remote-action download and real upload transfer are not exercised by CI. |
+| Nemotron contract adapter | `MOCKED` | Injected-client structured-output tests only; CrashCheck CLI does not call the model. |
+| Differential Nemotron + ConTree path | `IMPLEMENTED_NOT_CURRENTLY_OBSERVED` | Bounded adapter and guest-receipt tests exist, but no current-tree provider receipt exists. |
+| CrashCheck ConTree transport | `BLOCKED` | Not implemented; local execution is never substituted for live. |
+| Genuine current-tree live proof | `BLOCKED` | Missing Token Factory key, ConTree profile, immutable image UUID, and CrashCheck transport. |
+| Browser visual/screenshot QA | `UNAVAILABLE` | No in-app browser instance was available; JavaScript, strict bindings, accessibility contracts, and HTTP paths were verified instead. |
+| Hosted URL and demo video | `NOT_PROVIDED` | Static artifact and one-command local preview exist; no deployment authorization or recording is claimed. |
+| Arbitrary repositories, databases, languages, or general schedule search | `UNSUPPORTED` | The alpha supports the audited Python 3.12/POSIX/SQLite `CreditStore` slice only. |
 
-No fixture, mock, or historical result is represented as live evidence.
+## Evidence axes
 
-Latest verified source: `03b58607add660c9da470488eacd74189c34c6c3`. Latest local bundle:
-`70e10c52e50c143b526af020c37aee2ee4bce0da85453bb1470d42736895b725`.
+For the committed hero:
+
+- transport: `LOCAL`;
+- execution: `COMPLETED`;
+- provenance: `FIXTURE`;
+- integrity: `VALID`;
+- candidate verdict: `PATCH_FAILED_STILL_REPRODUCES`; and
+- corrected control: `FIX_PROVEN_FOR_THIS_CAPSULE`.
+
+Transport success never supplies the behavioral verdict. The verdict comes from validated guest
+process/state receipts and fixed rules. No fixture, mock, historical result, or provider-looking ID
+is represented as `LIVE` or `RECORDED_LIVE`.
+
+## Review links
+
+- [measured benchmark](../benchmarks/results/crashcheck-v1.json)
+- [viewer](assets/crashcheck-hero/index.html)
+- [run manifest](assets/crashcheck-hero/runs/local-20260831T020037-73e97ef2/manifest.json)
+- [full receipt](assets/crashcheck-hero/runs/local-20260831T020037-73e97ef2/report.html)
+- [capsule](assets/crashcheck-hero/repros/double-credit/1025d9c6e014394cf80629d180e7cb4fb1a77a4b7b26934980b5f5ea975069a8/capsule.json)
+- [live prerequisites](LIVE_RUNBOOK.md)
