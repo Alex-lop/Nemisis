@@ -123,7 +123,7 @@ def test_check_routes_arguments_artifacts_and_failure_exit(
                     SimpleNamespace(
                         removed_fault=SimpleNamespace(value="effect-commit"),
                         confirmations=(SimpleNamespace(), SimpleNamespace()),
-                        irreducible=True,
+                        sole_fault_action_necessary_for_fixture=True,
                     ),
                 ),
                 attempts=(),
@@ -170,7 +170,7 @@ def test_check_routes_arguments_artifacts_and_failure_exit(
     assert f"engine source commit: {'a' * 40}" in output.out
     assert "hunt: 2 hypotheses -> selected effect-commit (effect-commit-v1)" in output.out
     assert (
-        "minimization: deleted effect-commit; empty schedule was EXACTLY_ONCE in 2/2 fresh "
+        "necessity: deleted effect-commit; empty schedule was EXACTLY_ONCE in 2/2 fresh "
         "base worlds; deletion rejected; final fault actions 1/1 (fixture-only necessity proof)"
         in output.out
     )
@@ -197,7 +197,7 @@ def test_crash_result_makes_no_minimization_claim_for_incomplete_evidence(
                 SimpleNamespace(
                     removed_fault=SimpleNamespace(value="effect-commit"),
                     confirmations=(SimpleNamespace(), SimpleNamespace()),
-                    irreducible=False,
+                    sole_fault_action_necessary_for_fixture=False,
                 ),
             ),
             attempts=(),
@@ -209,7 +209,7 @@ def test_crash_result_makes_no_minimization_claim_for_incomplete_evidence(
     cli._print_crash_result(result, as_json=False)
 
     output = capsys.readouterr().out
-    assert "minimization: empty-schedule evidence incomplete; no minimization claim" in output
+    assert "necessity: empty-schedule evidence incomplete; no necessity claim" in output
     assert "final fault actions" not in output
 
 

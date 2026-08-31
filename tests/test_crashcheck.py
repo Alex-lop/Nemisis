@@ -99,9 +99,9 @@ def test_three_tree_hero_runs_fifteen_fresh_worlds(
     hunt_attempts = [receipt.attempt for receipt in result.hypothesis_receipts]
     assert len(result.minimization_receipts) == 1
     reduction = result.minimization_receipts[0]
-    assert reduction.irreducible
-    assert not reduction.reproduced
-    assert not reduction.retained
+    assert reduction.sole_fault_action_necessary_for_fixture
+    assert not reduction.empty_schedule_reproduced_duplicate
+    assert not reduction.deletion_accepted
     assert len(reduction.confirmations) == 2
     database_ids = {attempt.database_id for attempt in hunt_attempts}
     database_ids.update(attempt.database_id for attempt in reduction.confirmations)
@@ -421,7 +421,7 @@ def test_minimization_exception_publishes_incomplete_evidence(
     assert len(result.bindings) == len(result.attempts) == 1
     assert len(result.minimization_receipts) == 1
     reduction = result.minimization_receipts[0]
-    assert not reduction.irreducible
+    assert not reduction.sole_fault_action_necessary_for_fixture
     assert all(
         attempt.execution_status is ExecutionStatus.SETUP_ERROR
         and "RuntimeError" in (attempt.failure_detail or "")

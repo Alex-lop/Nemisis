@@ -455,9 +455,9 @@ class NoFaultReplayReceipt(_DigestedModel):
 
 
 class MinimizationReceipt(_DigestedModel):
-    """Deterministic deletion trial proving whether one fault action is necessary."""
+    """Fixture-scoped deletion check for the selected schedule's sole fault action."""
 
-    schema_version: Literal["1"] = "1"
+    schema_version: Literal["2"] = "2"
     parent_capsule_digest: Sha256
     contract_digest: Sha256
     originating_base_tree_digest: Sha256
@@ -465,9 +465,9 @@ class MinimizationReceipt(_DigestedModel):
     candidate_schedule: tuple[FaultBoundary, ...] = Field(max_length=1)
     removed_fault: FaultBoundary
     confirmations: tuple[NoFaultReplayReceipt, ...] = Field(min_length=2, max_length=2)
-    reproduced: bool
-    retained: bool
-    irreducible: bool
+    empty_schedule_reproduced_duplicate: bool
+    deletion_accepted: bool
+    sole_fault_action_necessary_for_fixture: bool
     trace_digest: Sha256
 
     @model_validator(mode="after")
@@ -478,7 +478,7 @@ class MinimizationReceipt(_DigestedModel):
             or self.candidate_schedule
             or self.removed_fault is not FaultBoundary.EFFECT_COMMIT
         ):
-            raise ValueError("minimization trial differs from the trusted one-fault deletion")
+            raise ValueError("deletion trial differs from the trusted one-fault schedule")
         for attempt in self.confirmations:
             attempt._require_canonical_digest()
         if any(
@@ -487,7 +487,7 @@ class MinimizationReceipt(_DigestedModel):
             or attempt.tree_digest != self.originating_base_tree_digest
             for attempt in self.confirmations
         ):
-            raise ValueError("minimization confirmations differ from their exact parent inputs")
+            raise ValueError("deletion confirmations differ from their exact parent inputs")
         unique_groups = (
             [attempt.digest for attempt in self.confirmations],
             [attempt.receipt_id for attempt in self.confirmations],
@@ -512,7 +512,7 @@ class MinimizationReceipt(_DigestedModel):
             or any(len(set(values)) != 1 for values in shared_groups)
             or len(database_file_digests) > 1
         ):
-            raise ValueError("minimization confirmations require fresh execution identities")
+            raise ValueError("deletion confirmations require fresh execution identities")
         completed = all(
             attempt.execution_status is ExecutionStatus.COMPLETED
             and attempt.integrity_status is IntegrityStatus.VALID
@@ -522,29 +522,31 @@ class MinimizationReceipt(_DigestedModel):
             attempt.observation is CrashObservation.DUPLICATE_EFFECT
             for attempt in self.confirmations
         )
-        irreducible = completed and all(
+        necessary = completed and all(
             attempt.observation is CrashObservation.EXACTLY_ONCE for attempt in self.confirmations
         )
         if (
-            self.reproduced is not reproduced
-            or self.retained is not reproduced
-            or self.irreducible is not irreducible
+            self.empty_schedule_reproduced_duplicate is not reproduced
+            or self.deletion_accepted is not reproduced
+            or self.sole_fault_action_necessary_for_fixture is not necessary
         ):
-            raise ValueError("minimization decision contradicts its confirmation receipts")
+            raise ValueError("deletion decision contradicts its confirmation receipts")
         stable = {
             "candidate_schedule": self.candidate_schedule,
             "confirmation_count": len(self.confirmations),
             "contract_digest": self.contract_digest,
-            "irreducible": self.irreducible,
+            "sole_fault_action_necessary_for_fixture": (
+                self.sole_fault_action_necessary_for_fixture
+            ),
             "originating_base_tree_digest": self.originating_base_tree_digest,
             "parent_capsule_digest": self.parent_capsule_digest,
             "parent_schedule": self.parent_schedule,
             "removed_fault": self.removed_fault,
-            "reproduced": self.reproduced,
-            "retained": self.retained,
+            "empty_schedule_reproduced_duplicate": self.empty_schedule_reproduced_duplicate,
+            "deletion_accepted": self.deletion_accepted,
         }
         if sha256_json(stable) != self.trace_digest:
-            raise ValueError("minimization trace digest mismatch")
+            raise ValueError("one-action deletion trace digest mismatch")
         return self
 
 
@@ -757,9 +759,11 @@ class CrashCheckResult(_DigestedModel):
                 _validate_conclusive_hypothesis_receipts(self.hypothesis_receipts)
                 if (
                     len(self.minimization_receipts) != 1
-                    or not self.minimization_receipts[0].irreducible
+                    or not self.minimization_receipts[0].sole_fault_action_necessary_for_fixture
                 ):
-                    raise ValueError("conclusive full check requires proven witness minimization")
+                    raise ValueError(
+                        "conclusive full check requires a fixture-scoped one-action deletion proof"
+                    )
             elif len(self.bindings) > 1:
                 raise ValueError("conclusive full check requires both crash-boundary hypotheses")
             _validate_conclusive_verdict(self.verdict, self.attempts)

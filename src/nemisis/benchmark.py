@@ -633,9 +633,9 @@ def _measure_hunt(result: CrashCheckResult, capsule: ReproCapsule) -> HuntMeasur
         or selected[0].fault_boundary is not FaultBoundary.EFFECT_COMMIT
         or capsule.fault_boundary is not selected[0].fault_boundary
         or len(minimization) != 1
-        or not minimization[0].irreducible
-        or minimization[0].reproduced
-        or minimization[0].retained
+        or not minimization[0].sole_fault_action_necessary_for_fixture
+        or minimization[0].empty_schedule_reproduced_duplicate
+        or minimization[0].deletion_accepted
         or capsule.minimization_trace != (minimization[0].trace_digest,)
         or any(
             attempt.execution_status is not ExecutionStatus.COMPLETED

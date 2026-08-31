@@ -81,7 +81,7 @@ report.</caption>
         )
         reduction_outcome = (
             "deletion rejected; the sole fault action is necessary for this fixture witness"
-            if minimization.irreducible
+            if minimization.sole_fault_action_necessary_for_fixture
             else "empty-schedule evidence incomplete; no minimization claim"
         )
         minimization_section = f"""<section class="card" aria-labelledby="minimization">

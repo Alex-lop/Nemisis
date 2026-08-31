@@ -152,7 +152,7 @@ def _render_report(
                             )
                         ),
                     ),
-                    irreducible=minimization_irreducible is not False,
+                    sole_fault_action_necessary_for_fixture=(minimization_irreducible is not False),
                     trace_digest="m" * 64,
                 ),
             )

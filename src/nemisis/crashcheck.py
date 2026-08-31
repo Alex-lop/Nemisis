@@ -267,8 +267,11 @@ def check(
             root / "minimization-worlds",
         )
         minimization_receipts = (minimization_receipt,)
-        if not minimization_receipt.irreducible:
-            detail = "The selected witness could not be proven irreducible in two fresh worlds."
+        if not minimization_receipt.sole_fault_action_necessary_for_fixture:
+            detail = (
+                "The fixture-scoped one-action deletion check did not establish necessity in two "
+                "fresh base worlds."
+            )
             attempt = _failed_attempt(
                 capsule, base_binding, WorldRole.BASE, TruthLabel.LOCAL, detail
             )
@@ -819,7 +822,7 @@ def _minimize_witness(
     source: Path,
     work_root: Path,
 ) -> tuple[MinimizationReceipt, ReproCapsule]:
-    """Test deletion twice; this alpha proceeds only with an irreducible one-action witness."""
+    """Delete the sole fault action twice; continue only when both fixture worlds are exact-once."""
 
     def one(index: int) -> NoFaultReplayReceipt:
         nonce = f"minimize-{index}-{uuid.uuid4().hex}"
@@ -867,20 +870,20 @@ def _minimize_witness(
     reproduced = completed and all(
         attempt.observation is CrashObservation.DUPLICATE_EFFECT for attempt in confirmations
     )
-    irreducible = completed and all(
+    necessary = completed and all(
         attempt.observation is CrashObservation.EXACTLY_ONCE for attempt in confirmations
     )
     stable = {
         "candidate_schedule": (),
         "confirmation_count": len(confirmations),
         "contract_digest": contract.digest,
-        "irreducible": irreducible,
+        "sole_fault_action_necessary_for_fixture": necessary,
         "originating_base_tree_digest": binding.tree_digest,
         "parent_capsule_digest": parent.digest,
         "parent_schedule": (FaultBoundary.EFFECT_COMMIT,),
         "removed_fault": FaultBoundary.EFFECT_COMMIT,
-        "reproduced": reproduced,
-        "retained": reproduced,
+        "empty_schedule_reproduced_duplicate": reproduced,
+        "deletion_accepted": reproduced,
     }
     receipt = MinimizationReceipt.with_digest(
         parent_capsule_digest=parent.digest,
@@ -890,9 +893,9 @@ def _minimize_witness(
         candidate_schedule=(),
         removed_fault=FaultBoundary.EFFECT_COMMIT,
         confirmations=confirmations,
-        reproduced=reproduced,
-        retained=reproduced,
-        irreducible=irreducible,
+        empty_schedule_reproduced_duplicate=reproduced,
+        deletion_accepted=reproduced,
+        sole_fault_action_necessary_for_fixture=necessary,
         trace_digest=sha256_json(stable),
     )
     return receipt, _seal_capsule(
@@ -1055,7 +1058,9 @@ def _publish(
     if minimization_receipts and capsule.minimization_trace != (
         minimization_receipts[0].trace_digest,
     ):
-        raise CrashCheckError("capsule minimization trace differs from its reduction receipt")
+        raise CrashCheckError(
+            "capsule one-action deletion trace differs from its fixture necessity receipt"
+        )
     root = _absolute(Path(os.environ.get("NEMISIS_ARTIFACT_ROOT", ".nemisis")))
     run_relative = Path("runs") / run_id
     repro_relative = Path("repros") / "double-credit" / capsule.digest

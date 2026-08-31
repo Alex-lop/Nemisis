@@ -299,13 +299,13 @@ def _minimization_receipts(
         "candidate_schedule": (),
         "confirmation_count": 2,
         "contract_digest": capsule.contract_digest,
-        "irreducible": True,
+        "sole_fault_action_necessary_for_fixture": True,
         "originating_base_tree_digest": binding.tree_digest,
         "parent_capsule_digest": capsule.digest,
         "parent_schedule": (FaultBoundary.EFFECT_COMMIT,),
         "removed_fault": FaultBoundary.EFFECT_COMMIT,
-        "reproduced": False,
-        "retained": False,
+        "empty_schedule_reproduced_duplicate": False,
+        "deletion_accepted": False,
     }
     return (
         MinimizationReceipt.with_digest(
@@ -316,9 +316,9 @@ def _minimization_receipts(
             candidate_schedule=(),
             removed_fault=FaultBoundary.EFFECT_COMMIT,
             confirmations=confirmations,
-            reproduced=False,
-            retained=False,
-            irreducible=True,
+            empty_schedule_reproduced_duplicate=False,
+            deletion_accepted=False,
+            sole_fault_action_necessary_for_fixture=True,
             trace_digest=sha256_json(stable),
         ),
     )
@@ -763,13 +763,17 @@ def test_minimization_receipt_binds_trace_and_fresh_confirmations() -> None:
     capsule = _capsule()
     binding = _binding(capsule)
     receipt = _minimization_receipts(capsule, binding)[0]
+    assert receipt.schema_version == "2"
+    assert receipt.sole_fault_action_necessary_for_fixture
+    serialized = receipt.model_dump(mode="json")
+    assert not {"irreducible", "reproduced", "retained"} & serialized.keys()
     values = {
         name: getattr(receipt, name)
         for name in MinimizationReceipt.model_fields
         if name != "digest"
     }
     values["trace_digest"] = HASHES[8]
-    with pytest.raises(ValidationError, match="trace digest mismatch"):
+    with pytest.raises(ValidationError, match="deletion trace digest mismatch"):
         MinimizationReceipt.with_digest(**values)
 
     missing_database_digest = {
