@@ -146,12 +146,12 @@ class HuntMeasurement(StrictModel):
     selected_hypothesis_id: Literal["effect-commit-v1"] = "effect-commit-v1"
     selected_fault_boundary: Literal[FaultBoundary.EFFECT_COMMIT] = FaultBoundary.EFFECT_COMMIT
     hypothesis_selection_ratio: float = Field(default=0.5, ge=0.5, le=0.5)
-    minimization_trial_count: Literal[1] = 1
-    minimization_world_count: Literal[2] = 2
+    fault_action_deletion_trial_count: Literal[1] = 1
+    deletion_confirmation_world_count: Literal[2] = 2
     initial_fault_action_count: Literal[1] = 1
     final_fault_action_count: Literal[1] = 1
-    minimization_ratio: float = Field(default=1.0, ge=1.0, le=1.0)
-    minimization_wall_time_ns: int = Field(ge=0)
+    fault_action_retention_ratio: float = Field(default=1.0, ge=1.0, le=1.0)
+    deletion_proof_wall_time_ns: int = Field(ge=0)
     time_to_first_witness_ns: int = Field(ge=0)
     wall_time_ns: int = Field(ge=0)
 
@@ -649,7 +649,7 @@ def _measure_hunt(result: CrashCheckResult, capsule: ReproCapsule) -> HuntMeasur
     minimization_start = min(attempt.started_at for attempt in minimization[0].confirmations)
     minimization_end = max(attempt.ended_at for attempt in minimization[0].confirmations)
     return HuntMeasurement(
-        minimization_wall_time_ns=_duration_ns(minimization_start, minimization_end),
+        deletion_proof_wall_time_ns=_duration_ns(minimization_start, minimization_end),
         time_to_first_witness_ns=_duration_ns(earliest_start, reproduced[0].attempt.ended_at),
         wall_time_ns=_duration_ns(
             earliest_start, max(receipt.attempt.ended_at for receipt in receipts)
@@ -746,7 +746,7 @@ def _input_digest(
             "hunt": hunt.model_dump(
                 mode="json",
                 exclude={
-                    "minimization_wall_time_ns",
+                    "deletion_proof_wall_time_ns",
                     "time_to_first_witness_ns",
                     "wall_time_ns",
                 },

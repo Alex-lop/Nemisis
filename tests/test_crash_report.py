@@ -19,7 +19,13 @@ from nemisis.models import TruthLabel
 from nemisis.report import write_crash_report
 
 
-def _render_report(tmp_path: Path, *, complete: bool, fixed: bool = False) -> str:
+def _render_report(
+    tmp_path: Path,
+    *,
+    complete: bool,
+    fixed: bool = False,
+    minimization_irreducible: bool | None = None,
+) -> str:
     checkpoint = cast(
         CreditSnapshot,
         SimpleNamespace(
@@ -131,10 +137,22 @@ def _render_report(tmp_path: Path, *, complete: bool, fixed: bool = False) -> st
                 SimpleNamespace(
                     removed_fault=FaultBoundary.EFFECT_COMMIT,
                     confirmations=(
-                        SimpleNamespace(observation=CrashObservation.EXACTLY_ONCE),
-                        SimpleNamespace(observation=CrashObservation.EXACTLY_ONCE),
+                        SimpleNamespace(
+                            observation=(
+                                CrashObservation.EXACTLY_ONCE
+                                if minimization_irreducible is not False
+                                else CrashObservation.NOT_OBSERVED
+                            )
+                        ),
+                        SimpleNamespace(
+                            observation=(
+                                CrashObservation.EXACTLY_ONCE
+                                if minimization_irreducible is not False
+                                else CrashObservation.NOT_OBSERVED
+                            )
+                        ),
                     ),
-                    irreducible=True,
+                    irreducible=minimization_irreducible is not False,
                     trace_digest="m" * 64,
                 ),
             )
@@ -185,9 +203,10 @@ def test_crash_report_uses_receipt_and_capsule_values_and_escapes_html(tmp_path:
     assert "marker-commit-v1" in report
     assert "REPRODUCED" in report
     assert "NOT REPRODUCED" in report
-    assert "Deterministic witness minimization" in report
+    assert "Single-action deletion / necessity check" in report
     assert "empty schedule observed" in report
-    assert "one-action schedule is irreducible" in report
+    assert "sole fault action is necessary for this fixture witness" in report
+    assert "No general minimizer claim" in report
     assert "event-digest&lt;&amp;" in report
     assert "attempt-&lt;unsafe&gt;" in report
     assert "capsule-digest&lt;&amp;" in report
@@ -230,7 +249,7 @@ def test_incomplete_report_makes_no_success_claim_and_uses_semantic_html(tmp_pat
     assert "blocked by &lt;script&gt;alert(1)&lt;/script&gt;" in report
     assert "real process-group SIGKILL" not in report
     assert "hypothesis hunt and minimization" not in report
-    assert "Deterministic witness minimization" not in report
+    assert "Single-action deletion / necessity check" not in report
     assert "Selected outcome" not in report
     assert "<head>" in report
     assert '<main id="main" class="verdict-warn">' in report
@@ -238,4 +257,14 @@ def test_incomplete_report_makes_no_success_claim_and_uses_semantic_html(tmp_pat
     assert '<ol class="timeline">' in report
     assert '<th scope="row">' in report
     assert '<th scope="col">' in report
+
+
+def test_crash_report_makes_no_minimization_claim_for_incomplete_evidence(
+    tmp_path: Path,
+) -> None:
+    report = _render_report(tmp_path, complete=True, minimization_irreducible=False)
+
+    assert "Single-action deletion / necessity check" in report
+    assert "empty-schedule evidence incomplete; no minimization claim" in report
+    assert "sole fault action is necessary" not in report
     assert "<caption>1 receipt(s) across 2 source-tree binding(s).</caption>" in report

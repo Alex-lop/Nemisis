@@ -95,7 +95,7 @@ def test_measures_the_audited_three_tree_outcome_matrix(
 
     assert result.crashcheck_verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
     assert result.hunt.model_dump(
-        exclude={"minimization_wall_time_ns", "time_to_first_witness_ns", "wall_time_ns"}
+        exclude={"deletion_proof_wall_time_ns", "time_to_first_witness_ns", "wall_time_ns"}
     ) == {
         "role": "base",
         "attempted_world_count": 2,
@@ -106,11 +106,11 @@ def test_measures_the_audited_three_tree_outcome_matrix(
         "selected_hypothesis_id": "effect-commit-v1",
         "selected_fault_boundary": FaultBoundary.EFFECT_COMMIT,
         "hypothesis_selection_ratio": 0.5,
-        "minimization_trial_count": 1,
-        "minimization_world_count": 2,
+        "fault_action_deletion_trial_count": 1,
+        "deletion_confirmation_world_count": 2,
         "initial_fault_action_count": 1,
         "final_fault_action_count": 1,
-        "minimization_ratio": 1.0,
+        "fault_action_retention_ratio": 1.0,
     }
     assert result.hunt.time_to_first_witness_ns <= result.hunt.wall_time_ns
 
@@ -140,7 +140,7 @@ def test_binds_exact_source_capsule_environment_and_canonical_bytes(
             "hunt": result.hunt.model_dump(
                 mode="json",
                 exclude={
-                    "minimization_wall_time_ns",
+                    "deletion_proof_wall_time_ns",
                     "time_to_first_witness_ns",
                     "wall_time_ns",
                 },
@@ -215,7 +215,7 @@ def _without_timings(value: Any) -> Any:
             not in {
                 "crashcheck_wall_time_ns",
                 "duration_ns",
-                "minimization_wall_time_ns",
+                "deletion_proof_wall_time_ns",
                 "result_digest",
                 "time_to_first_witness_ns",
                 "wall_time_ns",

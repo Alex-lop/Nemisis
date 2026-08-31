@@ -119,6 +119,13 @@ def test_check_routes_arguments_artifacts_and_failure_exit(
                         selected=False,
                     ),
                 ),
+                minimization_receipts=(
+                    SimpleNamespace(
+                        removed_fault=SimpleNamespace(value="effect-commit"),
+                        confirmations=(SimpleNamespace(), SimpleNamespace()),
+                        irreducible=True,
+                    ),
+                ),
                 attempts=(),
                 bindings=(),
                 artifacts={"manifest": "runs/manifest.json"},
@@ -162,8 +169,48 @@ def test_check_routes_arguments_artifacts_and_failure_exit(
     assert f"engine code digest: {'e' * 64}" in output.out
     assert f"engine source commit: {'a' * 40}" in output.out
     assert "hunt: 2 hypotheses -> selected effect-commit (effect-commit-v1)" in output.out
+    assert (
+        "minimization: deleted effect-commit; empty schedule was EXACTLY_ONCE in 2/2 fresh "
+        "base worlds; deletion rejected; final fault actions 1/1 (fixture-only necessity proof)"
+        in output.out
+    )
     assert f"manifest: {(tmp_path / 'runs/manifest.json').resolve()}" in output.out
     assert "CrashCheck check started (LOCAL)" in output.err
+
+
+def test_crash_result_makes_no_minimization_claim_for_incomplete_evidence(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    result = cast(
+        CrashCheckResult,
+        SimpleNamespace(
+            transport=TruthLabel.LOCAL,
+            execution_status=ExecutionStatus.SETUP_ERROR,
+            integrity_status=IntegrityStatus.INCOMPLETE,
+            verdict=CrashVerdict.EVIDENCE_INCOMPLETE,
+            summary="minimization incomplete",
+            capsule_digest="c" * 64,
+            engine_code_digest="e" * 64,
+            engine_source_commit=None,
+            hypothesis_receipts=(),
+            minimization_receipts=(
+                SimpleNamespace(
+                    removed_fault=SimpleNamespace(value="effect-commit"),
+                    confirmations=(SimpleNamespace(), SimpleNamespace()),
+                    irreducible=False,
+                ),
+            ),
+            attempts=(),
+            bindings=(),
+            artifacts={},
+        ),
+    )
+
+    cli._print_crash_result(result, as_json=False)
+
+    output = capsys.readouterr().out
+    assert "minimization: empty-schedule evidence incomplete; no minimization claim" in output
+    assert "final fault actions" not in output
 
 
 def test_json_error_preserves_the_unsupported_target_verdict(

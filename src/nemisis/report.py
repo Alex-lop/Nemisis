@@ -80,16 +80,17 @@ report.</caption>
             attempt.observation.value for attempt in minimization.confirmations
         )
         reduction_outcome = (
-            "reduction rejected; the one-action schedule is irreducible"
+            "deletion rejected; the sole fault action is necessary for this fixture witness"
             if minimization.irreducible
-            else "minimization evidence incomplete"
+            else "empty-schedule evidence incomplete; no minimization claim"
         )
         minimization_section = f"""<section class="card" aria-labelledby="minimization">
-<h2 id="minimization">Deterministic witness minimization</h2>
+<h2 id="minimization">Single-action deletion / necessity check</h2>
 <p>Tried deleting the capsule's sole <code>{escape(minimization.removed_fault.value)}</code>
 fault action in {len(minimization.confirmations)} fresh base worlds. The empty schedule observed
 <code>{escape(observations)}</code>; {escape(reduction_outcome)}.</p>
-<p>Stable reduction trace <code>{escape(minimization.trace_digest)}</code></p></section>"""
+<p>No general minimizer claim. Stable deletion trace
+<code>{escape(minimization.trace_digest)}</code></p></section>"""
     else:
         minimization_section = ""
     representative = next(

@@ -120,11 +120,15 @@ def _print_crash_result(
         print(f"hunt: {len(result.hypothesis_receipts)} hypotheses -> {selection}")
     if minimization_receipts := getattr(result, "minimization_receipts", ()):
         minimization = minimization_receipts[0]
-        outcome = "irreducible" if minimization.irreducible else "incomplete"
-        print(
-            "minimization: removed fault replayed "
-            f"{len(minimization.confirmations)}x -> {outcome}; final schedule 1/1 action"
-        )
+        if minimization.irreducible:
+            confirmations = len(minimization.confirmations)
+            print(
+                f"minimization: deleted {minimization.removed_fault.value}; empty schedule was "
+                f"EXACTLY_ONCE in {confirmations}/{confirmations} fresh base worlds; deletion "
+                "rejected; final fault actions 1/1 (fixture-only necessity proof)"
+            )
+        else:
+            print("minimization: empty-schedule evidence incomplete; no minimization claim")
     representative = next(
         (
             attempt
