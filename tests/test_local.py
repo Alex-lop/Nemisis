@@ -93,3 +93,13 @@ def _pid_exists(pid: int) -> bool:
     except ProcessLookupError:
         return False
     return True
+
+
+def test_verify_refuses_non_posix_platforms_plainly(monkeypatch: pytest.MonkeyPatch) -> None:
+    import os
+
+    import nemisis.local as local_module
+
+    monkeypatch.setattr(os, "name", "nt")
+    with pytest.raises(ValueError, match="POSIX Python 3.12\\+"):
+        local_module.verify_local(output_root=Path("/nonexistent"))

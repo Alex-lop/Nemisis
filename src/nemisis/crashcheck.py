@@ -694,26 +694,40 @@ def _load_exported_contract(path: Path) -> RetryContract:
 
 def _validate_capsule_contract(capsule: ReproCapsule, contract: RetryContract) -> None:
     event = load_event()
-    expected = (
-        capsule.contract_digest == contract.digest,
-        capsule.originating_base_tree_digest == contract.originating_base_tree_digest,
-        capsule.engine_code_digest == engine_code_digest(),
-        capsule.scenario_id == contract.scenario_id,
-        capsule.event_id == event["event_id"],
-        capsule.account_id == event["account_id"],
-        capsule.amount_cents == event["amount_cents"],
-        capsule.event_digest == contract.event_digest,
-        capsule.fault_intent_id == contract.fault_intent_id,
-        capsule.probe_id == contract.probe_id,
-        capsule.predicate_ids == contract.predicate_ids,
-        capsule.runner_id == RUNNER_ID,
-        capsule.runner_version == RUNNER_VERSION,
-        capsule.environment_digest == runner_environment_digest(),
-        capsule.initial_database_digest == initial_database_digest(event),
-        capsule.truth_label is contract.truth_label,
-    )
-    if not all(expected):
-        raise CrashCheckError("capsule fields differ from its accepted contract or trusted engine")
+    expected = {
+        "contract_digest": capsule.contract_digest == contract.digest,
+        "originating_base_tree_digest": (
+            capsule.originating_base_tree_digest == contract.originating_base_tree_digest
+        ),
+        "engine_code_digest": capsule.engine_code_digest == engine_code_digest(),
+        "scenario_id": capsule.scenario_id == contract.scenario_id,
+        "event_id": capsule.event_id == event["event_id"],
+        "account_id": capsule.account_id == event["account_id"],
+        "amount_cents": capsule.amount_cents == event["amount_cents"],
+        "event_digest": capsule.event_digest == contract.event_digest,
+        "fault_intent_id": capsule.fault_intent_id == contract.fault_intent_id,
+        "probe_id": capsule.probe_id == contract.probe_id,
+        "predicate_ids": capsule.predicate_ids == contract.predicate_ids,
+        "runner_id": capsule.runner_id == RUNNER_ID,
+        "runner_version": capsule.runner_version == RUNNER_VERSION,
+        "environment_digest": capsule.environment_digest == runner_environment_digest(),
+        "initial_database_digest": (
+            capsule.initial_database_digest == initial_database_digest(event)
+        ),
+        "truth_label": capsule.truth_label is contract.truth_label,
+    }
+    failed = [name for name, okay in expected.items() if not okay]
+    if failed:
+        hint = ""
+        if "engine_code_digest" in failed or "environment_digest" in failed:
+            hint = (
+                "; this capsule was recorded under a different engine build or runtime, so "
+                "run check again to freeze a capsule for this engine"
+            )
+        raise CrashCheckError(
+            "capsule fields differ from its accepted contract or trusted engine: "
+            f"{', '.join(failed)}{hint}"
+        )
 
 
 def _bind_anchor(

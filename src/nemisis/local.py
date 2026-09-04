@@ -56,6 +56,7 @@ class LocalVerification:
 def verify_local(
     *, fixture_id: str = FIXTURE_ID, output_root: Path = Path(".nemisis/runs")
 ) -> LocalVerification:
+    require_posix_sigkill()
     fixture = load_fixture(fixture_id)
     run_id = f"local-{datetime.now(UTC):%Y%m%dT%H%M%S}-{uuid.uuid4().hex[:8]}"
     request = VerificationRequest(
@@ -183,6 +184,18 @@ def verify_local(
     report_path = run_dir / "report.html"
     write_html_report(manifest, report_path)
     return LocalVerification(manifest, manifest_path, report_path)
+
+
+def require_posix_sigkill() -> None:
+    """Both surfaces kill real process groups; say so plainly on an unsupported platform."""
+    if (
+        os.name != "posix"
+        or not hasattr(os, "killpg")
+        or not hasattr(os, "setsid")
+        or not hasattr(signal, "SIGKILL")
+        or sys.version_info < (3, 12)
+    ):
+        raise ValueError("POSIX Python 3.12+ with process groups and SIGKILL is required")
 
 
 def materialize_repository(fixture: Fixture, destination: Path) -> None:
