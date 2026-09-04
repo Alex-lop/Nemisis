@@ -645,6 +645,10 @@ def _completion_content(completion: object) -> str:
     refusal = _field(message, "refusal", required=False)
     if refusal:
         raise NemotronResponseError("Nemotron refused to generate verification tests")
+    if _field(choices[0], "finish_reason", required=False) == "length":
+        raise NemotronResponseError(
+            f"Nemotron response was truncated at max_tokens={MAX_OUTPUT_TOKENS}"
+        )
     content = _field(message, "content", required=False)
     if not isinstance(content, str) or not content:
         raise NemotronResponseError("Nemotron response did not contain JSON content")

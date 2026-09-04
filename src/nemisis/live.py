@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import configparser
 import gzip
 import io
 import os
@@ -60,7 +61,7 @@ def live_configuration_blockers() -> tuple[str, ...]:
         blockers.append(f"{ROOT_IMAGE_ENV} is missing")
     try:
         profile = resolve_profile()
-    except ProfileError:
+    except (ProfileError, configparser.Error):
         blockers.append("CONTREE_PROFILE is missing or invalid")
     else:
         if profile.token is None or not profile.token.strip():

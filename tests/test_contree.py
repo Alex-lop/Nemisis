@@ -24,6 +24,7 @@ from contree_client import (
     WhoAmIResponse,
 )
 
+import nemisis.contree as contree
 from nemisis.contree import (
     _RUNNER_SHELL,
     _TREE_CODE,
@@ -389,3 +390,35 @@ def test_extracts_bound_tree_and_junit_evidence() -> None:
     malformed = ContreeExecution(**{**execution.__dict__, "stdout": "NEMISIS_JUNIT_BASE64=!"})
     with pytest.raises(ContreeProtocolError, match="malformed JUnit"):
         ContreeBackend.junit_xml(malformed)
+
+
+def test_files_match_tolerates_provider_uid_gid_defaults_but_pins_uuid_and_mode() -> None:
+    expected = {"/opt/nemisis/bundle.tar.gz": FileSpec(uuid="bundle", mode="0444")}
+
+    assert contree._files_match(
+        {"/opt/nemisis/bundle.tar.gz": FileSpec(uuid="bundle", uid=0, gid=0, mode="0444")},
+        expected,
+    )
+    assert not contree._files_match(
+        {"/opt/nemisis/bundle.tar.gz": FileSpec(uuid="other", uid=0, gid=0, mode="0444")},
+        expected,
+    )
+    assert not contree._files_match(
+        {"/opt/nemisis/bundle.tar.gz": FileSpec(uuid="bundle", mode="0644")}, expected
+    )
+    pinned = {"/opt/nemisis/bundle.tar.gz": FileSpec(uuid="bundle", uid=0, gid=0, mode="0444")}
+    assert not contree._files_match(
+        {"/opt/nemisis/bundle.tar.gz": FileSpec(uuid="bundle", uid=1000, gid=0, mode="0444")},
+        pinned,
+    )
+
+
+def test_malformed_profile_file_is_a_configuration_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "auth.ini").write_text("token = abc\n[profile:default]\n", encoding="utf-8")
+    monkeypatch.setenv("CONTREE_HOME", str(tmp_path))
+    monkeypatch.delenv("CONTREE_PROFILE", raising=False)
+
+    with pytest.raises(ContreeConfigurationError, match="could not be loaded"):
+        ContreeBackend.from_profile()

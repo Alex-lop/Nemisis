@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import configparser
 import os
 import re
 from base64 import b64decode
@@ -246,7 +247,7 @@ class ContreeBackend:
             backend = cls(client, timeout=timeout)
             backend.check_capability()
             return backend
-        except ProfileError:
+        except (ProfileError, configparser.Error, ValueError):
             raise ContreeConfigurationError(
                 "ConTree profile could not be loaded; set CONTREE_PROFILE to a profile "
                 "configured in ~/.config/contree/auth.ini"
@@ -565,8 +566,8 @@ def _files_match(actual: dict[str, FileSpec] | EllipsisType, expected: dict[str,
         and all(
             actual[path].uuid == file.uuid
             and actual[path].mode == file.mode
-            and actual[path].uid == file.uid
-            and actual[path].gid == file.gid
+            and (file.uid is ... or actual[path].uid == file.uid)
+            and (file.gid is ... or actual[path].gid == file.gid)
             for path, file in expected.items()
         )
     )

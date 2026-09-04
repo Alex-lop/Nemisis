@@ -135,3 +135,16 @@ def test_live_bundle_always_includes_required_fixture_claims() -> None:
         "adversarial.duplicate",
         "adversarial.crash-retry",
     }
+
+
+def test_malformed_contree_profile_is_a_blocker_not_a_traceback(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "auth.ini").write_text("token = abc\n[profile:default]\n", encoding="utf-8")
+    monkeypatch.setenv("CONTREE_HOME", str(tmp_path))
+    for name in ("CONTREE_PROFILE", "NEBIUS_API_KEY", "NEMISIS_CONTREE_ROOT_IMAGE"):
+        monkeypatch.delenv(name, raising=False)
+
+    blockers = live.live_configuration_blockers()
+
+    assert "CONTREE_PROFILE is missing or invalid" in blockers

@@ -404,3 +404,28 @@ def test_provider_failures_are_clear_and_sanitized(
         )
     if str(error):
         assert str(error) not in str(caught.value)
+
+
+def test_truncated_completion_is_reported_as_truncation_not_schema_failure() -> None:
+    class _Truncated(_Completions):
+        def create(self, **kwargs: object) -> object:
+            self.calls.append(kwargs)
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": '{"catalog_ids":["sqlite-credit-v1"',
+                            "refusal": None,
+                        },
+                        "finish_reason": "length",
+                    }
+                ]
+            }
+
+    fake = _FakeClient(_contract_payload())
+    fake.chat = _Chat(_Truncated(_contract_payload()))
+
+    with pytest.raises(NemotronResponseError, match="truncated at max_tokens"):
+        _adapter(fake).generate_contract(
+            "issue", "base", ("sqlite-credit-v1",), {"amount_cents": (1, 10_000)}
+        )
