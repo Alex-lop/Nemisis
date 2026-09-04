@@ -2,6 +2,11 @@
 
 > Don't ask whether the coding agent says it is done. Make the exact patch prove each claim.
 
+The spelling **Nemisis** is intentional. One breath: AI coding agents ship retry patches that look
+green and still double-charge in production; CrashCheck kills the worker after the money moves,
+restarts it, replays the same event, and checks the database for a duplicate. See the
+[one-page pitch](docs/PITCH.md) and the [timed demo script](docs/DEMO_SCRIPT.md).
+
 Nemisis CrashCheck turns a green-looking retry-safety patch into an executed counterexample: it
 kills a real worker after a durable side effect, starts a fresh worker, replays the identical event,
 and determines whether the exact patch stopped the duplicate effect. The verdict comes from durable
@@ -50,6 +55,32 @@ uv run nemisis replay "$CAPSULE_PATH" \
 
 CrashCheck uses `LOCAL` as the execution transport. The packaged audited contract and capsule carry
 the separate `FIXTURE` truth label in the manifest and report. Neither label means `LIVE`.
+
+### Draft the contract with Nemotron
+
+`init --nemotron` asks `nvidia/nemotron-3-super-120b-a12b` on Nebius Token Factory to read the
+issue and the exact base handler, select audited catalog IDs, and propose the expected single
+effect. It never sees a candidate. Deterministic code accepts the proposal only when it names the
+audited fault intent and the exact `amount_cents`; otherwise nothing is drafted and the command
+exits `2` with the model's actual values. The sanitized receipt lands in `.nemisis/proposal.json`,
+and `check --scenario .nemisis/config.json` carries it into the manifest and report as provenance.
+It is labelled `LIVE` only for a genuine Token Factory call, it is never crash evidence, and it never
+touches the verdict.
+
+```bash
+export NEBIUS_API_KEY=...   # Token Factory key; without it the command fails closed
+uv run nemisis init --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
+  --target app.credits:apply_credit --base fixture:sqlite-credit-v1/buggy \
+  --scenario sqlite-credit-v1 --nemotron
+uv run nemisis check --base fixture:sqlite-credit-v1/buggy \
+  --candidate fixture:sqlite-credit-v1/misleading-green \
+  --corrected fixture:sqlite-credit-v1/atomic \
+  --scenario .nemisis/config.json --mode local
+```
+
+The model call is bounded to structured output over the audited catalog; the prompt template, input,
+and response are recorded by digest only. No key, issue text, handler source, or raw response enters
+the receipt.
 
 ### Open the one-minute evidence viewer
 
@@ -151,10 +182,12 @@ validated generated-test subset. Its JUnit report is guest-produced evidence ret
 bounded Sandbox output, not a provider-owned test attestation; arbitrary repositories are not
 supported by that trust channel. Networking is disabled during execution.
 
-CrashCheck's `--mode live` provider transport is not yet connected and fails closed. The current
-environment also lacks the Token Factory key, usable ConTree profile, and immutable root image, so
-there is no current-tree `LIVE` or `RECORDED_LIVE` receipt. Neither surface falls back to local mode.
-Run `uv run nemisis doctor --mode live` for the independent prerequisite checks.
+CrashCheck's own live call is `init --nemotron`; it needs only `NEBIUS_API_KEY`. CrashCheck's
+`--mode live` provider transport (running the kill/replay kernel inside a Token Factory Sandbox) is
+not yet connected and fails closed. The current environment lacks the Token Factory key, a usable
+ConTree profile, and an immutable root image, so there is no current-tree `LIVE` or `RECORDED_LIVE`
+receipt for either surface. Nothing falls back to local mode. Run `uv run nemisis doctor --mode live`
+for the independent prerequisite checks.
 
 ## Verify the project
 
