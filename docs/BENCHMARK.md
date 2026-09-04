@@ -72,5 +72,10 @@ uv run nemisis benchmark --output benchmarks/results/crashcheck-v1.json --json
 
 The command refuses a dirty execution-critical tree, validates the complete result against its
 strict schema and digests, and replaces the output file. Wall-clock timings enter `result_digest`,
-so every run publishes a new result digest even for identical behavior; update the digests above
-in the same follow-up commit.
+so every run publishes a new result digest even for identical behavior. The committed viewer binds
+this file to a manifest, so regenerating it is a set: rerun `check` with
+`--output-dir docs/assets/crashcheck-hero`, replace the old `runs/<run-id>/` and
+`repros/double-credit/<capsule-digest>/` directories with the new ones, point the `run_id` in
+`docs/assets/crashcheck-hero/index.html` at the new run, and update the digests above and in
+`docs/STATUS.md` and `docs/PROOF.md`, all in one follow-up commit; `tests/test_static_hero.py`
+fails until the set is consistent.

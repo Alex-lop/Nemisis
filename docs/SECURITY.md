@@ -50,7 +50,11 @@ untrusted inputs.
 
 The controller owns the process group, socket, execution nonce, and IPC session. It requires the
 expected durable checkpoint, sends `SIGKILL`, waits for exit `-9`, probes again, and spawns a new
-worker with a distinct nonce/session for replay. SQLite state is outside the source tree, uses
+worker with a distinct nonce/session for replay. Surviving descendants are detected by the worker's
+inherited stdout/stderr pipes staying open and are killed with the group; a handler that forks,
+calls `setsid`, and closes those pipes escapes that detection. That is inside the stated boundary
+(local mode is for a trusted checkout, not hostile code) and such a run still fails closed on its
+contradictory receipts rather than proving anything. SQLite state is outside the source tree, uses
 integer cents, WAL and `synchronous=FULL`, and is observed through fresh read-only connections.
 Failure to launch, checkpoint, kill, wait, probe, restart, replay, parse, or clean up makes evidence
 incomplete.
