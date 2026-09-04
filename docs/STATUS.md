@@ -51,7 +51,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 295 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 306 tests, and package build: pass locally on
   Python 3.12.13 (the suite also passed on 3.13 during development);
 - exact engine CI for the committed hero: [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355);
 - exact measured-source CI: [successful run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096);
@@ -60,7 +60,10 @@ provider run.
 - `init --nemotron` without `NEBIUS_API_KEY`: exit `2`, nothing written (verified);
 - `init --nemotron` with an injected client, then `check --scenario .nemisis/config.json`: receipt
   labelled `MOCKED` in the manifest and report, verdict unchanged (verified; this is a test path,
-  not a live claim).
+  not a live claim);
+- adversarial review on 2026-09-03 (seven lenses, two verifiers each) and the resulting fixes: a
+  config or exported contract can no longer stamp `LIVE`; `replay` refuses untrusted forks like
+  `check`; the viewer command binds loopback; every documented refusal path now has a test.
 
 No in-app browser was available for screenshot/visual interaction QA. No public hosted URL or demo
 video is claimed.

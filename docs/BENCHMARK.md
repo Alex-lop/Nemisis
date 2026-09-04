@@ -64,13 +64,13 @@ The capsule and result digests are bound to the measured environment (CPython 3.
 environment-independent. A rerun on another interpreter prints different capsule and result
 digests for the same observed behavior.
 
-Regenerate to a fresh path; wall-clock timings enter `result_digest`, so the committed file can
-never be overwritten in place:
+Regenerate with:
 
 ```bash
-uv run nemisis benchmark --output .nemisis/benchmark.json --json
+uv run nemisis benchmark --output benchmarks/results/crashcheck-v1.json --json
 ```
 
-The command refuses a dirty execution-critical tree and validates the complete result against its
-strict schema and digests. To publish, copy the new file over the committed one in a follow-up
-commit and update the digests above.
+The command refuses a dirty execution-critical tree, validates the complete result against its
+strict schema and digests, and replaces the output file. Wall-clock timings enter `result_digest`,
+so every run publishes a new result digest even for identical behavior; update the digests above
+in the same follow-up commit.
