@@ -9,7 +9,7 @@ from typing import Literal, Self
 from pydantic import Field, model_validator
 
 from nemisis.hashing import canonical_json, sha256_json
-from nemisis.models import SafeId, Sha256, StrictModel, TruthLabel
+from nemisis.models import ModelCallReceipt, SafeId, Sha256, StrictModel, TruthLabel
 from nemisis.safety import safe_relative_path
 
 REQUIRED_CONFIRMATIONS = 5
@@ -133,6 +133,56 @@ class RetryContract(_DigestedModel):
     def predicates_are_unique(self) -> RetryContract:
         if len(set(self.predicate_ids)) != len(self.predicate_ids):
             raise ValueError("predicate IDs must be unique")
+        return self
+
+
+class ContractProposal(_DigestedModel):
+    """Candidate-blind Nemotron proposal receipt: provenance for a drafted contract, never evidence.
+
+    The model saw only the issue text and the base handler. Deterministic code decided whether
+    its catalog selection and expected single effect match the audited scenario. A rejected
+    proposal drafts no contract; an accepted one changes nothing about how ``check`` decides.
+    """
+
+    schema_version: Literal["nemisis.contract-proposal.v1"] = "nemisis.contract-proposal.v1"
+    scenario_id: SafeId
+    target: str = Field(
+        min_length=3,
+        max_length=240,
+        pattern=r"^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$",
+    )
+    issue_digest: Sha256
+    base_ref: str = Field(min_length=1, max_length=500)
+    base_tree_digest: Sha256
+    handler_path: str = Field(min_length=4, max_length=240, pattern=r"^[A-Za-z0-9_./-]+\.py$")
+    offered_catalog_ids: tuple[SafeId, ...] = Field(min_length=1, max_length=16)
+    required_catalog_id: SafeId
+    proposed_catalog_ids: tuple[SafeId, ...] = Field(min_length=1, max_length=16)
+    audited_amount_cents: int = Field(gt=0, le=1_000_000)
+    proposed_amount_cents: int = Field(ge=-1_000_000_000, le=1_000_000_000)
+    accepted: bool
+    model_call: ModelCallReceipt
+
+    @model_validator(mode="after")
+    def proposal_is_coherent(self) -> ContractProposal:
+        safe_relative_path(self.handler_path)
+        offered = set(self.offered_catalog_ids)
+        if len(offered) != len(self.offered_catalog_ids):
+            raise ValueError("offered catalog IDs must be unique")
+        if self.required_catalog_id not in offered:
+            raise ValueError("required catalog ID was not offered to the model")
+        if not set(self.proposed_catalog_ids) <= offered:
+            raise ValueError("proposal selected a catalog ID that was not offered")
+        if self.model_call.truth_label not in {TruthLabel.LIVE, TruthLabel.MOCKED}:
+            raise ValueError("proposal receipt must come from a live or injected model client")
+        if not self.model_call.schema_valid or self.model_call.outcome != "success":
+            raise ValueError("proposal receipt must record a schema-valid successful call")
+        expected = (
+            self.required_catalog_id in self.proposed_catalog_ids
+            and self.proposed_amount_cents == self.audited_amount_cents
+        )
+        if self.accepted is not expected:
+            raise ValueError("proposal acceptance contradicts its proposed values")
         return self
 
 
@@ -1044,6 +1094,7 @@ __all__ = [
     "AnchorResolutionReceipt",
     "AnchorResolutionStatus",
     "AttemptReceipt",
+    "ContractProposal",
     "CrashCheckResult",
     "CrashObservation",
     "CrashVerdict",
