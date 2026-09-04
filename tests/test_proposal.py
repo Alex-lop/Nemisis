@@ -272,5 +272,6 @@ def test_cli_init_nemotron_rejection_drafts_nothing(
     assert error.value.code == 2
     captured = capsys.readouterr()
     assert "differs from the audited 2500" in captured.out
-    assert '"verdict":"EVIDENCE_INCOMPLETE"' in captured.out
+    assert '"error":"NEMOTRON PROPOSAL REJECTED' in captured.out
+    assert "verdict" not in captured.out
     assert not (tmp_path / ".nemisis").exists()

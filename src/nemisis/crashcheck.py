@@ -370,6 +370,7 @@ def check(
                 anchor_resolutions=(candidate_anchor,),
             )
         candidate_binding = candidate_anchor
+        _require_distinct_binding(candidate_binding, (base_binding,), WorldRole.CANDIDATE)
         candidate_attempts = _execute_confirmations(
             capsule,
             candidate_binding,
@@ -392,7 +393,7 @@ def check(
                 tuple(bindings),
                 tuple(attempts),
                 CrashVerdict.EVIDENCE_INCOMPLETE,
-                "Candidate execution completed without one stable supported observation.",
+                _unsupported_observation_summary(candidate_observation),
                 hypothesis_receipts=hypothesis_receipts,
                 minimization_receipts=minimization_receipts,
             )
@@ -421,6 +422,9 @@ def check(
                     anchor_resolutions=(corrected_anchor,),
                 )
             corrected_binding = corrected_anchor
+            _require_distinct_binding(
+                corrected_binding, (base_binding, candidate_binding), WorldRole.CORRECTED
+            )
             corrected_attempts = _execute_confirmations(
                 capsule,
                 corrected_binding,
@@ -443,7 +447,7 @@ def check(
             summary = "Five fresh worlds ended at exactly +$25, one ledger effect, and one marker."
         else:
             verdict = CrashVerdict.EVIDENCE_INCOMPLETE
-            summary = "Candidate execution completed without one stable supported observation."
+            summary = _unsupported_observation_summary(candidate_observation)
         return publish(
             run_id,
             started_at,
@@ -524,11 +528,19 @@ def replay(
                     if world_role is WorldRole.BASE
                     else CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
                 )
+                detail = _summary(verdict)
+            elif observation is CrashObservation.EXACTLY_ONCE and world_role is WorldRole.BASE:
+                verdict = CrashVerdict.EVIDENCE_INCOMPLETE
+                detail = (
+                    "The base role completed exactly once, so it did not reproduce this capsule; "
+                    "replay a fix under --role candidate or --role corrected."
+                )
             elif observation is CrashObservation.EXACTLY_ONCE:
                 verdict = CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE
+                detail = _summary(verdict)
             else:
                 verdict = CrashVerdict.EVIDENCE_INCOMPLETE
-            detail = _summary(verdict)
+                detail = _unsupported_observation_summary(observation)
         else:
             raise CrashCheckError("mode must be 'local' or 'live'")
         return _publish(
@@ -731,6 +743,25 @@ def _bind_anchor(
         )
     except ValueError as error:
         raise CrashCheckError(f"UNSUPPORTED_TARGET: {error}") from error
+
+
+def _require_distinct_binding(
+    binding: AnchorBinding, earlier: tuple[AnchorBinding, ...], role: WorldRole
+) -> None:
+    if any(binding.digest == other.digest for other in earlier):
+        raise CrashCheckError(
+            f"{role.value} resolves to the same source ref and tree as an earlier role; "
+            "supply a different ref"
+        )
+
+
+def _unsupported_observation_summary(observation: CrashObservation) -> str:
+    if observation is CrashObservation.INVARIANT_FAILED:
+        return (
+            "Every world completed, but the final durable state matched neither exactly-once nor "
+            "the capsule's duplicate shape: the invariant failed, so nothing is proven."
+        )
+    return "Execution completed without one stable supported observation."
 
 
 def _anchor_failure_summary(receipt: AnchorResolutionReceipt) -> str:

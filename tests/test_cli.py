@@ -341,7 +341,8 @@ def test_benchmark_error_exits_two(
     assert error.value.code == 2
     captured = capsys.readouterr()
     assert captured.out == ""
-    assert "EVIDENCE_INCOMPLETE: could not write .nemisis/benchmark.json" in captured.err
+    assert "ERROR: could not write .nemisis/benchmark.json" in captured.err
+    assert "EVIDENCE_INCOMPLETE" not in captured.err
 
 
 def test_ci_smoke_covers_both_surfaces_and_discovers_the_bound_capsule() -> None:
@@ -361,3 +362,7 @@ def test_action_example_pins_a_real_release_and_bounds_runtime() -> None:
     assert "Alex-lop/Nemisis@f05ae921cf3d866f69adf8415d6d7bd52071bf37" in workflow
     assert "0123456789abcdef" not in workflow
     assert "timeout-minutes: 15" in workflow
+    assert "Refuse untrusted fork execution without isolation" in workflow
+    assert "github.event.pull_request.head.repo.full_name != github.repository" in workflow
+    assert "persist-credentials: false" in workflow
+    assert "permissions:\n  contents: read" in workflow

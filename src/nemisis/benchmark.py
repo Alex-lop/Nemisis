@@ -403,7 +403,8 @@ def run_benchmark(output: Path) -> BenchmarkResult:
     result = BenchmarkResult.model_validate(payload)
     if source_commit() != commit:
         raise BenchmarkError("source_commit() changed during the benchmark")
-    _write_exact(output, canonical_json(result) + b"\n")
+    # The output path is caller-chosen and timings enter the digest, so a rerun replaces it.
+    _write_exact(output, canonical_json(result) + b"\n", replace=True)
     return result
 
 

@@ -302,7 +302,7 @@ def _exit_code(verdict: CrashVerdict) -> int:
 def _artifact_root(path: Path) -> Iterator[None]:
     name = "NEMISIS_ARTIFACT_ROOT"
     previous = os.environ.get(name)
-    os.environ[name] = str(path)
+    os.environ[name] = str(path.resolve())
     try:
         yield
     finally:
@@ -312,14 +312,22 @@ def _artifact_root(path: Path) -> Iterator[None]:
             os.environ[name] = previous
 
 
-def _fail(message: str, *, as_json: bool = False) -> None:
-    verdict = (
-        "UNSUPPORTED_TARGET" if message.startswith("UNSUPPORTED_TARGET:") else "EVIDENCE_INCOMPLETE"
-    )
-    if as_json:
-        print(canonical_json({"message": message, "verdict": verdict}).decode())
+def _fail(message: str, *, as_json: bool = False, crashcheck: bool = True) -> None:
+    """Exit 2. Only check/replay failures carry a CrashCheck verdict; the rest are plain errors."""
+    if crashcheck:
+        verdict = (
+            "UNSUPPORTED_TARGET"
+            if message.startswith("UNSUPPORTED_TARGET:")
+            else "EVIDENCE_INCOMPLETE"
+        )
+        if as_json:
+            print(canonical_json({"message": message, "verdict": verdict}).decode())
+        else:
+            print(f"{verdict}: {message}", file=sys.stderr)
+    elif as_json:
+        print(canonical_json({"error": message}).decode())
     else:
-        print(f"{verdict}: {message}", file=sys.stderr)
+        print(f"ERROR: {message}", file=sys.stderr)
     raise SystemExit(2)
 
 
@@ -336,11 +344,14 @@ def main() -> None:
 
             blockers = live_configuration_blockers()
             if blockers:
-                _fail(f"LIVE BLOCKED: {'; '.join(blockers)}. Local mode was not substituted.")
+                _fail(
+                    f"LIVE BLOCKED: {'; '.join(blockers)}. Local mode was not substituted.",
+                    crashcheck=False,
+                )
             try:
                 _print_result(verify_live(fixture_id=args.fixture, output_root=args.output_dir))
             except (ContreeBackendError, NemotronError) as error:
-                _fail(f"LIVE FAILED: {error}. Local mode was not substituted.")
+                _fail(f"LIVE FAILED: {error}. Local mode was not substituted.", crashcheck=False)
             return
 
         if args.command == "init":
@@ -355,6 +366,7 @@ def main() -> None:
                     _fail(
                         f"NEMOTRON PROPOSAL REJECTED: {error}. No contract was drafted.",
                         as_json=args.json,
+                        crashcheck=False,
                     )
             path = initialize(args.issue, args.target, args.base, args.scenario)
             if args.accept_contract:
@@ -406,4 +418,8 @@ def main() -> None:
         if status:
             raise SystemExit(status)
     except (BenchmarkError, CrashCheckError, OSError, ValueError) as error:
-        _fail(str(error), as_json=bool(getattr(args, "json", False)))
+        _fail(
+            str(error),
+            as_json=bool(getattr(args, "json", False)),
+            crashcheck=args.command in {"check", "replay"},
+        )
