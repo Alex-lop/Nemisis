@@ -183,7 +183,11 @@ def initialize(issue: str | Path, target: str, base: str | Path, scenario_id: st
 def accept_contract(digest: str, path: Path = CONFIG_PATH) -> RetryContract:
     """Accept only the exact draft digest previously printed to the user."""
     payload, draft = _load_config(path)
-    if payload["status"] != "DRAFT" or draft.digest != digest:
+    if payload["status"] == "ACCEPTED":
+        raise CrashCheckError(
+            f"contract is already ACCEPTED with digest {draft.digest}; nothing to accept"
+        )
+    if draft.digest != digest:
         raise CrashCheckError("accepted digest does not match the current draft contract")
     values = draft.model_dump(mode="python", exclude={"digest", "accepted", "truth_label"})
     contract = RetryContract.with_digest(

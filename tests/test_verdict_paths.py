@@ -136,8 +136,10 @@ def test_accept_contract_refuses_a_wrong_digest_and_a_second_acceptance(
 
     accepted = accept_contract(json.loads(before)["contract"]["digest"], config)
     assert accepted.accepted and accepted.truth_label is TruthLabel.LOCAL
-    with pytest.raises(CrashCheckError, match="does not match the current draft"):
+    with pytest.raises(CrashCheckError, match="already ACCEPTED"):
         accept_contract(accepted.digest, config)
+    with pytest.raises(CrashCheckError, match="already ACCEPTED"):
+        accept_contract(json.loads(before)["contract"]["digest"], config)
 
 
 def test_exported_capsule_refuses_a_substituted_accepted_contract(

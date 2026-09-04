@@ -843,6 +843,9 @@ def _cleanup(spawns: list[_Spawn]) -> str | None:
     for spawn in spawns:
         try:
             spawn.channel.close()
+            # Deliberately unconditional: a /dev/null descendant can outlive a reaped leader in
+            # the same group (tested). The window for PID reuse between reap and this call is
+            # microseconds; containment wins that trade.
             with suppress(ProcessLookupError):
                 os.killpg(spawn.process.pid, signal.SIGKILL)
             if spawn.process.poll() is None:

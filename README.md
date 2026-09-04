@@ -116,7 +116,8 @@ nemisis check --base main --candidate HEAD --scenario .nemisis/config.json --mod
 ```
 
 Acceptance re-seals the draft under a new `LOCAL` digest; the CLI prints both. Rerunning `init`
-with the same issue, base, and target is a no-op; a different one must delete
+with the same issue, base, and target is a no-op, rerunning `--accept-contract` reports that the
+contract is already accepted, and a different issue, base, or target must delete
 `.nemisis/config.json` first. `nemisis benchmark` runs only inside this checkout. Passing the
 reviewed config explicitly supports this pre-commit first run. Once the config is committed on the
 base ref, the scenario ID loads only that exact base-owned copy; cwd and candidate copies cannot
