@@ -14,6 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import partial
 from importlib import resources
 from io import BytesIO
 from pathlib import Path
@@ -32,6 +33,7 @@ from nemisis.crash_models import (
     AnchorBinding,
     AnchorResolutionReceipt,
     AttemptReceipt,
+    ContractProposal,
     CrashCheckResult,
     CrashObservation,
     CrashVerdict,
@@ -192,6 +194,8 @@ def check(
         root = Path(temporary)
         base_source = _materialize_source(base, root / "source-base")
         contract = _contract_for_check(scenario, base_source)
+        proposal = _proposal_for_check(scenario, contract)
+        publish = partial(_publish, proposal=proposal)
         if mode not in {"local", "live"}:
             raise CrashCheckError("mode must be 'local' or 'live'")
         requested_transport = TruthLabel.LIVE if mode == "live" else TruthLabel.LOCAL
@@ -204,7 +208,7 @@ def check(
             preflight_capsule.digest,
         )
         if isinstance(base_anchor, AnchorResolutionReceipt):
-            return _publish(
+            return publish(
                 run_id,
                 started_at,
                 preflight_capsule,
@@ -223,7 +227,7 @@ def check(
             attempt = _failed_attempt(
                 capsule, base_binding, WorldRole.BASE, TruthLabel.LIVE, detail
             )
-            return _publish(
+            return publish(
                 run_id,
                 started_at,
                 capsule,
@@ -247,7 +251,7 @@ def check(
             attempt = _failed_attempt(
                 capsule, base_binding, WorldRole.BASE, TruthLabel.LOCAL, detail
             )
-            return _publish(
+            return publish(
                 run_id,
                 started_at,
                 capsule,
@@ -275,7 +279,7 @@ def check(
             attempt = _failed_attempt(
                 capsule, base_binding, WorldRole.BASE, TruthLabel.LOCAL, detail
             )
-            return _publish(
+            return publish(
                 run_id,
                 started_at,
                 capsule,
@@ -292,7 +296,7 @@ def check(
             capsule, base_binding, base_source.path, root / "base-worlds", WorldRole.BASE
         )
         if _confirmed_observation(base_attempts, capsule) is not CrashObservation.DUPLICATE_EFFECT:
-            return _publish(
+            return publish(
                 run_id,
                 started_at,
                 capsule,
@@ -312,7 +316,7 @@ def check(
                 TruthLabel.LOCAL,
                 "Local execution of an untrusted fork candidate is blocked; use ConTree.",
             )
-            return _publish(
+            return publish(
                 run_id,
                 started_at,
                 capsule,
@@ -335,7 +339,7 @@ def check(
             capsule.digest,
         )
         if isinstance(candidate_anchor, AnchorResolutionReceipt):
-            return _publish(
+            return publish(
                 run_id,
                 started_at,
                 capsule,
@@ -363,7 +367,7 @@ def check(
             CrashObservation.DUPLICATE_EFFECT,
             CrashObservation.EXACTLY_ONCE,
         }:
-            return _publish(
+            return publish(
                 run_id,
                 started_at,
                 capsule,
@@ -386,7 +390,7 @@ def check(
                 capsule.digest,
             )
             if isinstance(corrected_anchor, AnchorResolutionReceipt):
-                return _publish(
+                return publish(
                     run_id,
                     started_at,
                     capsule,
@@ -423,7 +427,7 @@ def check(
         else:
             verdict = CrashVerdict.EVIDENCE_INCOMPLETE
             summary = "Candidate execution completed without one stable supported observation."
-        return _publish(
+        return publish(
             run_id,
             started_at,
             capsule,
@@ -579,6 +583,40 @@ def _contract_for_check(scenario: str | Path | RetryContract, base: _Source) -> 
     if contract.originating_base_tree_digest != base.tree_digest:
         raise CrashCheckError("contract originating base digest differs from the supplied base")
     return contract
+
+
+def _proposal_for_check(
+    scenario: str | Path | RetryContract, contract: RetryContract
+) -> ContractProposal | None:
+    """Attach the sidecar Nemotron proposal only for a config path whose sibling binds it."""
+    if isinstance(scenario, RetryContract) or str(scenario) == SCENARIO_ID:
+        return None
+    return _load_proposal(Path(str(scenario)).with_name("proposal.json"), contract)
+
+
+def _load_proposal(path: Path, contract: RetryContract) -> ContractProposal | None:
+    try:
+        status = path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise CrashCheckError("contract proposal could not be read") from error
+    if not stat.S_ISREG(status.st_mode) or status.st_size > MAX_CONFIG_BYTES:
+        raise CrashCheckError("contract proposal is not a bounded regular file")
+    try:
+        proposal = ContractProposal.model_validate_json(path.read_bytes())
+    except OSError as error:
+        raise CrashCheckError("contract proposal could not be read") from error
+    except ValueError as error:
+        raise CrashCheckError("contract proposal failed strict validation") from error
+    bound = (
+        proposal.accepted
+        and proposal.scenario_id == contract.scenario_id
+        and proposal.target == contract.target
+        and proposal.issue_digest == contract.issue_digest
+        and proposal.base_tree_digest == contract.originating_base_tree_digest
+    )
+    return proposal if bound else None
 
 
 def _contract_for_capsule(
@@ -1052,6 +1090,7 @@ def _publish(
     hypothesis_receipts: tuple[HypothesisReceipt, ...] = (),
     minimization_receipts: tuple[MinimizationReceipt, ...] = (),
     transport: TruthLabel | None = None,
+    proposal: ContractProposal | None = None,
 ) -> CrashCheckResult:
     if capsule.engine_code_digest != engine_code_digest():
         raise CrashCheckError("capsule engine digest differs from the installed engine")
@@ -1179,6 +1218,7 @@ def _publish(
         "bindings": [item.model_dump(mode="json") for item in bindings],
         "capsule": capsule.model_dump(mode="json"),
         "contract": contract.model_dump(mode="json"),
+        "contract_proposal": (proposal.model_dump(mode="json") if proposal is not None else None),
         "result": result.model_dump(mode="json"),
         "schema_version": "nemisis.crashcheck.run.v1",
     }
@@ -1186,7 +1226,7 @@ def _publish(
     if attempts:
         with tempfile.TemporaryDirectory(prefix="nemisis-report-") as temporary:
             rendered = Path(temporary) / "report.html"
-            write_crash_report(result, capsule, rendered)
+            write_crash_report(result, capsule, rendered, proposal=proposal)
             _write_exact(run_dir / "report.html", rendered.read_bytes())
     return result
 

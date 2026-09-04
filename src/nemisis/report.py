@@ -6,11 +6,17 @@ import json
 from html import escape
 from pathlib import Path
 
-from nemisis.crash_models import CrashCheckResult, CreditSnapshot, ReproCapsule
+from nemisis.crash_models import ContractProposal, CrashCheckResult, CreditSnapshot, ReproCapsule
 from nemisis.models import ArtifactStatus, RunManifest
 
 
-def write_crash_report(result: CrashCheckResult, capsule: ReproCapsule, path: Path) -> None:
+def write_crash_report(
+    result: CrashCheckResult,
+    capsule: ReproCapsule,
+    path: Path,
+    *,
+    proposal: ContractProposal | None = None,
+) -> None:
     """Render verdict-first static CrashCheck evidence with no executable controls."""
     rows = "".join(
         "<tr>"
@@ -93,6 +99,7 @@ fault action in {len(minimization.confirmations)} fresh base worlds. The empty s
 <code>{escape(minimization.trace_digest)}</code></p></section>"""
     else:
         minimization_section = ""
+    proposal_section = _proposal_section(proposal)
     representative = next(
         (attempt for attempt in result.attempts if attempt.execution_status.value != "COMPLETED"),
         next(
@@ -236,6 +243,7 @@ body {{ padding: .75rem; }} .comparison {{ grid-template-columns: 1fr; }}
 <div class="card"><dt>Provenance</dt><dd>{escape(result.integrity_status.value)}</dd></div>
 <div class="card"><dt>CrashCheck verdict</dt><dd>{escape(result.verdict.value)}</dd></div>
 </dl>
+{proposal_section}
 <section class="card" aria-labelledby="attempt-story"><h2 id="attempt-story">Representative \
 {escape(representative.role.value)} attempt</h2>
 <p>Receipt <code>{escape(representative.receipt_id)}</code></p>
@@ -271,6 +279,38 @@ source-tree binding(s).</caption>
 </body>
 </html>"""
     path.write_text(document, encoding="utf-8")
+
+
+def _proposal_section(proposal: ContractProposal | None) -> str:
+    if proposal is None:
+        return ""
+    receipt = proposal.model_call
+    label = receipt.truth_label.value
+    intent = (
+        "selected" if proposal.required_catalog_id in proposal.proposed_catalog_ids else "omitted"
+    )
+    decision = "accepted" if proposal.accepted else "rejected"
+    return f"""<section class="card" aria-labelledby="contract-proposal">
+<h2 id="contract-proposal">Contract proposal · {escape(label)} Nemotron receipt</h2>
+<p>Before any candidate was read, <code>{escape(receipt.model_id)}</code> on Token Factory \
+(<code>{escape(receipt.endpoint_region)}</code>) saw only the issue and the base handler \
+<code>{escape(proposal.handler_path)}</code>. It {escape(intent)} fault intent \
+<code>{escape(proposal.required_catalog_id)}</code> and proposed an expected single effect of \
+{_money(proposal.proposed_amount_cents)}; deterministic code {escape(decision)} that against the \
+audited {_money(proposal.audited_amount_cents)}. The model never sees candidate code and never \
+emits a verdict; this receipt is provenance for the contract, not crash evidence.</p>
+<dl class="identity" aria-label="Model call receipt">
+<div><dt>Truth label</dt><dd><code>{escape(label)}</code></dd></div>
+<div><dt>Prompt digest</dt><dd><code>{escape(receipt.prompt_template_digest)}</code></dd></div>
+<div><dt>Input digest</dt><dd><code>{escape(receipt.input_digest)}</code></dd></div>
+<div><dt>Response digest</dt><dd><code>{escape(receipt.response_digest or "none")}</code></dd></div>
+<div><dt>Latency</dt><dd>{_latency(receipt.latency_ms)}</dd></div>
+<div><dt>Proposal digest</dt><dd><code>{escape(proposal.digest)}</code></dd></div>
+</dl></section>"""
+
+
+def _latency(value: int | None) -> str:
+    return f"{value} ms" if value is not None else "n/a"
 
 
 def _snapshot_text(snapshot: CreditSnapshot | None) -> str:

@@ -9,12 +9,13 @@ import pytest
 
 import nemisis.cli as cli
 import nemisis.proposal as proposal_module
-from nemisis.crash_fixture import BUGGY_REF, load_contract, load_issue
-from nemisis.crash_models import ContractProposal
+from nemisis.crash_fixture import BUGGY_REF, MISLEADING_GREEN_REF, load_contract, load_issue
+from nemisis.crash_models import ContractProposal, CrashVerdict
+from nemisis.crashcheck import CrashCheckError, check, initialize
 from nemisis.hashing import canonical_json
 from nemisis.models import TruthLabel
 from nemisis.nemotron import DEFAULT_MODEL_ID, NemotronClient, _Client
-from nemisis.proposal import PROPOSAL_NAME, ProposalError, propose_contract
+from nemisis.proposal import PROPOSAL_NAME, ProposalError, propose_contract, write_proposal
 
 AUDITED = load_contract()
 TARGET = AUDITED["target"]
@@ -133,6 +134,58 @@ def test_unsupported_target_is_refused_before_any_model_call(issue: Path) -> Non
         propose_contract(issue, "app.other:handler", BUGGY_REF, client=_adapter(fake))
 
     assert fake.models.calls == [] and fake.chat.completions.calls == []
+
+
+def test_bound_proposal_flows_into_check_manifest_and_report(
+    issue: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    artifacts = tmp_path / "artifacts"
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(artifacts))
+    proposal = propose_contract(
+        issue, TARGET, BUGGY_REF, client=_adapter(_FakeClient(_payload(OFFERED, 2_500)))
+    )
+    config = initialize(issue, TARGET, BUGGY_REF, "sqlite-credit-v1")
+    write_proposal(proposal, config.with_name(PROPOSAL_NAME))
+
+    result = check(BUGGY_REF, MISLEADING_GREEN_REF, config, mode="local")
+
+    assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
+    manifest = json.loads((artifacts / result.artifacts["manifest"]).read_text(encoding="utf-8"))
+    assert manifest["contract_proposal"]["digest"] == proposal.digest
+    assert manifest["contract_proposal"]["model_call"]["truth_label"] == "MOCKED"
+    report = (artifacts / result.artifacts["report"]).read_text(encoding="utf-8")
+    assert "MOCKED Nemotron receipt" in report
+    assert DEFAULT_MODEL_ID in report
+    assert "never emits a verdict" in report
+
+
+def test_foreign_proposal_is_not_attached_and_malformed_one_fails_closed(
+    issue: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    proposal = propose_contract(
+        issue, TARGET, BUGGY_REF, client=_adapter(_FakeClient(_payload(OFFERED, 2_500)))
+    )
+    config = initialize(issue, TARGET, BUGGY_REF, "sqlite-credit-v1")
+    foreign = ContractProposal.with_digest(
+        **proposal.model_dump(mode="python", exclude={"digest", "model_call", "issue_digest"}),
+        issue_digest="f" * 64,
+        model_call=proposal.model_call,
+    )
+    sidecar = config.with_name(PROPOSAL_NAME)
+    write_proposal(foreign, sidecar)
+
+    result = check(BUGGY_REF, MISLEADING_GREEN_REF, config, mode="local")
+    manifest = json.loads(
+        (tmp_path / "artifacts" / result.artifacts["manifest"]).read_text(encoding="utf-8")
+    )
+    assert manifest["contract_proposal"] is None
+
+    sidecar.write_bytes(b'{"schema_version":"nemisis.contract-proposal.v1"}')
+    with pytest.raises(CrashCheckError, match="strict validation"):
+        check(BUGGY_REF, MISLEADING_GREEN_REF, config, mode="local")
 
 
 def test_cli_init_nemotron_fails_closed_without_a_credential(
