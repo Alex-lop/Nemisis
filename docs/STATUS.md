@@ -1,18 +1,23 @@
 # Status
 
-Updated 2026-08-30 (America/New_York).
+Updated 2026-09-03 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
 
-## Exact release identities
+## Exact identities
 
-- latest execution-critical engine: `f05ae921cf3d866f69adf8415d6d7bd52071bf37`
+Committed hero evidence (unchanged, bound to its own exact source and engine):
+
 - measured clean source: `ddaf186aa81b8a7ebd442da1f2dfeee6878e7dce`
 - evidence/viewer publication: `3d66ccd4499fae5f1d6fbe5beee4b097d3ce3949`
-- engine code digest: `47d78405ca59dee877328e16face03b15af484e3d65811e8caf213f00d8ec912`
+- engine code digest at that source: `47d78405ca59dee877328e16face03b15af484e3d65811e8caf213f00d8ec912`
 - capsule digest: `1025d9c6e014394cf80629d180e7cb4fb1a77a4b7b26934980b5f5ea975069a8`
 - benchmark result digest: `11016ce964b88961c246c91eb1ae437cf0ff9e9547a794ad845776af52af864a`
 
-The evidence commit follows the measured source commit, so the benchmark and manifest correctly
-retain `ddaf186…` instead of claiming the later publication commit measured itself.
+Current tree:
+
+- engine code digest: `da94b4a8ae4d1e9b4a3ad4ef6988534ea0ae1b1b043a9cc97c85f67b5b2b744b`
+  (changed by the contract-proposal commits; a fresh `check` prints a new capsule digest bound to
+  this engine, and the committed hero is not relabelled)
+- interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence
 
 ## Product state
 
@@ -27,10 +32,10 @@ CrashCheck's supported Python/SQLite alpha is locally demonstrated:
 - the exported capsule/regression fails on misleading-green and passes on atomic from an installed
   wheel outside the checkout.
 
-The candidate-blind base phase runs two fixed hypotheses. It selects `effect-commit-v1` by fixed
-catalog rank, then deletes that schedule's sole fault action. Two fresh empty-schedule worlds end
-exactly once, so deletion is rejected and the action is necessary for this fixture witness. This
-is not a general minimizer.
+New since 2026-08-30: `nemisis init --nemotron` asks Nemotron on Token Factory for a candidate-blind
+contract proposal (audited catalog IDs plus the expected single effect), accepts it only when fixed
+rules agree, writes a secret-free receipt to `.nemisis/proposal.json`, and `check` carries that
+receipt into the manifest and report. The model never sees a candidate and never touches the verdict.
 
 The committed one-minute viewer is served with:
 
@@ -44,16 +49,16 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 267 tests, and package build: pass locally;
-- exact engine CI: [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355);
+- locked dependency sync, formatter, Ruff, mypy, 276 tests, and package build: pass locally on
+  Python 3.12.13 (the suite also passed on 3.13 during development);
+- exact engine CI for the committed hero: [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355);
 - exact measured-source CI: [successful run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096);
-- evidence/viewer CI: [successful run 33349903736](https://github.com/Alex-lop/Nemisis/actions/runs/33349903736), including 267 tests, build, composite Action, and installed-wheel replay;
+- evidence/viewer CI: [successful run 33349903736](https://github.com/Alex-lop/Nemisis/actions/runs/33349903736);
 - local doctor: `READY` for Python 3.12, POSIX `SIGKILL`, and SQLite WAL/`FULL`;
-- clean installed-wheel `init` → digest acceptance → `check`: expected candidate exit `1`;
-- installed-wheel base/candidate/corrected replay: exits `1` / `1` / `0`;
-- clean exported regression: fails candidate and passes corrected;
-- benchmark schema/digests, viewer evidence bindings, JavaScript syntax, local links, HTTP asset
-  paths, and secret/path scans: pass.
+- `init --nemotron` without `NEBIUS_API_KEY`: exit `2`, nothing written (verified);
+- `init --nemotron` with an injected client, then `check --scenario .nemisis/config.json`: receipt
+  labelled `MOCKED` in the manifest and report, verdict unchanged (verified; this is a test path,
+  not a live claim).
 
 No in-app browser was available for screenshot/visual interaction QA. No public hosted URL or demo
 video is claimed.
@@ -62,18 +67,27 @@ video is claimed.
 
 `LIVE` remains `BLOCKED`, without fallback:
 
-- `NEBIUS_API_KEY` is absent;
+- `NEBIUS_API_KEY` is absent, so no current-tree Nemotron proposal receipt exists; the code path
+  that would produce it is wired and contract-tested;
 - no usable ConTree profile is present;
 - `NEMISIS_CONTREE_ROOT_IMAGE` is absent; and
 - CrashCheck's ConTree provider transport is not implemented.
 
-The inherited differential verifier has contract-tested Nemotron/ConTree adapters, but there is no
-current-tree model call, Sandbox operation, or sanitized live receipt. Nemisis is therefore a
-verified local alpha, not yet hackathon-submission-ready under the directive's live-sponsor gate.
+The first genuine sponsor receipt is one command away once a Token Factory key exists:
+`nemisis init --nemotron` at an exact commit, with `.nemisis/proposal.json` committed and its digest
+named in this file. Until then Nemisis is a verified local alpha with a wired but unexercised live
+model path, not yet hackathon-submission-ready.
 
 ## Direction
 
-Option A is retained: one excellent SQLite slice. A second scenario would add adapter work without
-closing the higher-value live transport, public hosting, or demo-video gaps. The next milestone is
-one exact-SHA CrashCheck Nemotron + ConTree receipt using an immutable image, followed by a public
-viewer build and sub-three-minute recording.
+Option A is retained: one excellent SQLite slice, made undeniable. In order:
+
+1. Obtain a Token Factory key; capture and commit the exact-SHA `LIVE` proposal receipt.
+2. Record the sub-three-minute demo from `docs/DEMO_SCRIPT.md`.
+3. Connect the CrashCheck kernel to a Token Factory Sandbox (spawn, subprocess result, process-group
+   kill) against one immutable image so untrusted pull requests can be checked; keep `doctor` and
+   `check --mode live` `BLOCKED` until a real receipt exists.
+4. Publish the static viewer at a public URL.
+
+A second scenario or backend is deliberately deferred; it would add adapter surface without closing
+any submission gate.
