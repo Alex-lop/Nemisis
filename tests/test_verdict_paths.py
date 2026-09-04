@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
 import pytest
 
 import nemisis.cli as cli
+import nemisis.crashcheck as crashcheck_module
 from nemisis.crash_fixture import (
     ATOMIC_REF,
     BUGGY_REF,
@@ -16,19 +18,24 @@ from nemisis.crash_fixture import (
     load_issue,
 )
 from nemisis.crash_models import (
+    AnchorResolutionStatus,
     CrashObservation,
     CrashVerdict,
     ExecutionStatus,
+    RetryContract,
     WorldRole,
 )
 from nemisis.crashcheck import (
     CrashCheckError,
     _audited_contract,
     _seal_capsule,
+    accept_contract,
     check,
     initialize,
     replay,
 )
+from nemisis.hashing import canonical_json
+from nemisis.models import TruthLabel
 
 TARGET = "app.credits:apply_credit"
 
@@ -99,6 +106,136 @@ def test_replay_base_role_can_reproduce_but_never_prove_a_fix(
 
     still_broken = replay(capsule, MISLEADING_GREEN_REF, role="candidate")
     assert still_broken.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
+
+
+def test_check_refuses_a_draft_contract_and_a_contract_for_another_base(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    config = _draft_config(tmp_path, monkeypatch)
+    assert json.loads(config.read_bytes())["status"] == "DRAFT"
+
+    with pytest.raises(CrashCheckError, match="contract is DRAFT"):
+        check(BUGGY_REF, MISLEADING_GREEN_REF, config, mode="local")
+
+    accept_contract(json.loads(config.read_bytes())["contract"]["digest"], config)
+    with pytest.raises(CrashCheckError, match="originating base digest differs"):
+        check(MISLEADING_GREEN_REF, ATOMIC_REF, config, mode="local")
+    assert not (tmp_path / "artifacts").exists()
+
+
+def test_accept_contract_refuses_a_wrong_digest_and_a_second_acceptance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _draft_config(tmp_path, monkeypatch)
+    before = config.read_bytes()
+
+    with pytest.raises(CrashCheckError, match="does not match the current draft"):
+        accept_contract("0" * 64, config)
+    assert config.read_bytes() == before
+
+    accepted = accept_contract(json.loads(before)["contract"]["digest"], config)
+    assert accepted.accepted and accepted.truth_label is TruthLabel.LOCAL
+    with pytest.raises(CrashCheckError, match="does not match the current draft"):
+        accept_contract(accepted.digest, config)
+
+
+def test_exported_capsule_refuses_a_substituted_accepted_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.chdir(tmp_path)
+    audited = _audited_contract()
+    capsule = _seal_capsule(audited)
+    other = RetryContract.with_digest(
+        **audited.model_dump(mode="python", exclude={"digest", "accepted", "truth_label"})
+        | {"issue_digest": "e" * 64},
+        accepted=True,
+        truth_label=TruthLabel.LOCAL,
+    )
+    repro = tmp_path / "repro"
+    repro.mkdir()
+    (repro / "capsule.json").write_bytes(canonical_json(capsule) + b"\n")
+    (repro / "contract.json").write_bytes(canonical_json(other) + b"\n")
+
+    with pytest.raises(CrashCheckError, match="unaccepted or has another digest"):
+        replay(repro / "capsule.json", ATOMIC_REF, role="corrected")
+
+    (repro / "capsule.json").write_bytes(canonical_json(_seal_capsule(other)) + b"\n")
+    (repro / "contract.json").unlink()
+    with pytest.raises(CrashCheckError, match="not the audited or accepted local contract"):
+        replay(repro / "capsule.json", ATOMIC_REF, role="corrected")
+
+
+def test_replay_live_mode_is_blocked_without_substitution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for name in ("NEBIUS_API_KEY", "CONTREE_PROFILE", "CONTREE_HOME", "NEMISIS_CONTREE_ROOT_IMAGE"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "empty-config"))
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+
+    result = replay(_seal_capsule(_audited_contract()), ATOMIC_REF, role="corrected", mode="live")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert result.transport is TruthLabel.LIVE
+    assert result.execution_status is ExecutionStatus.UNSUPPORTED
+    assert "Local execution was not substituted" in result.summary
+    assert result.attempts[0].spawns == ()
+
+
+def test_base_that_does_not_reproduce_publishes_incomplete_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    original = crashcheck_module._confirmed_observation
+
+    def base_never_reproduces(attempts: tuple[object, ...], capsule: object) -> CrashObservation:
+        if attempts and getattr(attempts[0], "role", None) is WorldRole.BASE:
+            return CrashObservation.NOT_OBSERVED
+        return original(attempts, capsule)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(crashcheck_module, "_confirmed_observation", base_never_reproduces)
+
+    result = check(BUGGY_REF, MISLEADING_GREEN_REF, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert "did not reproduce in five fresh worlds" in result.summary
+    assert {a.role for a in result.attempts} == {WorldRole.BASE}
+
+
+def test_failed_corrected_control_withholds_the_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+
+    result = check(BUGGY_REF, ATOMIC_REF, SCENARIO_ID, corrected=MISLEADING_GREEN_REF, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert "corrected control did not prove" in result.summary
+    by_role = {
+        role: {a.observation for a in result.attempts if a.role is role} for role in WorldRole
+    }
+    assert by_role[WorldRole.CANDIDATE] == {CrashObservation.EXACTLY_ONCE}
+    assert by_role[WorldRole.CORRECTED] == {CrashObservation.DUPLICATE_EFFECT}
+
+
+def test_three_argument_handler_is_an_invalid_match(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "three-argument", THREE_ARGUMENT)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    receipt = result.anchor_resolutions[0]
+    assert receipt.role is WorldRole.CANDIDATE
+    assert receipt.status is AnchorResolutionStatus.INVALID_MATCH
+    assert receipt.matched_paths == ("app/credits.py",)
+    assert "candidate target mapping" in result.summary
+    assert "(store, event)" in result.summary
+    assert {a.role for a in result.attempts} == {WorldRole.BASE}
 
 
 def test_same_ref_for_two_roles_is_refused_with_a_reason(
