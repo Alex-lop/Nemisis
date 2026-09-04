@@ -91,6 +91,7 @@ _HYPOTHESES = (
     (2, "marker-commit-v1", FaultBoundary.MARKER_COMMIT, 2),
 )
 _MINIMIZATION_CONFIRMATIONS = 2
+UNTRUSTED_FORK_DETAIL = "Local execution of an untrusted fork source is blocked; use ConTree."
 
 
 class CrashCheckError(ValueError):
@@ -314,7 +315,7 @@ def check(
                 base_binding,
                 WorldRole.BASE,
                 TruthLabel.LOCAL,
-                "Local execution of an untrusted fork candidate is blocked; use ConTree.",
+                UNTRUSTED_FORK_DETAIL,
             )
             return publish(
                 run_id,
@@ -492,6 +493,10 @@ def replay(
             detail = _live_blocker()
             attempts = (_failed_attempt(sealed, binding, world_role, TruthLabel.LIVE, detail),)
             verdict = CrashVerdict.EVIDENCE_INCOMPLETE
+        elif _untrusted_fork():
+            detail = UNTRUSTED_FORK_DETAIL
+            attempts = (_failed_attempt(sealed, binding, world_role, TruthLabel.LOCAL, detail),)
+            verdict = CrashVerdict.EVIDENCE_INCOMPLETE
         elif mode == "local":
             attempts = _execute_confirmations(
                 sealed, binding, materialized.path, root / "worlds", world_role
@@ -646,11 +651,13 @@ def _load_exported_contract(path: Path) -> RetryContract:
         status = path.lstat()
         if not stat.S_ISREG(status.st_mode) or status.st_size > MAX_CONFIG_BYTES:
             raise CrashCheckError("exported capsule contract is not a bounded regular file")
-        return RetryContract.model_validate_json(path.read_bytes())
+        contract = RetryContract.model_validate_json(path.read_bytes())
     except OSError as error:
         raise CrashCheckError("exported capsule contract could not be read") from error
     except ValueError as error:
         raise CrashCheckError("exported capsule contract failed strict validation") from error
+    _require_contract_label(contract)
+    return contract
 
 
 def _validate_capsule_contract(capsule: ReproCapsule, contract: RetryContract) -> None:
@@ -1416,7 +1423,23 @@ def _load_config_bytes(content: bytes) -> tuple[dict[str, object], RetryContract
         or payload["status"] != expected_status
     ):
         raise CrashCheckError("Nemisis config metadata contradicts its contract")
+    _require_contract_label(contract)
     return payload, contract
+
+
+def _require_contract_label(contract: RetryContract) -> None:
+    """Only the packaged contract is FIXTURE; accepted user contracts are LOCAL; drafts PLANNED."""
+    if not contract.accepted:
+        expected = TruthLabel.PLANNED
+    elif contract.digest == _audited_contract().digest:
+        expected = TruthLabel.FIXTURE
+    else:
+        expected = TruthLabel.LOCAL
+    if contract.truth_label is not expected:
+        raise CrashCheckError(
+            f"contract truth label {contract.truth_label.value} contradicts its acceptance state; "
+            f"expected {expected.value}"
+        )
 
 
 def _write_exact(path: Path, content: bytes, *, replace: bool = False) -> None:
