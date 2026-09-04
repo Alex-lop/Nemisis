@@ -29,6 +29,7 @@ the claim matrix. Its Python surface is:
 
 ```python
 initialize(issue, target, base, scenario_id) -> Path
+propose_contract(issue, target, base, scenario_id, client=None) -> ContractProposal
 check(base, candidate, scenario, corrected=None, mode="local") -> CrashCheckResult
 replay(capsule, source, role="candidate", mode="local") -> CrashCheckResult
 ```
@@ -37,6 +38,9 @@ The core records are:
 
 - `RetryContract`: accepted issue/base/target binding and trusted event, fault, probe, and predicate
   catalog IDs.
+- `ContractProposal`: the candidate-blind Nemotron receipt for a draft: offered and proposed catalog
+  IDs, audited and proposed `amount_cents`, the fixed accept/refuse decision, and the sanitized
+  `ModelCallReceipt`. Provenance only; it is outside the capsule address.
 - `AnchorBinding`: handler mapping plus supplied source ref, resolved source identity, and exact tree
   digest.
 - `HypothesisReceipt`: one candidate-blind base attempt, its fixed crash boundary and canonical
@@ -111,6 +115,12 @@ The live differential verifier currently supports only `idempotency-retry`. Its 
 written inside the guest and returned through bounded stdout; the parser and exact bundle binding
 detect malformed or incomplete results, but this is not a provider-owned test attestation. That
 trust boundary is not advertised for arbitrary repositories.
+
+CrashCheck's single model call is `init --nemotron` (`proposal.py`): the issue and the base handler
+resolved by the same anchor binder go to Nemotron with a strict schema over the audited catalog and
+one scalar bound; the adapter validates the model catalog first, and fixed rules accept or refuse
+the proposal. `check` attaches the sidecar receipt to the manifest and report only when it binds the
+loaded contract's exact identity.
 
 CrashCheck's local kernel is integrated; its ConTree provider transport is explicitly unimplemented.
 A requested CrashCheck live run returns `EVIDENCE_INCOMPLETE`/`UNSUPPORTED`, names the doctor

@@ -49,8 +49,23 @@ candidate materialization; each later claimed candidate or corrected role also r
 worlds. The checked-in audited contract is `FIXTURE`; another local contract requires explicit
 digest acceptance.
 
-The bounded Nemotron contract adapter may select only audited catalog IDs and in-range scalars, but
-it is not currently on the CrashCheck CLI path and no live generation is claimed.
+The bounded Nemotron contract adapter may select only audited catalog IDs and in-range scalars.
+`init --nemotron` puts it on the CrashCheck CLI path as provenance for a draft; see the decision
+below. No live generation is claimed until a genuine receipt exists.
+
+## Nemotron proposes at init, never at check
+
+The model's one CrashCheck role is to turn the issue and the exact base handler into a typed
+catalog proposal with one bounded scalar before any candidate exists. Fixed rules accept it only
+when it selects the audited fault intent and the exact expected effect; a mismatch drafts nothing
+and prints the model's values, so the call is load-bearing rather than decorative.
+
+The receipt lives beside the contract in `.nemisis/proposal.json` instead of inside it. A contract
+digest must stay a semantic identity (catalog IDs, issue, base tree, target) so the packaged
+`FIXTURE` contract and a user's accepted copy hash identically; a receipt carries timestamps and
+latency that would perturb that digest. `check` attaches the sidecar only when it is accepted and
+binds the same scenario, target, issue digest, and base tree digest; a foreign receipt is ignored
+and a malformed one fails closed. The proposal never enters the capsule address or the verdict.
 
 ## Strict JSON and fixed trusted runners
 

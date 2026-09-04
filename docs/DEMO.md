@@ -1,5 +1,22 @@
 # Demo
 
+The timed three-minute version with fallbacks is [DEMO_SCRIPT.md](DEMO_SCRIPT.md); the plain-language
+framing is [PITCH.md](PITCH.md). This file is the reference walkthrough.
+
+## 0. Nemotron contract proposal (needs `NEBIUS_API_KEY`)
+
+```bash
+uv run nemisis init --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
+  --target app.credits:apply_credit --base fixture:sqlite-credit-v1/buggy \
+  --scenario sqlite-credit-v1 --nemotron
+```
+
+Show the `nemotron:` line (model, endpoint region, `LIVE`, latency, receipt digest) and the
+`proposed:` line (fault intent selected, `amount_cents=2500` matches the audited event). Then pass
+`--scenario .nemisis/config.json` to the `check` below so the receipt appears in its report. Without
+the key the command exits `2` and drafts nothing; say so and continue with the audited fixture
+contract. Never show a `MOCKED` receipt as live.
+
 ## 1. Differential foundation
 
 ```bash

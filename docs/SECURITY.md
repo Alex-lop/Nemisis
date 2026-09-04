@@ -15,6 +15,11 @@ than a general hostile-code sandbox.
   fixtures, or committed receipts.
 - Missing, malformed, timed-out, or contradictory evidence fails closed and never triggers a live to
   local fallback.
+- A Nemotron contract proposal is provenance, not evidence. The model sees only issue text and the
+  base handler, may return only offered catalog IDs and one bounded scalar, is accepted or refused by
+  fixed rules before any draft, and is attached to a check only when its receipt binds the exact
+  contract identity. A malformed sidecar fails closed; a foreign one is ignored. The receipt never
+  contains the credential, the issue, the handler source, or the raw response.
 
 ## Differential verifier
 

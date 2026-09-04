@@ -27,7 +27,21 @@ changing that seam; do not infer it from mocked tests. See [`pyproject.toml`](..
 
 ## What Nemisis can run live today
 
-Only the original packaged `idempotency-retry` differential verifier is connected end to end:
+CrashCheck's own live call is the candidate-blind contract proposal. It needs only
+`NEBIUS_API_KEY`; the resulting receipt is labelled `LIVE`, stored beside the contract, and carried
+into the next `check` manifest and report:
+
+```bash
+uv run nemisis init --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
+  --target app.credits:apply_credit --base fixture:sqlite-credit-v1/buggy \
+  --scenario sqlite-credit-v1 --nemotron
+```
+
+Without the key it exits `2` and drafts nothing. A proposal that omits the audited fault intent or
+proposes a different `amount_cents` also exits `2` and prints the model's values.
+
+The original packaged `idempotency-retry` differential verifier is the only path connected to
+ConTree end to end:
 
 ```bash
 uv run nemisis verify --fixture idempotency-retry --mode live
@@ -98,23 +112,16 @@ print({key: document.get(key) for key in ("id", "status", "supported_features")}
 PY
 ```
 
-Optional billable schema smoke, using the same bounded adapter as Nemisis:
+Billable schema smoke, using the same bounded adapter and the real product path:
 
 ```bash
-uv run python - <<'PY'
-from nemisis.nemotron import NemotronClient
-
-result = NemotronClient().generate_contract(
-    "Select the audited retry boundary.",
-    "One $25 credit must be applied exactly once.",
-    ("effect-commit-v1",),
-    {"amount_cents": (2500, 2500)},
-)
-print(result.receipt.model_id, result.receipt.schema_valid, result.receipt.outcome)
-PY
+uv run nemisis init --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
+  --target app.credits:apply_credit --base fixture:sqlite-credit-v1/buggy \
+  --scenario sqlite-credit-v1 --nemotron --json
 ```
 
-This proves only a current structured-output call. It does not prove a Sandbox run or CrashCheck.
+This proves a current structured-output call and a receipted, accepted proposal. It does not prove a
+Sandbox run or a CrashCheck live transport.
 
 ### 3. Authenticated profile and immutable-image probe
 
@@ -184,7 +191,8 @@ After all probes pass, run the supported live verifier and retain its sanitized 
 The command `uv run nemisis doctor --mode live --json` returned `BLOCKED` on 2026-08-30:
 
 - local Python 3.12, POSIX process groups/`SIGKILL`, and SQLite WAL/`FULL` probes passed;
-- `NEBIUS_API_KEY` was absent, so the authenticated model catalog and structured call were not run;
+- `NEBIUS_API_KEY` was absent (rechecked 2026-09-03), so the authenticated model catalog, the
+  structured call, and therefore the `init --nemotron` proposal receipt were not run;
 - no ConTree profile was found, so authentication, `whoami`, uploads, spawns, and operation receipts
   were not run;
 - `NEMISIS_CONTREE_ROOT_IMAGE` was absent, so no immutable image or required binaries were inspected;

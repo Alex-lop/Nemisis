@@ -34,6 +34,8 @@ The packaged fixture command is the audited shortcut because its contract is alr
 ## Five-beat CrashCheck story
 
 1. Bind the accepted issue, target, exact base tree, canonical event, and trusted catalog IDs.
+   With `init --nemotron`, Nemotron proposes the catalog binding and expected single effect from
+   the issue and base handler only; fixed rules accept or refuse the proposal before any draft.
 2. Before candidate materialization, run two fixed base hypotheses, select the canonical
    reproducer, then delete its sole fault action in two fresh worlds. Proceed only when both
    no-fault replays finish exactly once, proving this one-action schedule necessary for the
@@ -63,12 +65,16 @@ An accepted catalog target whose exact-tree anchor has zero, multiple, or invali
 
 ## Model and isolation roles
 
-For CrashCheck's future live contract role, Nemotron may turn bounded base-only context into typed
-catalog proposals; that call may not emit commands, probes, SQL, assertions, or verdicts.
-CrashCheck does not yet call Nemotron in its CLI, and its contract adapter is contract-tested with
-injected clients only. The inherited differential live path has a separate generator that may emit
-schema-, path-, import-, and assertion-restricted Pytest files, but no current-tree live receipt
-exists.
+`nemisis init --nemotron` is CrashCheck's Nemotron role: bounded base-only context (issue text and
+the exact base handler) becomes a typed catalog proposal plus one bounded scalar. That call may not
+emit commands, probes, SQL, assertions, or verdicts. Deterministic code accepts the proposal only
+when it selects the audited fault intent and the exact `amount_cents`; otherwise no contract is
+drafted. The sanitized receipt (`.nemisis/proposal.json`) is provenance carried into the check
+manifest and report, never crash evidence, and it never enters the capsule digest. The adapter is
+contract-tested with injected clients (`MOCKED`); a `LIVE` receipt requires a genuine Token Factory
+call with `NEBIUS_API_KEY`, which this environment lacks. The inherited differential live path has a
+separate generator that may emit schema-, path-, import-, and assertion-restricted Pytest files, but
+no current-tree live receipt exists for either surface.
 
 ConTree supplies isolated prepared and branched worlds for the inherited differential live path.
 CrashCheck's ConTree transport is not implemented, so untrusted candidates and CrashCheck live mode
@@ -96,7 +102,8 @@ code, repair generation, PR comments, and a hosted control plane.
 | Portable capsule, manifest, report, regression, and replay | `_publish`, `report.py` | artifact relocation/export/replay tests | Same workflow includes installed-wheel replay |
 | Composite GitHub Action | `action.yml` | local Action job plus release tests | GitHub-hosted at the same exact SHA; expected candidate rejection is exit 1 |
 | Measured benchmark and one-minute viewer | `benchmark.py`, `docs/assets/crashcheck-hero/` | benchmark and static evidence-binding tests | `LOCAL` / `FIXTURE`; source `ddaf186aa81b8a7ebd442da1f2dfeee6878e7dce`, capsule `1025d9c6…` |
-| Nemotron and ConTree adapters | `nemotron.py`, `contree.py`, `live.py` | injected-client contract tests | `MOCKED`; genuine current-tree path is `BLOCKED` |
+| Candidate-blind Nemotron contract proposal at `init` | `proposal.py`, `crash_models.py`, `cli.py`, `crashcheck.py`, `report.py` | `test_proposal.py`: candidate blindness, fail-closed rejection, sidecar binding into manifest/report | `MOCKED` in tests; `LIVE` requires `NEBIUS_API_KEY`; no current-tree live receipt yet |
+| ConTree adapter and CrashCheck live transport | `contree.py`, `live.py` | injected-client contract tests | `MOCKED`; CrashCheck Sandbox transport `BLOCKED` |
 
 No fixture, mock, historical result, or local run may be relabeled as live evidence. Genuine live
 claims require sanitized receipts bound to the exact source SHA, capsule digest, model, endpoint,
