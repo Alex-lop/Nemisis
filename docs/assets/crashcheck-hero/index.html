@@ -386,7 +386,9 @@ Promise.all([
   boundEvidence.hidden = true;
   document.title = "Nemisis CrashCheck — evidence unavailable";
   evidenceStatusTitle.textContent = "Evidence unavailable";
-  evidenceStatusDetail.textContent = `No claim rendered: ${error.message}`;
+  evidenceStatusDetail.textContent = `No claim rendered: ${error.message}. Serve the repository root with `
+    + "uv run python -m http.server 8000 --bind 127.0.0.1 and open "
+    + "http://127.0.0.1:8000/docs/assets/crashcheck-hero/ (fetch is blocked on file:// pages).";
 });
 
 button.disabled = true;

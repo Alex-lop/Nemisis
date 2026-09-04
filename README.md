@@ -45,7 +45,8 @@ worker nonces, and final snapshots.
 CrashCheck does not run the fixture's ordinary repository tests; the benchmark measures those
 separately as context for the counterexample.
 
-Replay the atomic revision using the exact `capsule:` path printed by `check`:
+Replay the atomic revision using the `capsule:` path printed by `check` (its directory is the
+`capsule digest:` line):
 
 ```bash
 CAPSULE_PATH=.nemisis/repros/double-credit/PASTE_PRINTED_DIGEST/capsule.json
@@ -87,13 +88,14 @@ the receipt.
 From the repository root, serve the committed static evidence:
 
 ```bash
-uv run python -m http.server 8000
+uv run python -m http.server 8000 --bind 127.0.0.1
 ```
 
 Open <http://127.0.0.1:8000/docs/assets/crashcheck-hero/> and select **Replay fixture evidence**.
 The control reveals the committed, digest-bound `LOCAL` / `FIXTURE` receipt; it does not execute
 repository code, call a model, or start a provider run. If either JSON binding fails, the viewer
-shows no behavioral claim.
+shows no behavioral claim. Bind to loopback as shown: the server exposes the whole checkout,
+including any `.env`, and browsers block the page's `fetch` on `file://`, so serve it.
 
 ### Use the audited SQLite adapter in a trusted repository
 
@@ -101,18 +103,25 @@ shows no behavioral claim.
 the exact printed digest is accepted. This alpha does not analyze arbitrary handlers, databases, or
 languages; it accepts only `sqlite-credit-v1` and the fixed two-argument `CreditStore` contract.
 
+Install the CLI once, then run these from your own repository (`uv run nemisis` only exists inside
+this checkout):
+
 ```bash
-uv run nemisis init --issue issue.md --target app.credits:apply_credit --base main \
+uv tool install "git+https://github.com/Alex-lop/Nemisis@main"   # or a reviewed commit SHA
+nemisis init --issue issue.md --target app.credits:apply_credit --base main \
   --scenario sqlite-credit-v1
-uv run nemisis init --issue issue.md --target app.credits:apply_credit --base main \
+nemisis init --issue issue.md --target app.credits:apply_credit --base main \
   --scenario sqlite-credit-v1 --accept-contract PASTE_PRINTED_DIGEST
-uv run nemisis check --base main --candidate HEAD \
-  --scenario .nemisis/config.json --mode local
+nemisis check --base main --candidate HEAD --scenario .nemisis/config.json --mode local
 ```
 
-Passing the reviewed config explicitly supports this pre-commit first run. Once the config is
-committed on the base ref, the scenario ID loads only that exact base-owned copy; cwd and candidate
-copies cannot override it.
+Acceptance re-seals the draft under a new `LOCAL` digest; the CLI prints both. Rerunning `init`
+with the same issue, base, and target is a no-op; a different one must delete
+`.nemisis/config.json` first. `nemisis benchmark` runs only inside this checkout. Passing the
+reviewed config explicitly supports this pre-commit first run. Once the config is committed on the
+base ref, the scenario ID loads only that exact base-owned copy; cwd and candidate copies cannot
+override it. Evaluating a Git ref with a dirty working tree prints a warning: the commit, not the
+checkout, is what ran.
 
 Git refs are resolved to full commit SHAs. Fixture refs retain their exact fixture identity; local
 directories are identified by their copied tree digest. Each `AnchorBinding` records the supplied
@@ -130,8 +139,8 @@ CrashCheck commands support `--json`; progress stays on stderr. Their exit polic
 Every run writes a manifest beneath `.nemisis/runs/<run-id>/`. Attempt-bearing runs add a report;
 the golden path also records the full single-action deletion receipt. A pre-execution mapping
 failure instead adds `anchor-resolution.json`. Immutable repro assets live under
-`.nemisis/repros/double-credit/<capsule-digest>/`; completed runs add the executable integration/fault
-regression. Stored paths are artifact-root-relative, so the bundle can move without retaining a
+`.nemisis/repros/double-credit/<capsule-digest>/`; runs that completed with valid integrity add the
+executable integration/fault regression. Stored paths are artifact-root-relative, so the bundle can move without retaining a
 host path.
 
 ## Differential verifier
@@ -144,6 +153,8 @@ uv run nemisis verify --fixture idempotency-retry --mode local
 
 It runs real subprocesses in separate temporary base and candidate worlds. The same trusted
 baseline tests, adversarial tests, runner definition, parser, and bundle bytes run in both worlds.
+`verify` is report-only: it prints the matrix and the artifact decision and always exits `0`; the
+CrashCheck exit table above does not apply to it.
 
 | Claim | Relation | Base | Candidate | Verdict |
 | --- | --- | --- | --- | --- |

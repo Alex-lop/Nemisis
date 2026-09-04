@@ -11,6 +11,8 @@ Committed hero evidence (unchanged, bound to its own exact source and engine):
 - engine code digest at that source: `47d78405ca59dee877328e16face03b15af484e3d65811e8caf213f00d8ec912`
 - capsule digest: `1025d9c6e014394cf80629d180e7cb4fb1a77a4b7b26934980b5f5ea975069a8`
 - benchmark result digest: `11016ce964b88961c246c91eb1ae437cf0ff9e9547a794ad845776af52af864a`
+- the capsule and benchmark digests are bound to CPython 3.12.13 / SQLite 3.53.1 / Darwin arm64
+  through the runner environment digest; only the engine code digest is environment-independent
 
 Current tree:
 
@@ -40,7 +42,7 @@ receipt into the manifest and report. The model never sees a candidate and never
 The committed one-minute viewer is served with:
 
 ```bash
-uv run python -m http.server 8000
+uv run python -m http.server 8000 --bind 127.0.0.1
 ```
 
 Then open <http://127.0.0.1:8000/docs/assets/crashcheck-hero/>. It remains hidden until the committed
@@ -49,7 +51,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 276 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 295 tests, and package build: pass locally on
   Python 3.12.13 (the suite also passed on 3.13 during development);
 - exact engine CI for the committed hero: [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355);
 - exact measured-source CI: [successful run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096);

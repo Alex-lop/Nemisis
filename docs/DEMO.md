@@ -89,7 +89,7 @@ the same scoped requirement and depends on the installed Nemisis package.
 ## 3. One-minute evidence viewer
 
 ```bash
-uv run python -m http.server 8000
+uv run python -m http.server 8000 --bind 127.0.0.1
 ```
 
 Open <http://127.0.0.1:8000/docs/assets/crashcheck-hero/> and click **Replay fixture evidence**.
@@ -101,7 +101,7 @@ Token Factory. A failed benchmark/manifest binding hides the story instead of re
 
 1. Show the benchmark's green Pytest and sequential checks as context.
 2. Show both base-only hunt receipts and deterministic `effect-commit` selection.
-3. Hold on `+$25 durable -> SIGKILL -> fresh worker` in the confirmation trace.
+3. Hold on `timeline: $25.00 durable -> SIGKILL -> fresh worker -> $50.00`.
 4. Show five candidate reproductions at `$50` and `PATCH_FAILED_STILL_REPRODUCES`.
 5. Replay the unchanged capsule against atomic and show five fresh `$25` confirmations with one
    marker; finish on the scoped—not global—verdict and engine digest.

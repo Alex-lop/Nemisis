@@ -58,11 +58,19 @@ host load can change it. No provider latency, concurrency limit, or cost was mea
 
 The evidence commit necessarily follows the clean measured source commit. The JSON retains that
 immediately preceding SHA rather than pretending the unexecuted evidence commit measured itself.
-Regenerate with:
+
+The capsule and result digests are bound to the measured environment (CPython 3.12.13, SQLite
+3.53.1, Darwin arm64) through the runner environment digest; only the engine code digest is
+environment-independent. A rerun on another interpreter prints different capsule and result
+digests for the same observed behavior.
+
+Regenerate to a fresh path; wall-clock timings enter `result_digest`, so the committed file can
+never be overwritten in place:
 
 ```bash
-uv run nemisis benchmark --output benchmarks/results/crashcheck-v1.json --json
+uv run nemisis benchmark --output .nemisis/benchmark.json --json
 ```
 
-The command refuses a dirty execution-critical tree, validates the complete result against its
-strict schema and digests, and refuses to overwrite different evidence.
+The command refuses a dirty execution-critical tree and validates the complete result against its
+strict schema and digests. To publish, copy the new file over the committed one in a follow-up
+commit and update the digests above.

@@ -19,7 +19,7 @@ commit prints its own capsule and engine digests.
 | Installed-wheel replay and regression | `VERIFIED` | External temp install: base/candidate/corrected replay exits `1`/`1`/`0`; exported regression fails candidate and passes atomic. |
 | Measured benchmark | `LOCAL` / `FIXTURE` | Result `11016ce964b88961c246c91eb1ae437cf0ff9e9547a794ad845776af52af864a`; strict schema/digest validation passes. |
 | Static one-minute viewer | `LOCAL` / `FIXTURE` | Verdict-first five-beat viewer, exact receipt bindings, fail-closed runtime, and explicit “Replay fixture evidence” control. |
-| Project gates | `VERIFIED` | Locked sync, formatting, Ruff, mypy, 276 local tests, sdist, and wheel pass. |
+| Project gates | `VERIFIED` | Locked sync, formatting, Ruff, mypy, 295 local tests, sdist, and wheel pass. |
 | GitHub composite Action | `VERIFIED_WITH_BOUNDARY` | Exact-SHA CI executes `uses: ./`, expected candidate rejection, artifact validation, installed-wheel smoke, and corrected replay. The copyable workflow pins engine `f05ae921…`; remote-action download and real upload transfer are not exercised by CI. |
 | Nemotron contract proposal (`init --nemotron`) | `MOCKED` / `BLOCKED` | Wired into the CLI and into the check manifest and report; injected-client tests prove candidate blindness, fail-closed rejection, secret-free receipts, and sidecar binding. No `NEBIUS_API_KEY` here, so no current-tree `LIVE` receipt. |
 | Differential Nemotron + ConTree path | `IMPLEMENTED_NOT_CURRENTLY_OBSERVED` | Bounded adapter and guest-receipt tests exist, but no current-tree provider receipt exists. |

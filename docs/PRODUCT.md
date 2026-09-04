@@ -18,9 +18,10 @@ CrashCheck is the primary product surface.
   and an optional corrected control.
 - Contract: accepted, base-owned JSON selecting only the fixed `sqlite-credit-v1` event, fault,
   probe, predicate, and adapter catalog.
-- Output: every run publishes a JSON manifest. Attempt-bearing runs add a static report; completed
-  golden-path checks add a content-addressed Repro Capsule and executable regression. A
-  pre-execution anchor failure instead adds a structured anchor-resolution receipt.
+- Output: every run publishes a JSON manifest plus the capsule, contract, event, and metadata of its
+  content-addressed repro directory. Attempt-bearing runs add a static report; runs that completed
+  with valid integrity add the executable regression. A pre-execution anchor failure instead adds a
+  structured anchor-resolution receipt.
 - Authority: models may propose bounded catalog choices and scalar values. Strict schemas, digests,
   parent-owned execution, read-only probes, and fixed classification rules alone decide the result.
 
