@@ -7,6 +7,7 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 import tarfile
 import tempfile
 import uuid
@@ -160,6 +161,21 @@ def initialize(issue: str | Path, target: str, base: str | Path, scenario_id: st
         "target": target,
     }
     path = Path.cwd() / CONFIG_PATH
+    if path.exists():
+        _, existing = _load_config(path)
+        same_identity = (
+            existing.scenario_id == contract.scenario_id
+            and existing.target == contract.target
+            and existing.issue_digest == contract.issue_digest
+            and existing.originating_base_tree_digest == contract.originating_base_tree_digest
+        )
+        if same_identity and existing.accepted:
+            return path
+        if not same_identity:
+            raise CrashCheckError(
+                f"{path} already holds a contract for a different issue, base, or target; "
+                "delete it to re-initialize"
+            )
     _write_exact(path, canonical_json(payload) + b"\n")
     return path
 
@@ -719,8 +735,10 @@ def _bind_anchor(
 
 def _anchor_failure_summary(receipt: AnchorResolutionReceipt) -> str:
     return (
-        f"The accepted {receipt.role.value} target mapping was {receipt.status.value}: "
-        f"{receipt.detail}. No unbound source was executed."
+        f"The accepted {receipt.role.value} target mapping for {receipt.target} was "
+        f"{receipt.status.value} in {receipt.source_ref} "
+        f"(resolved {receipt.resolved_source_identity[:16]}): {receipt.detail}. "
+        "No unbound source was executed."
     )
 
 
@@ -1120,7 +1138,6 @@ def _publish(
         "metadata": (repro_relative / "metadata.json").as_posix(),
     }
     if attempts:
-        artifacts["regression_test"] = (repro_relative / "test_repro.py").as_posix()
         artifacts["report"] = (run_relative / "report.html").as_posix()
     if anchor_resolutions:
         artifacts["anchor_resolution"] = (run_relative / "anchor-resolution.json").as_posix()
@@ -1156,6 +1173,13 @@ def _publish(
         result_transport = attempts[0].transport
     else:
         result_transport = transport
+    exercised = (
+        bool(attempts)
+        and execution is ExecutionStatus.COMPLETED
+        and integrity is IntegrityStatus.VALID
+    )
+    if exercised:
+        artifacts["regression_test"] = (repro_relative / "test_repro.py").as_posix()
     result = CrashCheckResult.with_digest(
         run_id=run_id,
         transport=result_transport,
@@ -1190,7 +1214,7 @@ def _publish(
         "truth_label": capsule.truth_label,
     }
     _write_exact(repro_dir / "metadata.json", canonical_json(metadata) + b"\n")
-    if attempts:
+    if exercised:
         _write_exact(repro_dir / "test_repro.py", _regression_asset(capsule))
     if anchor_resolutions:
         _write_exact(
@@ -1229,7 +1253,10 @@ def _publish(
         "result": result.model_dump(mode="json"),
         "schema_version": "nemisis.crashcheck.run.v1",
     }
-    _write_exact(run_dir / "manifest.json", canonical_json(manifest) + b"\n")
+    _write_exact(
+        run_dir / "manifest.json",
+        json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False).encode() + b"\n",
+    )
     if attempts:
         with tempfile.TemporaryDirectory(prefix="nemisis-report-") as temporary:
             rendered = Path(temporary) / "report.html"
@@ -1243,6 +1270,8 @@ def _materialize_source(value: str | Path, destination: Path) -> _Source:
     if ref in FIXTURE_REFS:
         fixture = materialize_fixture(ref, destination)
         return _Source(ref, fixture.path, fixture.tree_digest, ref, None)
+    if ref.startswith("fixture:"):
+        raise CrashCheckError(f"unknown fixture ref {ref!r}; known: {', '.join(FIXTURE_REFS)}")
     path = Path(value)
     try:
         path_status = path.lstat()
@@ -1256,18 +1285,25 @@ def _materialize_source(value: str | Path, destination: Path) -> _Source:
         _copy_tree(source, destination)
         digest = sha256_tree(destination)
         return _Source(str(path), destination.resolve(), digest, digest, config)
-    repository = _git_repository()
-    commit = (
-        _git(
-            repository,
-            "rev-parse",
-            "--verify",
-            "--end-of-options",
-            f"{ref}^{{commit}}",
+    try:
+        repository = _git_repository()
+        commit = (
+            _git(
+                repository,
+                "rev-parse",
+                "--verify",
+                "--end-of-options",
+                f"{ref}^{{commit}}",
+            )
+            .decode()
+            .strip()
         )
-        .decode()
-        .strip()
-    )
+    except CrashCheckError as error:
+        raise CrashCheckError(
+            f"{error} (ref {ref!r} is not a packaged fixture ref, an existing directory, or a "
+            "resolvable Git commit)"
+        ) from error
+    _warn_if_working_tree_is_dirty(repository, ref, commit)
     archive = _git(repository, "archive", "--format=tar", commit)
     if not archive or len(archive) > MAX_SOURCE_ARCHIVE_BYTES:
         raise CrashCheckError("resolved Git source archive is empty or oversized")
@@ -1359,6 +1395,26 @@ def _extract_archive(content: bytes, destination: Path) -> bytes | None:
     except tarfile.TarError as error:
         raise CrashCheckError("Git source archive is malformed") from error
     return config
+
+
+def _warn_if_working_tree_is_dirty(repository: Path, ref: str, commit: str) -> None:
+    """Evidence binds the commit, not the checkout; say so when they differ."""
+    try:
+        dirty = subprocess.run(
+            ["git", "-C", str(repository), "status", "--porcelain", "--untracked-files=no"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return
+    if dirty:
+        print(
+            f"warning: working tree has uncommitted changes; {ref} was evaluated at commit "
+            f"{commit}, not the checkout",
+            file=sys.stderr,
+        )
 
 
 def _git_repository() -> Path:
