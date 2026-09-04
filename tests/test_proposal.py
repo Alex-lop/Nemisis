@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import cast
 
 import pytest
 
+import nemisis.cli as cli
+import nemisis.proposal as proposal_module
 from nemisis.crash_fixture import BUGGY_REF, load_contract, load_issue
 from nemisis.crash_models import ContractProposal
 from nemisis.hashing import canonical_json
 from nemisis.models import TruthLabel
 from nemisis.nemotron import DEFAULT_MODEL_ID, NemotronClient, _Client
-from nemisis.proposal import ProposalError, propose_contract
+from nemisis.proposal import PROPOSAL_NAME, ProposalError, propose_contract
 
 AUDITED = load_contract()
 TARGET = AUDITED["target"]
@@ -130,3 +133,91 @@ def test_unsupported_target_is_refused_before_any_model_call(issue: Path) -> Non
         propose_contract(issue, "app.other:handler", BUGGY_REF, client=_adapter(fake))
 
     assert fake.models.calls == [] and fake.chat.completions.calls == []
+
+
+def test_cli_init_nemotron_fails_closed_without_a_credential(
+    issue: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("NEBIUS_API_KEY", raising=False)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["nemisis", "init", "--issue", str(issue), "--target", TARGET, "--base", BUGGY_REF]
+        + ["--nemotron"],
+    )
+
+    with pytest.raises(SystemExit) as error:
+        cli.main()
+
+    assert error.value.code == 2
+    captured = capsys.readouterr()
+    assert "NEMOTRON PROPOSAL REJECTED" in captured.err
+    assert "NEBIUS_API_KEY" in captured.err
+    assert captured.out == ""
+    assert not (tmp_path / ".nemisis").exists()
+
+
+def test_cli_init_nemotron_writes_receipt_and_prints_provenance(
+    issue: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        proposal_module,
+        "NemotronClient",
+        lambda: _adapter(_FakeClient(_payload(OFFERED, 2_500))),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["nemisis", "init", "--issue", str(issue), "--target", TARGET, "--base", BUGGY_REF]
+        + ["--nemotron"],
+    )
+
+    cli.main()
+
+    out = capsys.readouterr().out
+    assert "status: ACCEPTED" in out
+    assert f"nemotron: {DEFAULT_MODEL_ID} · global · MOCKED · schema valid" in out
+    assert "amount_cents=2500 matches the audited event" in out
+    sidecar = tmp_path / ".nemisis" / PROPOSAL_NAME
+    proposal = ContractProposal.model_validate_json(sidecar.read_bytes())
+    assert f"receipt {proposal.digest}" in out
+    config = json.loads((tmp_path / ".nemisis" / "config.json").read_text(encoding="utf-8"))
+    assert config["contract"]["issue_digest"] == proposal.issue_digest
+    assert config["contract"]["originating_base_tree_digest"] == proposal.base_tree_digest
+
+
+def test_cli_init_nemotron_rejection_drafts_nothing(
+    issue: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        proposal_module,
+        "NemotronClient",
+        lambda: _adapter(_FakeClient(_payload(OFFERED, 25))),
+    )
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["nemisis", "init", "--issue", str(issue), "--target", TARGET, "--base", BUGGY_REF]
+        + ["--nemotron", "--json"],
+    )
+
+    with pytest.raises(SystemExit) as error:
+        cli.main()
+
+    assert error.value.code == 2
+    captured = capsys.readouterr()
+    assert "differs from the audited 2500" in captured.out
+    assert '"verdict":"EVIDENCE_INCOMPLETE"' in captured.out
+    assert not (tmp_path / ".nemisis").exists()

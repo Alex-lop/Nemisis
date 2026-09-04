@@ -3,6 +3,7 @@
 .mypy_cache/
 .nemisis/*
 !.nemisis/config.json
+!.nemisis/proposal.json
 .pytest_cache/
 .ruff_cache/
 .venv/

@@ -12,7 +12,7 @@ from pathlib import Path
 
 from nemisis.benchmark import BenchmarkError, BenchmarkResult, run_benchmark
 from nemisis.crash_fixture import SCENARIO_ID
-from nemisis.crash_models import CrashCheckResult, CrashVerdict
+from nemisis.crash_models import ContractProposal, CrashCheckResult, CrashVerdict
 from nemisis.crashcheck import CrashCheckError, accept_contract, check, initialize, replay
 from nemisis.doctor import DoctorResult, doctor
 from nemisis.fixture import FIXTURE_ID
@@ -38,6 +38,11 @@ def _parser() -> argparse.ArgumentParser:
     init.add_argument("--base", required=True)
     init.add_argument("--scenario", default=SCENARIO_ID, choices=[SCENARIO_ID])
     init.add_argument("--accept-contract")
+    init.add_argument(
+        "--nemotron",
+        action="store_true",
+        help="ask Nemotron on Token Factory to propose the contract from the issue and base only",
+    )
     init.add_argument("--json", action="store_true")
 
     crashcheck = commands.add_parser("check", help="run a crash/retry counterexample")
@@ -168,20 +173,40 @@ def _print_doctor(result: DoctorResult, *, as_json: bool) -> None:
         print(f"{item['status']:<7} {item['name']}: {item['detail']}")
 
 
-def _print_init(path: Path, *, as_json: bool) -> None:
+def _print_init(
+    path: Path,
+    *,
+    as_json: bool,
+    proposal: ContractProposal | None = None,
+    proposal_path: Path | None = None,
+) -> None:
     payload = json.loads(path.read_text(encoding="utf-8"))
     contract = payload["contract"]
-    result = {
+    result: dict[str, object] = {
         "config": str(path),
         "contract_digest": contract["digest"],
         "status": payload["status"],
     }
+    if proposal is not None and proposal_path is not None:
+        result["proposal"] = str(proposal_path)
+        result["contract_proposal"] = proposal.model_dump(mode="json")
     if as_json:
         print(canonical_json(result).decode())
         return
     print(f"config: {result['config']}")
     print(f"contract: {result['contract_digest']}")
     print(f"status: {result['status']}")
+    if proposal is not None and proposal_path is not None:
+        from nemisis.proposal import describe
+
+        receipt = proposal.model_call
+        print(f"proposal: {proposal_path}")
+        print(
+            f"nemotron: {receipt.model_id} · {receipt.endpoint_region} · "
+            f"{receipt.truth_label.value} · schema valid · {receipt.latency_ms} ms · "
+            f"receipt {proposal.digest}"
+        )
+        print(f"proposed: {describe(proposal)}; accepted by deterministic catalog check")
 
 
 def _print_benchmark(result: BenchmarkResult, output: Path, *, as_json: bool) -> None:
@@ -247,10 +272,27 @@ def main() -> None:
             return
 
         if args.command == "init":
+            proposal = None
+            if args.nemotron:
+                from nemisis.nemotron import NemotronError
+                from nemisis.proposal import ProposalError, propose_contract
+
+                try:
+                    proposal = propose_contract(args.issue, args.target, args.base, args.scenario)
+                except (NemotronError, ProposalError) as error:
+                    _fail(
+                        f"NEMOTRON PROPOSAL REJECTED: {error}. No contract was drafted.",
+                        as_json=args.json,
+                    )
             path = initialize(args.issue, args.target, args.base, args.scenario)
             if args.accept_contract:
                 accept_contract(args.accept_contract, path)
-            _print_init(path, as_json=args.json)
+            proposal_path = None
+            if proposal is not None:
+                from nemisis.proposal import PROPOSAL_NAME, write_proposal
+
+                proposal_path = write_proposal(proposal, path.with_name(PROPOSAL_NAME))
+            _print_init(path, as_json=args.json, proposal=proposal, proposal_path=proposal_path)
             return
 
         if args.command == "doctor":
