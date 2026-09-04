@@ -165,16 +165,16 @@ def test_check_routes_arguments_artifacts_and_failure_exit(
     assert "NEMISIS_ARTIFACT_ROOT" not in os.environ
     output = capsys.readouterr()
     assert "verdict: PATCH_FAILED_STILL_REPRODUCES" in output.out
-    assert f"capsule: {'c' * 64}" in output.out
+    assert f"capsule digest: {'c' * 64}" in output.out
     assert f"engine code digest: {'e' * 64}" in output.out
     assert f"engine source commit: {'a' * 40}" in output.out
-    assert "hunt: 2 hypotheses -> selected effect-commit (effect-commit-v1)" in output.out
+    assert "hypotheses: 2 run -> selected effect-commit (effect-commit-v1)" in output.out
     assert (
         "necessity: deleted effect-commit; empty schedule was EXACTLY_ONCE in 2/2 fresh "
         "base worlds; deletion rejected; final fault actions 1/1 (fixture-only necessity proof)"
         in output.out
     )
-    assert f"manifest: {(tmp_path / 'runs/manifest.json').resolve()}" in output.out
+    assert f"manifest: {tmp_path / 'runs/manifest.json'}" in output.out
     assert "CrashCheck check started (LOCAL)" in output.err
 
 
@@ -272,7 +272,9 @@ def test_benchmark_uses_default_output_without_changing_artifact_root(
     seen: dict[str, object] = {}
     result = cast(
         BenchmarkResult,
-        SimpleNamespace(result_digest="d" * 64, source_commit="a" * 40),
+        SimpleNamespace(
+            result_digest="d" * 64, source_commit="a" * 40, cases=(), crashcheck_wall_time_ns=0
+        ),
     )
 
     def fake_run_benchmark(output: Path) -> BenchmarkResult:
@@ -290,7 +292,8 @@ def test_benchmark_uses_default_output_without_changing_artifact_root(
         "output": Path(".nemisis/benchmark.json"),
     }
     assert os.environ["NEMISIS_ARTIFACT_ROOT"] == str(existing_artifact_root)
-    assert capsys.readouterr().out.splitlines() == [
+    assert capsys.readouterr().out.splitlines()[-4:] == [
+        "crashcheck wall: 0.00 s",
         f"result: {Path('.nemisis/benchmark.json').resolve()}",
         f"digest: {'d' * 64}",
         f"source: {'a' * 40}",

@@ -19,25 +19,41 @@ from nemisis.fixture import FIXTURE_ID
 from nemisis.hashing import canonical_json
 from nemisis.local import LocalVerification, verify_local
 from nemisis.models import RuntimeMode
+from nemisis.report import money
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nemisis")
     commands = parser.add_subparsers(dest="command", required=True)
 
+    ref_help = (
+        "fixture:<scenario>/<variant>, a Git ref resolved to one exact commit, or a local "
+        "directory copied and identified by its tree digest"
+    )
     verify = commands.add_parser("verify", help="run the original differential fixture")
     verify.add_argument("--fixture", default=FIXTURE_ID, choices=[FIXTURE_ID])
     verify.add_argument(
-        "--mode", default=RuntimeMode.LOCAL.value, choices=[mode.value for mode in RuntimeMode]
+        "--mode",
+        default=RuntimeMode.LOCAL.value,
+        choices=[mode.value for mode in RuntimeMode],
+        help="local runs subprocesses here; live requires Token Factory and ConTree",
     )
-    verify.add_argument("--output-dir", type=Path, default=Path(".nemisis/runs"))
+    verify.add_argument(
+        "--output-dir", type=Path, default=Path(".nemisis/runs"), help="where runs are written"
+    )
 
     init = commands.add_parser("init", help="write or accept a CrashCheck contract")
-    init.add_argument("--issue", type=Path, required=True)
-    init.add_argument("--target", required=True)
-    init.add_argument("--base", required=True)
+    init.add_argument("--issue", type=Path, required=True, help="UTF-8 bug report file")
+    init.add_argument(
+        "--target", required=True, help="module:function handler, e.g. app.credits:apply_credit"
+    )
+    init.add_argument("--base", required=True, help=f"exact base source: {ref_help}")
     init.add_argument("--scenario", default=SCENARIO_ID, choices=[SCENARIO_ID])
-    init.add_argument("--accept-contract")
+    init.add_argument(
+        "--accept-contract",
+        metavar="DIGEST",
+        help="accept the DRAFT whose digest init printed; re-seals it as LOCAL",
+    )
     init.add_argument(
         "--nemotron",
         action="store_true",
@@ -46,31 +62,69 @@ def _parser() -> argparse.ArgumentParser:
     init.add_argument("--json", action="store_true")
 
     crashcheck = commands.add_parser("check", help="run a crash/retry counterexample")
-    crashcheck.add_argument("--base", required=True)
-    crashcheck.add_argument("--candidate", default="HEAD")
-    crashcheck.add_argument("--corrected")
-    crashcheck.add_argument("--scenario", default=SCENARIO_ID)
-    crashcheck.add_argument("--mode", default="local", choices=["local", "live"])
-    crashcheck.add_argument("--output-dir", type=Path, default=Path(".nemisis"))
-    crashcheck.add_argument("--json", action="store_true")
+    crashcheck.add_argument("--base", required=True, help=f"exact base source: {ref_help}")
+    crashcheck.add_argument(
+        "--candidate", default="HEAD", help=f"exact candidate source (default HEAD): {ref_help}"
+    )
+    crashcheck.add_argument("--corrected", help=f"optional known-good control: {ref_help}")
+    crashcheck.add_argument(
+        "--scenario",
+        default=SCENARIO_ID,
+        help=f"{SCENARIO_ID} (audited fixture contract) or a path to an accepted config.json",
+    )
+    crashcheck.add_argument(
+        "--mode",
+        default="local",
+        choices=["local", "live"],
+        help="local kills real subprocesses here; live is not yet connected and fails closed",
+    )
+    crashcheck.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path(".nemisis"),
+        help="artifact root for runs/ and repros/",
+    )
+    crashcheck.add_argument("--json", action="store_true", help="print the result document only")
 
     replay_command = commands.add_parser("replay", help="replay an immutable Repro Capsule")
-    replay_command.add_argument("capsule", type=Path)
-    replay_command.add_argument("--source", required=True)
     replay_command.add_argument(
-        "--role", default="candidate", choices=["base", "candidate", "corrected"]
+        "capsule", type=Path, help="path to a capsule.json printed by check"
+    )
+    replay_command.add_argument("--source", required=True, help=f"exact source to test: {ref_help}")
+    replay_command.add_argument(
+        "--role",
+        default="candidate",
+        choices=["base", "candidate", "corrected"],
+        help="which verdict the source claims",
     )
     replay_command.add_argument("--mode", default="local", choices=["local", "live"])
-    replay_command.add_argument("--output-dir", type=Path, default=Path(".nemisis"))
-    replay_command.add_argument("--json", action="store_true")
+    replay_command.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path(".nemisis"),
+        help="artifact root for runs/ and repros/",
+    )
+    replay_command.add_argument(
+        "--json", action="store_true", help="print the result document only"
+    )
 
     doctor_command = commands.add_parser("doctor", help="check CrashCheck prerequisites")
-    doctor_command.add_argument("--mode", default="local", choices=["local", "live"])
+    doctor_command.add_argument(
+        "--mode",
+        default="local",
+        choices=["local", "live"],
+        help="live adds secret-free checks for the Token Factory key, ConTree profile, and image",
+    )
     doctor_command.add_argument("--json", action="store_true")
 
     benchmark = commands.add_parser("benchmark", help="run the audited CrashCheck benchmark")
-    benchmark.add_argument("--output", type=Path, default=Path(".nemisis/benchmark.json"))
-    benchmark.add_argument("--json", action="store_true")
+    benchmark.add_argument(
+        "--output",
+        type=Path,
+        default=Path(".nemisis/benchmark.json"),
+        help="result file; timings enter its digest, so use a fresh path to regenerate",
+    )
+    benchmark.add_argument("--json", action="store_true", help="print the result document only")
     return parser
 
 
@@ -109,7 +163,7 @@ def _print_crash_result(
     print(f"integrity: {result.integrity_status.value}")
     print(f"verdict: {result.verdict.value}")
     print(f"summary: {result.summary}")
-    print(f"capsule: {result.capsule_digest}")
+    print(f"capsule digest: {result.capsule_digest}")
     print(f"engine code digest: {result.engine_code_digest}")
     if result.engine_source_commit is not None:
         print(f"engine source commit: {result.engine_source_commit}")
@@ -122,7 +176,7 @@ def _print_crash_result(
             if selected is not None
             else "no witness selected"
         )
-        print(f"hunt: {len(result.hypothesis_receipts)} hypotheses -> {selection}")
+        print(f"hypotheses: {len(result.hypothesis_receipts)} run -> {selection}")
     if minimization_receipts := getattr(result, "minimization_receipts", ()):
         minimization = minimization_receipts[0]
         if minimization.sole_fault_action_necessary_for_fixture:
@@ -148,11 +202,15 @@ def _print_crash_result(
         checkpoint = representative.checkpoint_snapshot
         final = representative.final_snapshot
         if checkpoint is not None and final is not None:
+            signal_name = (
+                "SIGKILL"
+                if representative.kill_signal == 9
+                else f"signal {representative.kill_signal}"
+            )
             print(
                 "timeline: "
-                f"{checkpoint.account_balance_cents}¢ durable -> "
-                f"signal {representative.kill_signal} -> fresh worker -> "
-                f"{final.account_balance_cents}¢"
+                f"{money(checkpoint.account_balance_cents)} durable -> {signal_name} -> "
+                f"fresh worker -> {money(final.account_balance_cents)}"
             )
     for binding in result.bindings:
         print(
@@ -160,7 +218,7 @@ def _print_crash_result(
             f"(tree {binding.tree_digest})"
         )
     for name, path in sorted(result.artifacts.items()):
-        projected = Path(path) if artifact_root is None else (artifact_root / path).resolve()
+        projected = Path(path) if artifact_root is None else artifact_root / path
         print(f"{name}: {projected}")
 
 
@@ -179,6 +237,7 @@ def _print_init(
     as_json: bool,
     proposal: ContractProposal | None = None,
     proposal_path: Path | None = None,
+    accepted_draft: str | None = None,
 ) -> None:
     payload = json.loads(path.read_text(encoding="utf-8"))
     contract = payload["contract"]
@@ -187,6 +246,8 @@ def _print_init(
         "contract_digest": contract["digest"],
         "status": payload["status"],
     }
+    if accepted_draft is not None:
+        result["accepted_draft_digest"] = accepted_draft
     if proposal is not None and proposal_path is not None:
         result["proposal"] = str(proposal_path)
         result["contract_proposal"] = proposal.model_dump(mode="json")
@@ -194,6 +255,8 @@ def _print_init(
         print(canonical_json(result).decode())
         return
     print(f"config: {result['config']}")
+    if accepted_draft is not None:
+        print(f"accepted draft: {accepted_draft}")
     print(f"contract: {result['contract_digest']}")
     print(f"status: {result['status']}")
     if proposal is not None and proposal_path is not None:
@@ -213,6 +276,15 @@ def _print_benchmark(result: BenchmarkResult, output: Path, *, as_json: bool) ->
     if as_json:
         print(canonical_json(result).decode())
         return
+    print(f"{'variant':<18} {'existing test':<14} {'call twice':<12} {'crash + retry':<18} worlds")
+    for case in result.cases:
+        crash = case.crashcheck
+        print(
+            f"{case.variant:<18} {case.pytest.outcome.value:<14} "
+            f"{case.sequential.observation.value:<12} {crash.observation.value:<18} "
+            f"{crash.valid_world_count}/{crash.attempted_world_count}"
+        )
+    print(f"crashcheck wall: {result.crashcheck_wall_time_ns / 1e9:.2f} s")
     print(f"result: {output.resolve()}")
     print(f"digest: {result.result_digest}")
     print(f"source: {result.source_commit}")
@@ -292,7 +364,13 @@ def main() -> None:
                 from nemisis.proposal import PROPOSAL_NAME, write_proposal
 
                 proposal_path = write_proposal(proposal, path.with_name(PROPOSAL_NAME))
-            _print_init(path, as_json=args.json, proposal=proposal, proposal_path=proposal_path)
+            _print_init(
+                path,
+                as_json=args.json,
+                proposal=proposal,
+                proposal_path=proposal_path,
+                accepted_draft=args.accept_contract,
+            )
             return
 
         if args.command == "doctor":

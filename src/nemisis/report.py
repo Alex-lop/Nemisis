@@ -168,7 +168,7 @@ fault action in {len(minimization.confirmations)} fresh base worlds. The empty s
         )
     )
     tone = _verdict_tone(result.verdict.value)
-    observed = _money(final.account_balance_cents) if final is not None else "Not recorded"
+    observed = money(final.account_balance_cents) if final is not None else "Not recorded"
     document = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -224,7 +224,7 @@ body {{ padding: .75rem; }} .comparison {{ grid-template-columns: 1fr; }}
 <p class="summary">{escape(result.summary)}</p>
 <div class="comparison" aria-label="Expected and observed effects">
 <div class="measure"><span>Expected single effect</span>
-<strong>{_money(capsule.amount_cents)}</strong>
+<strong>{money(capsule.amount_cents)}</strong>
 <small>event <code>{escape(capsule.event_id)}</code></small></div>
 <span class="versus" aria-hidden="true">vs</span>
 <div class="measure"><span>Observed final balance</span><strong>{observed}</strong>
@@ -296,8 +296,8 @@ def _proposal_section(proposal: ContractProposal | None) -> str:
 (<code>{escape(receipt.endpoint_region)}</code>) saw only the issue and the base handler \
 <code>{escape(proposal.handler_path)}</code>. It {escape(intent)} fault intent \
 <code>{escape(proposal.required_catalog_id)}</code> and proposed an expected single effect of \
-{_money(proposal.proposed_amount_cents)}; deterministic code {escape(decision)} that against the \
-audited {_money(proposal.audited_amount_cents)}. The model never sees candidate code and never \
+{money(proposal.proposed_amount_cents)}; deterministic code {escape(decision)} that against the \
+audited {money(proposal.audited_amount_cents)}. The model never sees candidate code and never \
 emits a verdict; this receipt is provenance for the contract, not crash evidence.</p>
 <dl class="identity" aria-label="Model call receipt">
 <div><dt>Truth label</dt><dd><code>{escape(label)}</code></dd></div>
@@ -317,12 +317,12 @@ def _snapshot_text(snapshot: CreditSnapshot | None) -> str:
     if snapshot is None:
         return "not recorded"
     return (
-        f"{snapshot.account_balance_cents}¢ / ledger {snapshot.event_ledger_count} / "
+        f"{money(snapshot.account_balance_cents)} / ledger {snapshot.event_ledger_count} / "
         f"marker {snapshot.event_marker_count}"
     )
 
 
-def _money(cents: int) -> str:
+def money(cents: int) -> str:
     sign = "-" if cents < 0 else ""
     absolute = abs(cents)
     return f"{sign}${absolute // 100:,}.{absolute % 100:02d}"

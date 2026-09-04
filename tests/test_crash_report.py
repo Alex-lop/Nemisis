@@ -187,14 +187,14 @@ def test_crash_report_uses_receipt_and_capsule_values_and_escapes_html(tmp_path:
     assert "Patch still duplicates the effect" in report
     assert "Expected single effect</span>\n<strong>$12.34</strong>" in report
     assert "Observed final balance</span><strong>$24.68</strong>" in report
-    assert "<strong>Checkpoint reached.</strong> 1234¢ / ledger 1 / marker 0" in report
+    assert "<strong>Checkpoint reached.</strong> $12.34 / ledger 1 / marker 0" in report
     assert "<strong>Kill recorded.</strong> Signal 15; first worker PID 101" in report
     assert "process group 201, exit -15" in report
     assert "<strong>Fresh replay worker.</strong> Spawn 2; PID 102, process group 202" in report
     assert "replay-worker&lt;&amp;" in report
     assert "replay-session&lt;&amp;" in report
     assert "<strong>Replay acknowledged.</strong> Event <code>evt_report</code>" in report
-    assert "<strong>Final state observed.</strong> 2468¢ / ledger 2 / marker 1" in report
+    assert "<strong>Final state observed.</strong> $24.68 / ledger 2 / marker 1" in report
     assert f"<code>{'a' * 40}</code>" in report
     assert f"<code>{'e' * 64}</code>" in report
     assert "2-hypothesis candidate-blind hunt" in report
