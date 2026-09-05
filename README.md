@@ -5,12 +5,67 @@
 The spelling **Nemisis** is intentional. One breath: AI coding agents ship retry patches that look
 green and still double-charge in production; CrashCheck kills the worker after the money moves,
 restarts it, replays the same event, and checks the database for a duplicate. See the
-[one-page pitch](docs/PITCH.md) and the [timed demo script](docs/DEMO_SCRIPT.md).
+[one-page pitch](docs/PITCH.md) and the [90-second demo](docs/DEMO.md).
+
+## See it in action
+
+Everything below is a real local run of the packaged `sqlite-credit-v1` fixture on this tree. The
+labels say `LOCAL` and `FIXTURE` because that is what it is: no provider run is claimed anywhere on
+this page.
+
+![Thirty-second terminal recording: the original buggy handler reproduces the double credit, the agent's green patch still reproduces it under the same kill and retry, and the atomic fix ends at exactly one credit in five fresh worlds](docs/assets/screenshots/crashcheck-demo.gif)
+
+One frozen crash, three revisions: the original bug reproduces, the agent's "fixed" patch still
+reproduces, and only the atomic fix survives the same kill and retry.
+
+![Terminal output of nemisis check: verdict PATCH_FAILED_STILL_REPRODUCES, timeline $25.00 durable -> SIGKILL -> fresh worker -> $50.00, exit code 1](docs/assets/screenshots/terminal-check-misleading-green.png)
+
+The agent's patch passed its own tests; two seconds after `check` starts, the timeline line shows
+`$25.00` durably on disk, a `SIGKILL`, a fresh worker, and `$50.00` in the account.
+
+![The generated HTML report for that run: Patch still duplicates the effect, expected $25.00 versus observed $50.00, capsule and engine digests](docs/assets/screenshots/report-patch-failed.png)
+
+This is the report a reviewer gets: expected versus observed money, and the digests that bind the
+verdict to the exact source tree and the exact engine bytes that ran.
+
+![Terminal output of nemisis replay against the atomic revision: verdict FIX_PROVEN_FOR_THIS_CAPSULE, timeline ends at $25.00, exit code 0](docs/assets/screenshots/terminal-replay-atomic-proven.png)
+
+The same frozen capsule replayed against the atomic fix: five fresh worlds end at `$25.00`, one
+ledger row, one marker, exit `0`. The capsule is the regression test the next patch must beat.
+
+![The committed evidence viewer mid-replay: beat 3 of 5, Worker killed, SIGKILL with process id and exit -9, with the LOCAL and FIXTURE badges in the top bar](docs/assets/screenshots/viewer-02-mid-replay.png)
+
+The committed one-minute viewer steps through the five recorded beats with the `LOCAL` / `FIXTURE`
+labels pinned to the top; it reads the committed receipt and executes nothing.
+
+![Terminal output of uv run pytest -q: 312 passed](docs/assets/screenshots/terminal-pytest-green.png)
+
+![Terminal output of nemisis doctor --mode live: local checks PASS, NEBIUS_API_KEY, ConTree profile, root image and the CrashCheck provider transport BLOCKED, exit code 2](docs/assets/screenshots/terminal-doctor-live-blocked.png)
+
+The whole suite is green, and `doctor --mode live` says exactly what a live run still needs. Nothing
+is labelled `LIVE` until those lines pass for real; [docs/LIVE_SETUP.md](docs/LIVE_SETUP.md) is the
+turnkey path from a Token Factory key to a genuine receipt.
+
+### What it does, and what it never does
+
+- **Does:** runs the exact patch in a real worker process, kills it after the durable side effect,
+  replays the identical event in a fresh worker, and decides from durable state and process
+  receipts. Exit `1` for a patch that still duplicates, `0` for one that does not, `2` when the
+  evidence is incomplete.
+- **Does:** freezes the crash into a content-addressed capsule and an executable regression test,
+  so the next patch is checked against the same kill.
+- **Never:** pushes, merges, comments, opens a pull request, or touches your git history. It writes
+  a run directory under `.nemisis/` (or `--output-dir`) and prints a decision instead of taking one.
+- **Never:** upgrades a label. Local runs are `LOCAL`, the packaged case is `FIXTURE`, injected
+  clients are `MOCKED`, and `LIVE` requires a genuine provider receipt. Missing evidence fails closed
+  and is never replaced by a fallback.
+- **Not yet:** arbitrary repositories, databases, or languages. This alpha audits exactly one
+  scenario (`sqlite-credit-v1`) and one two-argument `CreditStore` handler shape, on purpose.
 
 Nemisis CrashCheck turns a green-looking retry-safety patch into an executed counterexample: it
 kills a real worker after a durable side effect, starts a fresh worker, replays the identical event,
 and determines whether the exact patch stopped the duplicate effect. The verdict comes from durable
-state and process receipts—not model confidence.
+state and process receipts, not model confidence.
 
 CrashCheck is the narrow crash/retry product built on Nemisis's broader deterministic differential
 verification foundation. Both surfaces remain available; neither claims universal patch safety.
@@ -81,7 +136,7 @@ uv run nemisis check --base fixture:sqlite-credit-v1/buggy \
 
 The model call is bounded to structured output over the audited catalog; the prompt template, input,
 and response are recorded by digest only. No key, issue text, handler source, or raw response enters
-the receipt.
+the receipt. [docs/LIVE_SETUP.md](docs/LIVE_SETUP.md) shows the exact success and failure output.
 
 ### Open the one-minute evidence viewer
 
@@ -92,10 +147,11 @@ uv run python -m http.server 8000 --bind 127.0.0.1
 ```
 
 Open <http://127.0.0.1:8000/docs/assets/crashcheck-hero/> and select **Replay fixture evidence**.
-The control reveals the committed, digest-bound `LOCAL` / `FIXTURE` receipt; it does not execute
-repository code, call a model, or start a provider run. If either JSON binding fails, the viewer
-shows no behavioral claim. Bind to loopback as shown: the server exposes the whole checkout,
-including any `.env`, and browsers block the page's `fetch` on `file://`, so serve it.
+The control steps through the five recorded beats and reveals the committed, digest-bound `LOCAL` /
+`FIXTURE` receipt; it does not execute repository code, call a model, or start a provider run. If
+either JSON binding fails, the viewer shows no behavioral claim. Bind to loopback as shown: the
+server exposes the whole checkout, including any `.env`, and browsers block the page's `fetch` on
+`file://`, so serve it.
 
 ### Use the audited SQLite adapter in a trusted repository
 
@@ -165,6 +221,9 @@ CrashCheck exit table above does not apply to it.
 | Crash then retry | `CHANGE_WITNESS` | `ASSERTION_FAIL` | `ASSERTION_FAIL` | `UNRESOLVED` |
 
 `LOCAL FIXTURE` means observed local execution of checked-in inputs, not Token Factory evidence.
+That `UNRESOLVED` row is where differential testing stops and CrashCheck starts; the
+[pitch](docs/PITCH.md#how-it-differs-from-differential-testing-you-have-seen) spells out the
+difference.
 
 ## GitHub pull requests
 
@@ -199,7 +258,8 @@ CrashCheck's own live call is `init --nemotron`; it needs only `NEBIUS_API_KEY`.
 not yet connected and fails closed. The current environment lacks the Token Factory key, a usable
 ConTree profile, and an immutable root image, so there is no current-tree `LIVE` or `RECORDED_LIVE`
 receipt for either surface. Nothing falls back to local mode. Run `uv run nemisis doctor --mode live`
-for the independent prerequisite checks.
+for the independent prerequisite checks, and follow [docs/LIVE_SETUP.md](docs/LIVE_SETUP.md) once a
+key exists.
 
 ## Verify the project
 
@@ -210,6 +270,10 @@ uv run mypy src tests
 uv run pytest
 uv build
 ```
+
+The screenshots and recording above are regenerated by the `vhs` tapes and the capture notes in
+[docs/assets/screenshots/](docs/assets/screenshots/); `tests/test_readme_truth.py` fails if any
+embedded image is missing, empty, or oddly sized, or if a quoted test count goes stale.
 
 See [product scope](docs/PRODUCT.md), [architecture](docs/ARCHITECTURE.md),
 [security boundary](docs/SECURITY.md), [proof ledger](docs/PROOF.md), and the
