@@ -2,10 +2,19 @@
 
 ## One breath
 
-AI coding agents ship retry patches that look green and still double-charge in production.
-CrashCheck is a crash-test dummy for those patches: it kills the worker after the money moves,
-restarts it, replays the same event, and checks the database for a duplicate. The verdict comes
-from the database and the process receipts, not from the model that wrote the patch.
+AI coding agents ship retry patches that look green and still double-charge in production: the
+existing test passes, a "call it twice" check passes, and the bug only appears when a worker dies
+between the credit and the marker that says the credit happened. CrashCheck is a crash-test dummy
+for those patches. It runs the handler in a real worker, waits until the `$25` credit is durably on
+disk, kills the whole process group with `SIGKILL`, confirms the worker is dead, starts a fresh
+worker, and delivers the byte-identical event again. Then it reads the SQLite file through an
+independent read-only connection. The agent's patch ends at `$50`; the real fix ends at `$25`. The
+verdict comes from the database and the process receipts, never from the model that wrote the
+patch, and the crash is frozen into a capsule that the next patch has to beat too.
+
+The 30-second recording of exactly that is
+[`docs/assets/screenshots/crashcheck-demo.gif`](assets/screenshots/crashcheck-demo.gif); the
+90-second spoken version is [DEMO.md](DEMO.md).
 
 ## The 90-second story
 
@@ -17,11 +26,11 @@ committed, sends `SIGKILL` to the whole process group, confirms the worker died,
 worker, and delivers the byte-identical event again. Then it reads the SQLite file through an
 independent read-only connection.
 
-| Revision | Existing test | Call twice | After a real crash and retry |
-| --- | --- | --- | --- |
-| buggy | green | `$25` | **`$50`** |
-| agent's "fixed" patch | green | `$25` | **`$50`** |
-| atomic fix | green | `$25` | `$25` |
+| Revision | Existing test | Call twice | After a real crash and retry | Visual |
+| --- | --- | --- | --- | --- |
+| buggy | green | `$25` | **`$50`** | GIF beat 1: `BUG_REPRODUCED` |
+| agent's "fixed" patch | green | `$25` | **`$50`** | [`terminal-check-misleading-green.png`](assets/screenshots/terminal-check-misleading-green.png), [`report-patch-failed.png`](assets/screenshots/report-patch-failed.png) |
+| atomic fix | green | `$25` | `$25` | [`terminal-replay-atomic-proven.png`](assets/screenshots/terminal-replay-atomic-proven.png), [`report-fix-proven.png`](assets/screenshots/report-fix-proven.png) |
 
 It does this in five fresh worlds per revision, in about two seconds, on a laptop, and exits `1`
 for the agent's patch and `0` for the real fix. Everything it observed is written to a manifest, a
@@ -34,7 +43,9 @@ static HTML report, and a content-addressed repro capsule you can replay against
   JSON schema over an audited catalog. The model proposes which fault intent applies and what the
   expected single effect is. Deterministic code accepts the proposal only if it matches the audited
   scenario exactly; otherwise nothing is drafted. The model never sees the candidate and never
-  emits the verdict. The sanitized receipt travels into the final report.
+  emits the verdict. The sanitized receipt travels into the final report. The path is wired and
+  contract-tested; it is labelled `LIVE` only when a real Token Factory call produced the receipt,
+  and the exact steps to produce one are in [LIVE_SETUP.md](LIVE_SETUP.md).
 - **Token Factory Sandboxes are the isolation story.** Local mode is for a trusted checkout only;
   untrusted pull requests are refused by the GitHub Action until the kill/replay kernel runs inside
   a Sandbox. The differential verifier already has a ConTree path; CrashCheck's Sandbox transport
@@ -46,6 +57,24 @@ Every claim in a CrashCheck result is a receipt: the worker's process id and exi
 distinct worker nonces, the database state before the crash, after the crash, and after the
 replay, the exact source tree digest, and the digest of the engine bytes that ran. Model prose
 cannot upgrade a result. Missing or contradictory evidence fails closed as `EVIDENCE_INCOMPLETE`.
+
+## How it differs from differential testing you have seen
+
+Running one test suite against a base and a candidate and reporting which tests actually
+discriminate between them is established practice. Meta's just-in-time test generation work
+([JiTTest, arXiv 2601.22832](https://arxiv.org/pdf/2601.22832)) generates diff-aware tests and
+reports how many of them catch anything, and any base-versus-candidate runner can classify a test
+that passes on both sides as non-discriminating. Nemisis's own `verify` command is that idea,
+applied to one immutable test bundle bound by digest to both worlds, with per-claim verdicts.
+
+The limit of every such tool is the one it shares with the test suite: it can only observe what a
+test exercises. No ordinary test kills the process between two statements, so a differential run
+of this fixture marks the crash-retry claim `UNRESOLVED` (base fails, candidate fails, nothing
+learned) and stops. CrashCheck starts there. It does not run the repository's tests at all. It
+drives the real handler to its durable checkpoint, kills it, replays, and reads durable state; the
+verdict is a database row count and a process exit code, and the crash is preserved as a capsule
+that any later patch must survive. That is the part that is new here, and it is deliberately
+narrow: one audited scenario, one handler shape, executed rather than inferred.
 
 ## What it is not, on purpose
 

@@ -1,5 +1,8 @@
 # Three-minute demo script
 
+The 90-second cut, with pasted expected output and the screenshots that back each beat, is
+[DEMO.md](DEMO.md). This is the longer version with the Nemotron beat and every fallback.
+
 Timed for a live judge or a recording. Left column is what you type, middle is what appears on
 screen, right is what you say. Every beat has a fallback so a live failure never becomes dead air.
 

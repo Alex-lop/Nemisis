@@ -1,9 +1,86 @@
-# Demo
+# 90-second demo
 
-The timed three-minute version with fallbacks is [DEMO_SCRIPT.md](DEMO_SCRIPT.md); the plain-language
-framing is [PITCH.md](PITCH.md). This file is the reference walkthrough.
+Five commands, one story: the agent's retry patch is green, and the money still moves twice. Every
+expected output below is pasted from a real local run of this tree; the screenshots and GIF it
+points at live in [`docs/assets/screenshots/`](assets/screenshots/) and were captured from the same
+commands. The longer three-minute cut with fallbacks is [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
 
-## 0. Nemotron contract proposal (needs `NEBIUS_API_KEY`)
+## The pitch, one paragraph (say this first)
+
+AI coding agents ship retry patches that look green and still double-charge in production: the
+existing test passes, a "call it twice" check passes, and the bug only appears when a worker dies
+between the credit and the marker that says the credit happened. CrashCheck is a crash-test dummy
+for those patches. It runs the handler in a real worker, waits until the `$25` credit is durably on
+disk, kills the whole process group with `SIGKILL`, confirms the worker is dead, starts a fresh
+worker, and delivers the byte-identical event again. Then it reads the SQLite file through an
+independent read-only connection. The agent's patch ends at `$50`; the real fix ends at `$25`. The
+verdict comes from the database and the process receipts, never from the model that wrote the
+patch, and the crash is frozen into a capsule that the next patch has to beat too.
+
+## Pre-flight (before the clock starts)
+
+```bash
+uv sync --frozen --dev
+uv run nemisis doctor --mode local          # expect: NEMISIS DOCTOR — LOCAL READY
+rm -rf .nemisis/runs .nemisis/repros
+clear
+```
+
+Terminal at 17 pt or larger, about 140 columns, dark theme. Run from the repository root so every
+printed path is relative (`.nemisis/…`) and no home directory appears on screen.
+
+## The script
+
+| Clock | Type | Judge sees | Say | Visual aid if the terminal fails |
+| --- | --- | --- | --- | --- |
+| 0:00 | `cat src/nemisis/fixtures/sqlite_credit_v1/trees/misleading-green/app/credits.py` | A three-line handler: `if processed: return`, `credit(...)`, `mark_processed(...)` | "A bug report says retries sometimes credit an order twice. An agent fixed it. Its test is green. The crash window is between those last two lines." | none needed |
+| 0:15 | `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/misleading-green --corrected fixture:sqlite-credit-v1/atomic --mode local` | about two seconds later, `verdict: PATCH_FAILED_STILL_REPRODUCES` and `timeline: $25.00 durable -> SIGKILL -> fresh worker -> $50.00`; exit `1` | "Worker starts. Twenty-five dollars hits disk. SIGKILL to the process group. Confirmed dead. Fresh worker, same event. Fifty dollars. Five fresh worlds, five times." | [`terminal-check-misleading-green.png`](assets/screenshots/terminal-check-misleading-green.png) |
+| 0:40 | `CAP=$(ls .nemisis/repros/double-credit/*/capsule.json)` then `uv run nemisis replay "$CAP" --source fixture:sqlite-credit-v1/buggy --role base --mode local` | `verdict: BUG_REPRODUCED`; exit `1` | "The crash is now a frozen capsule. Same capsule against the original buggy handler: the bug the agent was asked to fix." | [`crashcheck-demo.gif`](assets/screenshots/crashcheck-demo.gif), first beat |
+| 0:55 | `uv run nemisis replay "$CAP" --source fixture:sqlite-credit-v1/atomic --role corrected --mode local` | `verdict: FIX_PROVEN_FOR_THIS_CAPSULE`, `timeline: $25.00 durable -> SIGKILL -> fresh worker -> $25.00`; exit `0` | "Same kill, same retry, against an atomic fix. Twenty-five dollars, one ledger row, one marker. Exit zero. This is the regression test that ships with the repro." | [`terminal-replay-atomic-proven.png`](assets/screenshots/terminal-replay-atomic-proven.png) |
+| 1:15 | `open .nemisis/runs/$(ls -t .nemisis/runs \| head -1)/report.html` (macOS) or paste the printed `report:` path into a browser | Green report: **Fix proven for this capsule only**, `$25.00 vs $25.00`, capsule and engine digests | "Everything you just saw is a receipt: process ids, exit code minus nine, two worker nonces, database snapshots, source tree digests. No model confidence anywhere. What is proven is narrow on purpose: this exact tree beat this exact capsule." | [`report-fix-proven.png`](assets/screenshots/report-fix-proven.png) and the failing twin [`report-patch-failed.png`](assets/screenshots/report-patch-failed.png) |
+| 1:30 | stop | | | |
+
+## Expected output, verbatim
+
+`check` (the `capsule digest`, run id, and tree digests are the values your run prints; the
+verdict, summary, hypotheses, necessity, and timeline lines are exact):
+
+```text
+NEMISIS CRASHCHECK — LOCAL
+execution: COMPLETED
+integrity: VALID
+verdict: PATCH_FAILED_STILL_REPRODUCES
+summary: The candidate replayed evt_1042 to a durable +$50 duplicate effect.
+capsule digest: <64 hex digits>
+engine code digest: <64 hex digits, pinned in docs/STATUS.md>
+engine source commit: <the commit you ran at>
+hypotheses: 2 run -> selected effect-commit (effect-commit-v1)
+necessity: deleted effect-commit; empty schedule was EXACTLY_ONCE in 2/2 fresh base worlds; deletion rejected; final fault actions 1/1 (fixture-only necessity proof)
+timeline: $25.00 durable -> SIGKILL -> fresh worker -> $50.00
+```
+
+`replay … --source fixture:sqlite-credit-v1/buggy --role base`:
+
+```text
+verdict: BUG_REPRODUCED
+summary: The base replayed evt_1042 to a durable +$50 duplicate effect.
+```
+
+`replay … --source fixture:sqlite-credit-v1/atomic --role corrected`:
+
+```text
+verdict: FIX_PROVEN_FOR_THIS_CAPSULE
+summary: Five fresh worlds ended at exactly +$25, one ledger effect, and one marker.
+timeline: $25.00 durable -> SIGKILL -> fresh worker -> $25.00
+```
+
+Exit codes are `1`, `1`, `0`. If anything else appears, read the `summary:` line aloud; it names
+the missing receipt, and the run is `EVIDENCE_INCOMPLETE` rather than a verdict.
+
+## If you have a Token Factory key
+
+Insert one beat before `check`, at about 0:12, and pass `--scenario .nemisis/config.json` to the
+`check` command:
 
 ```bash
 uv run nemisis init --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
@@ -11,115 +88,22 @@ uv run nemisis init --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
   --scenario sqlite-credit-v1 --nemotron
 ```
 
-Show the `nemotron:` line (model, endpoint region, `LIVE`, latency, receipt digest) and the
-`proposed:` line (fault intent selected, `amount_cents=2500` matches the audited event). Then pass
-`--scenario .nemisis/config.json` to the `check` below so the receipt appears in its report. Without
-the key the command exits `2` and drafts nothing; say so and continue with the audited fixture
-contract. Never show a `MOCKED` receipt as live.
+Point at the `nemotron: … · LIVE · …` line and say: "Nemotron on Nebius Token Factory read the bug
+report and the base handler, never the patch, and proposed the contract. Our code checked it
+against the audited catalog. The model proposes; it never decides." The exact success and failure
+shapes are in [LIVE_SETUP.md](LIVE_SETUP.md). Without a key the command exits `2` and drafts
+nothing; say "fail closed" and continue. Never show a `MOCKED` receipt as live.
 
-## 1. Differential foundation
+## Fallbacks
 
-```bash
-uv sync --frozen --dev
-uv run nemisis verify --fixture idempotency-retry --mode local
-```
-
-Show the `LOCAL FIXTURE` label and matrix. The candidate supports ordinary duplicate retry but leaves
-the crash-then-retry change witness unresolved. Open the printed report to show that base and
-candidate executions share one verification-bundle digest.
-
-This is the original Nemisis thesis: a model or patch cannot authorize itself; observed typed
-relations determine the artifact decision.
-
-## 2. CrashCheck counterexample
-
-```bash
-uv run nemisis check \
-  --base fixture:sqlite-credit-v1/buggy \
-  --candidate fixture:sqlite-credit-v1/misleading-green \
-  --corrected fixture:sqlite-credit-v1/atomic \
-  --mode local
-```
-
-Exit `1` and `PATCH_FAILED_STILL_REPRODUCES` are expected. The run should expose this observed
-sequence:
-
-1. Exact fixture source identities and tree digests are bound.
-2. Exactly two candidate-blind base hypotheses run: `effect-commit-v1` reproduces, while
-   `marker-commit-v1` reaches exactly-once state. Their full attempt receipts remain visible.
-3. Deterministic selection chooses `effect-commit`. CrashCheck deletes that sole fault action in
-   two fresh base worlds; both empty-schedule replays are `EXACTLY_ONCE`, so deletion is rejected
-   and the one-action schedule is necessity-proven for this fixture. Hunt outcomes remain in
-   `hunt.json`; only the stable deletion decision enters the capsule trace.
-4. In each confirmation, `evt_1042` reaches a durable `+$25` effect, the controller sends
-   process-group `SIGKILL` and confirms exit `-9`, and a new worker nonce/session replays the
-   byte-identical event.
-5. Five fresh confirmations per role show the misleading-green candidate at `$50` and the atomic
-   control at `$25`, one ledger row,
-   and one marker under the same capsule semantics.
-
-The two hunt worlds, two deletion-confirmation worlds, and five fresh worlds per supplied role are
-all distinct. CrashCheck receipts cover only hunt, necessity, and kill/restart/replay evidence. The
-benchmark—not CrashCheck—runs the fixture's ordinary Pytest suite and sequential duplicate check as
-measured context:
-
-```bash
-uv run nemisis benchmark --output .nemisis/benchmark.json
-```
-
-Present those ordinary green checks as benchmark measurements, never as CrashCheck receipts.
-
-The CLI transport label is `LOCAL`; the manifest/report identifies the audited capsule as
-`FIXTURE`. Open the printed `manifest.json` and `report.html` for both hunt receipts, the selected
-boundary and one-action deletion trace, five confirmations per role, source bindings,
-capsule/event/environment/engine digests, database IDs, worker receipts, nonces, probes, kills, and
-final snapshots. Artifact references are relative to the selected output root.
-
-Replay the positive control:
-
-```bash
-CAPSULE_PATH=.nemisis/repros/double-credit/PASTE_PRINTED_DIGEST/capsule.json
-uv run nemisis replay "$CAPSULE_PATH" \
-  --source fixture:sqlite-credit-v1/atomic --role corrected --mode local
-```
-
-That replay must exit `0` with `FIX_PROVEN_FOR_THIS_CAPSULE`. The generated regression asset expresses
-the same scoped requirement and depends on the installed Nemisis package.
-
-## 3. One-minute evidence viewer
-
-```bash
-uv run python -m http.server 8000 --bind 127.0.0.1
-```
-
-Open <http://127.0.0.1:8000/docs/assets/crashcheck-hero/> and click **Replay fixture evidence**.
-Lead with the verdict and five beats, then expand the exact SHA/tree/capsule/event bindings. This
-button reveals committed `LOCAL` / `FIXTURE` evidence only; it does not execute code or contact
-Token Factory. A failed benchmark/manifest binding hides the story instead of retaining claims.
-
-## Sub-three-minute CrashCheck sequence
-
-1. Show the benchmark's green Pytest and sequential checks as context.
-2. Show both base-only hunt receipts and deterministic `effect-commit` selection.
-3. Hold on `timeline: $25.00 durable -> SIGKILL -> fresh worker -> $50.00`.
-4. Show five candidate reproductions at `$50` and `PATCH_FAILED_STILL_REPRODUCES`.
-5. Replay the unchanged capsule against atomic and show five fresh `$25` confirmations with one
-   marker; finish on the scoped—not global—verdict and engine digest.
-
-## Live demonstration
-
-The only implemented provider path is the fixture-limited differential verifier; it has no
-current-tree live receipt:
-
-```bash
-uv run nemisis doctor --mode live
-uv run nemisis verify --fixture idempotency-retry --mode live
-```
-
-The current environment may also lack the Token Factory key, usable ConTree profile, or immutable
-root image, but CrashCheck has an unconditional additional blocker: its live provider transport is
-not implemented. `doctor --mode live` must therefore remain `BLOCKED` even when external
-prerequisites are present. Do not substitute local output, mock receipts, provider-looking
-identifiers, or a `LIVE` badge. A future live recording must name the exact source SHA and engine
-digest, official Nebius endpoint/model, ConTree image and operation identities, and the
-guest-produced JUnit trust limitation.
+- **`check` prints `EVIDENCE_INCOMPLETE`.** Read the `summary:` line, then show the committed
+  evidence instead: `uv run python -m http.server 8000 --bind 127.0.0.1`, open
+  <http://127.0.0.1:8000/docs/assets/crashcheck-hero/>, press **Replay fixture evidence**. Say that
+  this is the committed `LOCAL` / `FIXTURE` receipt bound to an earlier exact commit. Screenshots:
+  [`viewer-01-initial.png`](assets/screenshots/viewer-01-initial.png),
+  [`viewer-02-mid-replay.png`](assets/screenshots/viewer-02-mid-replay.png),
+  [`viewer-03-verdict-receipt.png`](assets/screenshots/viewer-03-verdict-receipt.png).
+- **No browser.** Skip 1:15; the terminal verdicts carry the story.
+- **Stale `.nemisis/`.** `rm -rf .nemisis/runs .nemisis/repros` and start again from 0:15.
+- **Nothing runs.** Play [`crashcheck-demo.gif`](assets/screenshots/crashcheck-demo.gif) (30 s,
+  buggy → agent's patch → atomic fix) and narrate over it.
