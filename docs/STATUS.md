@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-09-03 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
+Updated 2026-09-04 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
 
 ## Exact identities
 
@@ -51,7 +51,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 306 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 312 tests, and package build: pass locally on
   Python 3.12.13 (the suite also passed on 3.13 during development);
 - exact engine CI for the committed hero: [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355);
 - exact measured-source CI: [successful run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096);
@@ -65,8 +65,16 @@ provider run.
   config or exported contract can no longer stamp `LIVE`; `replay` refuses untrusted forks like
   `check`; the viewer command binds loopback; every documented refusal path now has a test.
 
-No in-app browser was available for screenshot/visual interaction QA. No public hosted URL or demo
-video is claimed.
+Visual evidence now exists and is committed under `docs/assets/screenshots/`: a 30-second `vhs`
+terminal recording (`crashcheck-demo.gif`: buggy reproduces, the agent's patch still reproduces, the
+atomic fix is proven, all under one capsule), terminal stills of `check`, the atomic `replay`,
+`doctor --mode live`, and the green test suite, and headless-Chrome screenshots of the evidence viewer
+(initial, mid-replay, final receipt, fail-closed) and of the generated fail/pass reports. Every image
+is a real local run of the packaged fixture on this tree and carries `LOCAL` / `FIXTURE` labels where
+the surface shows labels; `tests/test_readme_truth.py` fails if an embedded image is missing or
+malformed. The viewer was redesigned on 2026-09-04 (stepped replay, pinned truth-label bar,
+PASS / FAIL colour language) and re-verified by the same tests. No public hosted URL is claimed and no
+provider run appears in any image.
 
 ## Sponsor and submission state
 
@@ -80,7 +88,8 @@ video is claimed.
 
 The first genuine sponsor receipt is one command away once a Token Factory key exists:
 `nemisis init --nemotron` at an exact commit, with `.nemisis/proposal.json` committed and its digest
-named in this file. Until then Nemisis is a verified local alpha with a wired but unexercised live
+named in this file. The exact turnkey sequence, with the success and failure output spelled out, is
+[`docs/LIVE_SETUP.md`](LIVE_SETUP.md). Until then Nemisis is a verified local alpha with a wired but unexercised live
 model path, not yet hackathon-submission-ready.
 
 ## Direction
@@ -88,7 +97,7 @@ model path, not yet hackathon-submission-ready.
 Option A is retained: one excellent SQLite slice, made undeniable. In order:
 
 1. Obtain a Token Factory key; capture and commit the exact-SHA `LIVE` proposal receipt.
-2. Record the sub-three-minute demo from `docs/DEMO_SCRIPT.md`.
+2. Record the spoken demo from `docs/DEMO.md` (the silent 30-second terminal GIF already exists).
 3. Connect the CrashCheck kernel to a Token Factory Sandbox (spawn, subprocess result, process-group
    kill) against one immutable image so untrusted pull requests can be checked; keep `doctor` and
    `check --mode live` `BLOCKED` until a real receipt exists.
