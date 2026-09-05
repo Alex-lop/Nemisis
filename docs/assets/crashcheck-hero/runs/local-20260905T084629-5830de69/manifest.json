@@ -44,16 +44,16 @@
     "account_id": "acct_7",
     "amount_cents": 2500,
     "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-    "digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
-    "engine_code_digest": "6f733e24221930ccc6f39f10055b4b627ca627836e144218db2217cf4b04c876",
-    "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+    "digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
+    "engine_code_digest": "99ef8ade38b4616013c2d68ca9b1e8179041bf6b03aae0a58ef54928a59e1c22",
+    "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
     "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
     "event_id": "evt_1042",
     "fault_boundary": "effect-commit",
     "fault_intent_id": "first-credit-effect-commit-v1",
     "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
     "minimization_trace": [
-      "9b0afc1eabed5169f43102c5cd7311efcf816b18c07ab001c6670ae9022fc453"
+      "cffdf35983e4a2ca1e25867bf212004b1821be100d53e00bbc404336e78392ea"
     ],
     "originating_base_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
     "predicate_ids": [
@@ -90,21 +90,21 @@
   "result": {
     "anchor_resolutions": [],
     "artifacts": {
-      "capsule": "repros/double-credit/0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6/capsule.json",
-      "contract": "repros/double-credit/0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6/contract.json",
-      "event": "repros/double-credit/0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6/event.json",
-      "hunt": "repros/double-credit/0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6/hunt.json",
-      "manifest": "runs/local-20260905T083048-803ee878/manifest.json",
-      "metadata": "repros/double-credit/0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6/metadata.json",
-      "minimization": "runs/local-20260905T083048-803ee878/minimization.json",
-      "regression_test": "repros/double-credit/0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6/test_repro.py",
-      "report": "runs/local-20260905T083048-803ee878/report.html"
+      "capsule": "repros/double-credit/41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c/capsule.json",
+      "contract": "repros/double-credit/41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c/contract.json",
+      "event": "repros/double-credit/41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c/event.json",
+      "hunt": "repros/double-credit/41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c/hunt.json",
+      "manifest": "runs/local-20260905T084629-5830de69/manifest.json",
+      "metadata": "repros/double-credit/41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c/metadata.json",
+      "minimization": "runs/local-20260905T084629-5830de69/minimization.json",
+      "regression_test": "repros/double-credit/41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c/test_repro.py",
+      "report": "runs/local-20260905T084629-5830de69/report.html"
     },
     "attempts": [
       {
         "amount_cents": 2500,
         "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -114,12 +114,12 @@
           "event_marker_count": 0
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-cb5e16aa2f5c44d7a803cc00d0032876",
-        "digest": "1148bd81eb7749857af744e165ec5c33253dda36ad2a4125f4eadde9aa6064fa",
-        "ended_at": "2026-09-05T08:30:48.994124Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-a5f7684b67834f37b501d944fdfc68c0",
+        "digest": "06690af375015aaf42dab59f2cfc3bfee1dd1e283159a7043429cb5811d491d0",
+        "ended_at": "2026-09-05T08:46:30.219260Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "1c68557916354556b45ef40339c5a9ef",
+        "execution_nonce": "d9ee4910fa7d4b24be1e4fb05a1fc302",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -155,100 +155,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-a8e4d54652504724bb98571425cb4933",
+        "receipt_id": "attempt-5f6d44ebd03a4ff0b01055882d94eb52",
         "replay_acknowledged": true,
         "role": "base",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:48.863408Z",
+            "ended_at": "2026-09-05T08:46:30.093125Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "b3724db18f1546749fe481bb4df3f7a9",
+            "ipc_session_id": "06650a252fee4908a79a2580b69b08c0",
             "phase": "first",
-            "pid": 64392,
-            "process_group_id": 64392,
+            "pid": 74207,
+            "process_group_id": 74207,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:48.763030Z",
+            "started_at": "2026-09-05T08:46:29.984248Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "912a376bb24b42c68b0c055097e7e6b7"
+            "worker_nonce": "92ef73984d404ac99ca01d656cc25ca0"
           },
           {
-            "ended_at": "2026-09-05T08:30:48.991219Z",
+            "ended_at": "2026-09-05T08:46:30.217900Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "62433b674b4a45ccbb2ea069ba94c497",
+            "ipc_session_id": "6fcf9142a8764e2389b1783adb5152d6",
             "phase": "replay",
-            "pid": 64396,
-            "process_group_id": 64396,
+            "pid": 74210,
+            "process_group_id": 74210,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:48.877607Z",
+            "started_at": "2026-09-05T08:46:30.095828Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "b3305be2cf7b4f088c0c114768751901"
+            "worker_nonce": "839372d6e9844e1980a0efd725a977d3"
           }
         ],
-        "started_at": "2026-09-05T08:30:48.749467Z",
+        "started_at": "2026-09-05T08:46:29.968978Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:48.749467Z"
+            "timestamp": "2026-09-05T08:46:29.968978Z"
           },
           {
-            "detail": "db-cb5e16aa2f5c44d7a803cc00d0032876",
+            "detail": "db-a5f7684b67834f37b501d944fdfc68c0",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:48.760334Z"
+            "timestamp": "2026-09-05T08:46:29.979770Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:48.760962Z"
+            "timestamp": "2026-09-05T08:46:29.982101Z"
           },
           {
-            "detail": "64392",
+            "detail": "74207",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:48.764469Z"
+            "timestamp": "2026-09-05T08:46:29.984851Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:48.861916Z"
+            "timestamp": "2026-09-05T08:46:30.091577Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:48.863410Z"
+            "timestamp": "2026-09-05T08:46:30.093130Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:48.863937Z"
+            "timestamp": "2026-09-05T08:46:30.093897Z"
           },
           {
-            "detail": "64396",
+            "detail": "74210",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:48.877877Z"
+            "timestamp": "2026-09-05T08:46:30.096240Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:48.991709Z"
+            "timestamp": "2026-09-05T08:46:30.218501Z"
           },
           {
             "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:48.991713Z"
+            "timestamp": "2026-09-05T08:46:30.218511Z"
           },
           {
             "detail": "DUPLICATE_EFFECT",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:48.994124Z"
+            "timestamp": "2026-09-05T08:46:30.219260Z"
           }
         ],
         "transport": "LOCAL",
@@ -257,7 +257,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -267,12 +267,12 @@
           "event_marker_count": 0
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-9e60c560d9f14f68ba200fc678352f85",
-        "digest": "44551a1e0bd10ad360fa176a7afc6f54213fa0523a598a79e6ee709891d0849c",
-        "ended_at": "2026-09-05T08:30:49.000408Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-4b521dc16c764933ace989147daa1357",
+        "digest": "81391158f6ca774f1c95f6c6e1dbd4b45ad073c623a1172d115b92404823f323",
+        "ended_at": "2026-09-05T08:46:30.242522Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "2f201f33021f4e3c8e4278ac7df00e0f",
+        "execution_nonce": "a8d1bef5adbf4648ab04dabb6a5f93cf",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -308,100 +308,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-d73235af08354fefa50fa2e345c48ee9",
+        "receipt_id": "attempt-46ad84366b534c7b939382f8877dcbe6",
         "replay_acknowledged": true,
         "role": "base",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:48.876757Z",
+            "ended_at": "2026-09-05T08:46:30.093600Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "b777d46b010f49f281869352d36b614d",
+            "ipc_session_id": "777b8c64ffe94f828c8f64677d62b677",
             "phase": "first",
-            "pid": 64394,
-            "process_group_id": 64394,
+            "pid": 74206,
+            "process_group_id": 74206,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:48.766551Z",
+            "started_at": "2026-09-05T08:46:29.984009Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "7b305562d3954c04b79c07862e9991e6"
+            "worker_nonce": "6e594a2c886e4494bbb951330bb8cc11"
           },
           {
-            "ended_at": "2026-09-05T08:30:48.999772Z",
+            "ended_at": "2026-09-05T08:46:30.241791Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "ece1e129ac0b4400bc3c8a558c99aaba",
+            "ipc_session_id": "7c8550a0bf7c4401a93b508593b89f44",
             "phase": "replay",
-            "pid": 64399,
-            "process_group_id": 64399,
+            "pid": 74212,
+            "process_group_id": 74212,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:48.879838Z",
+            "started_at": "2026-09-05T08:46:30.099292Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "bdd41e827e9c41fc9f9d4bc7263fa452"
+            "worker_nonce": "fe65cbbd4c544687bda23f36f9278e3f"
           }
         ],
-        "started_at": "2026-09-05T08:30:48.749799Z",
+        "started_at": "2026-09-05T08:46:29.969041Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:48.749799Z"
+            "timestamp": "2026-09-05T08:46:29.969041Z"
           },
           {
-            "detail": "db-9e60c560d9f14f68ba200fc678352f85",
+            "detail": "db-4b521dc16c764933ace989147daa1357",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:48.763420Z"
+            "timestamp": "2026-09-05T08:46:29.980164Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:48.765103Z"
+            "timestamp": "2026-09-05T08:46:29.980884Z"
           },
           {
-            "detail": "64394",
+            "detail": "74206",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:48.766926Z"
+            "timestamp": "2026-09-05T08:46:29.986450Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:48.872191Z"
+            "timestamp": "2026-09-05T08:46:30.089901Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:48.876765Z"
+            "timestamp": "2026-09-05T08:46:30.093600Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:48.878043Z"
+            "timestamp": "2026-09-05T08:46:30.097734Z"
           },
           {
-            "detail": "64399",
+            "detail": "74212",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:48.880089Z"
+            "timestamp": "2026-09-05T08:46:30.101155Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:49.000011Z"
+            "timestamp": "2026-09-05T08:46:30.242119Z"
           },
           {
             "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:49.000013Z"
+            "timestamp": "2026-09-05T08:46:30.242121Z"
           },
           {
             "detail": "DUPLICATE_EFFECT",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:49.000408Z"
+            "timestamp": "2026-09-05T08:46:30.242522Z"
           }
         ],
         "transport": "LOCAL",
@@ -410,7 +410,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -420,12 +420,12 @@
           "event_marker_count": 0
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-866b209d275e4b3a91b62d834a8d8f0e",
-        "digest": "9cf300fefc9e92af5687d8e1cfd54ea371d64d04f2dede530cf4973e7e03a2ad",
-        "ended_at": "2026-09-05T08:30:48.992367Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-2237e01162434ee892f367633e20c704",
+        "digest": "9ea9b17e9a1c61ed64b464035d0a5e74fa2791aa19e315911551263ed0226de8",
+        "ended_at": "2026-09-05T08:46:30.224129Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "e6a684b13ac7486985845a9643fb7096",
+        "execution_nonce": "8810714146c74d79a3600bbf5ddbb5e7",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -461,100 +461,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-005a0b3b432c48fbb72a94058e04d2b4",
+        "receipt_id": "attempt-a5887932ed08470094362ec64ec3287f",
         "replay_acknowledged": true,
         "role": "base",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:48.863310Z",
+            "ended_at": "2026-09-05T08:46:30.093572Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "d8f4b5295cf042fda218752e9b1a62fa",
+            "ipc_session_id": "ee86f3192bca42ab918d8a5437d3b2c1",
             "phase": "first",
-            "pid": 64390,
-            "process_group_id": 64390,
+            "pid": 74205,
+            "process_group_id": 74205,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:48.760272Z",
+            "started_at": "2026-09-05T08:46:29.982127Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "51d5dee29d1a49c9a3692c849d8917a4"
+            "worker_nonce": "35d7f934cdf54049ab3929d6fa33b3da"
           },
           {
-            "ended_at": "2026-09-05T08:30:48.990092Z",
+            "ended_at": "2026-09-05T08:46:30.220241Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "7ba2f7a7fbad4bf2989cd4a34cb7baf3",
+            "ipc_session_id": "635301590b054446a759cef308556c5f",
             "phase": "replay",
-            "pid": 64395,
-            "process_group_id": 64395,
+            "pid": 74211,
+            "process_group_id": 74211,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:48.865937Z",
+            "started_at": "2026-09-05T08:46:30.097877Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "07ccece3c0b641ec94867ecb138c9f4a"
+            "worker_nonce": "c0d18e496b6b4a778996569f1e1084bf"
           }
         ],
-        "started_at": "2026-09-05T08:30:48.749598Z",
+        "started_at": "2026-09-05T08:46:29.969087Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:48.749598Z"
+            "timestamp": "2026-09-05T08:46:29.969087Z"
           },
           {
-            "detail": "db-866b209d275e4b3a91b62d834a8d8f0e",
+            "detail": "db-2237e01162434ee892f367633e20c704",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:48.758257Z"
+            "timestamp": "2026-09-05T08:46:29.978145Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:48.758468Z"
+            "timestamp": "2026-09-05T08:46:29.980683Z"
           },
           {
-            "detail": "64390",
+            "detail": "74205",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:48.760599Z"
+            "timestamp": "2026-09-05T08:46:29.983145Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:48.861720Z"
+            "timestamp": "2026-09-05T08:46:30.089576Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:48.863312Z"
+            "timestamp": "2026-09-05T08:46:30.093573Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:48.863761Z"
+            "timestamp": "2026-09-05T08:46:30.096564Z"
           },
           {
-            "detail": "64395",
+            "detail": "74211",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:48.869066Z"
+            "timestamp": "2026-09-05T08:46:30.098170Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:48.990693Z"
+            "timestamp": "2026-09-05T08:46:30.221324Z"
           },
           {
             "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:48.990703Z"
+            "timestamp": "2026-09-05T08:46:30.221326Z"
           },
           {
             "detail": "DUPLICATE_EFFECT",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:48.992367Z"
+            "timestamp": "2026-09-05T08:46:30.224129Z"
           }
         ],
         "transport": "LOCAL",
@@ -563,7 +563,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -573,12 +573,12 @@
           "event_marker_count": 0
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-92108e3034e840a78b81de89506cc930",
-        "digest": "666414a9439c2b147c9fac7cd0ad9ece12fcee9ddddb9b1bbc837a65f53b91ca",
-        "ended_at": "2026-09-05T08:30:48.992246Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-6e3011ffef2c4769a6f52d40c2e7fd38",
+        "digest": "56beb984c184198f61d0e6ecdfe7811ae5e19ca9eb4c5e76ee387cd215dfeb57",
+        "ended_at": "2026-09-05T08:46:30.223512Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "9d4b0c3f681740f79145f49aa1c3d92a",
+        "execution_nonce": "54670684f0dd49c7ad11f702361206a5",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -614,100 +614,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-4479b0e07d9b4790b5feb7b7790547e3",
+        "receipt_id": "attempt-bdd32f1d22c54315a0536b0486689a1c",
         "replay_acknowledged": true,
         "role": "base",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:48.863442Z",
+            "ended_at": "2026-09-05T08:46:30.095449Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "e53e73bc018d40eeb517901ac90040f8",
+            "ipc_session_id": "a67b4b8ba1254fa9b6d5d6d1e901e493",
             "phase": "first",
-            "pid": 64393,
-            "process_group_id": 64393,
+            "pid": 74204,
+            "process_group_id": 74204,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:48.764590Z",
+            "started_at": "2026-09-05T08:46:29.980253Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "d33072c485c648ac9775b92a2ed583d7"
+            "worker_nonce": "5ab7ab57eb2e44008698430bd17a0360"
           },
           {
-            "ended_at": "2026-09-05T08:30:48.990131Z",
+            "ended_at": "2026-09-05T08:46:30.220216Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "30063dbf0211437b975e725f09157322",
+            "ipc_session_id": "679bb018bbd243ac89ff6f091359cce9",
             "phase": "replay",
-            "pid": 64397,
-            "process_group_id": 64397,
+            "pid": 74214,
+            "process_group_id": 74214,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:48.875749Z",
+            "started_at": "2026-09-05T08:46:30.101226Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "e29574a997484b05bc4c83936542b915"
+            "worker_nonce": "4c2a93592ce0465cb8396b4a20f011f1"
           }
         ],
-        "started_at": "2026-09-05T08:30:48.749739Z",
+        "started_at": "2026-09-05T08:46:29.969308Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:48.749739Z"
+            "timestamp": "2026-09-05T08:46:29.969308Z"
           },
           {
-            "detail": "db-92108e3034e840a78b81de89506cc930",
+            "detail": "db-6e3011ffef2c4769a6f52d40c2e7fd38",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:48.760009Z"
+            "timestamp": "2026-09-05T08:46:29.977994Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:48.763248Z"
+            "timestamp": "2026-09-05T08:46:29.978290Z"
           },
           {
-            "detail": "64393",
+            "detail": "74204",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:48.764899Z"
+            "timestamp": "2026-09-05T08:46:29.980527Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:48.862238Z"
+            "timestamp": "2026-09-05T08:46:30.090050Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:48.863442Z"
+            "timestamp": "2026-09-05T08:46:30.095483Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:48.865579Z"
+            "timestamp": "2026-09-05T08:46:30.098953Z"
           },
           {
-            "detail": "64397",
+            "detail": "74214",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:48.877301Z"
+            "timestamp": "2026-09-05T08:46:30.101411Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:48.990787Z"
+            "timestamp": "2026-09-05T08:46:30.221158Z"
           },
           {
             "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:48.990792Z"
+            "timestamp": "2026-09-05T08:46:30.221164Z"
           },
           {
             "detail": "DUPLICATE_EFFECT",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:48.992246Z"
+            "timestamp": "2026-09-05T08:46:30.223512Z"
           }
         ],
         "transport": "LOCAL",
@@ -716,7 +716,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -726,12 +726,12 @@
           "event_marker_count": 0
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-7142cb4475594e85b787bb5e790d1d2b",
-        "digest": "730fdf24bc6696636188b603c32758d212affdb9b20809abca5b2b0dc6d76c02",
-        "ended_at": "2026-09-05T08:30:48.995216Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-46d3bf561245431c8c8db9e37d651faa",
+        "digest": "ba57b7a9edb92230dad125e8092e3b9cb47b163a07a21a1969800fcb1ecff406",
+        "ended_at": "2026-09-05T08:46:30.222701Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "674855930f564888ae0a0709188a6003",
+        "execution_nonce": "35385485e50d4ca1a154b0b2ddd00e1b",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -767,100 +767,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-3d9b82f7b6504b61834fa7e9a6c33dbe",
+        "receipt_id": "attempt-38294c89b2b146f79ef4d27e896d2280",
         "replay_acknowledged": true,
         "role": "base",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:48.863469Z",
+            "ended_at": "2026-09-05T08:46:30.095660Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "52bb3b5cc65c464ab74dacc858d86379",
+            "ipc_session_id": "7657968ff6af4a7ea17cbca83fc024bd",
             "phase": "first",
-            "pid": 64391,
-            "process_group_id": 64391,
+            "pid": 74208,
+            "process_group_id": 74208,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:48.762722Z",
+            "started_at": "2026-09-05T08:46:29.986019Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "ff4dce47cbfe43259274d921a70ad927"
+            "worker_nonce": "84b34ce5cf7247d38729ddd1f106055a"
           },
           {
-            "ended_at": "2026-09-05T08:30:48.993808Z",
+            "ended_at": "2026-09-05T08:46:30.220372Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "69896eb324a24a848205a647a430bd09",
+            "ipc_session_id": "8af19baf455f4cad80cad90c68d3a709",
             "phase": "replay",
-            "pid": 64398,
-            "process_group_id": 64398,
+            "pid": 74213,
+            "process_group_id": 74213,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:48.874936Z",
+            "started_at": "2026-09-05T08:46:30.100802Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "6e4c67053f454a34a0c48d7c34049c6e"
+            "worker_nonce": "f15dbbb4d3cb43ffaca179ac068ae39a"
           }
         ],
-        "started_at": "2026-09-05T08:30:48.750017Z",
+        "started_at": "2026-09-05T08:46:29.969554Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:48.750017Z"
+            "timestamp": "2026-09-05T08:46:29.969554Z"
           },
           {
-            "detail": "db-7142cb4475594e85b787bb5e790d1d2b",
+            "detail": "db-46d3bf561245431c8c8db9e37d651faa",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:48.759819Z"
+            "timestamp": "2026-09-05T08:46:29.979985Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:48.760821Z"
+            "timestamp": "2026-09-05T08:46:29.984635Z"
           },
           {
-            "detail": "64391",
+            "detail": "74208",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:48.763357Z"
+            "timestamp": "2026-09-05T08:46:29.986302Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:48.861852Z"
+            "timestamp": "2026-09-05T08:46:30.093850Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:48.863470Z"
+            "timestamp": "2026-09-05T08:46:30.095661Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:48.868982Z"
+            "timestamp": "2026-09-05T08:46:30.099057Z"
           },
           {
-            "detail": "64398",
+            "detail": "74213",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:48.875657Z"
+            "timestamp": "2026-09-05T08:46:30.101275Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:48.994082Z"
+            "timestamp": "2026-09-05T08:46:30.221273Z"
           },
           {
             "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:48.994085Z"
+            "timestamp": "2026-09-05T08:46:30.221278Z"
           },
           {
             "detail": "DUPLICATE_EFFECT",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:48.995216Z"
+            "timestamp": "2026-09-05T08:46:30.222701Z"
           }
         ],
         "transport": "LOCAL",
@@ -869,7 +869,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -879,12 +879,12 @@
           "event_marker_count": 0
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-aa567b493ed544279a55e13679b38046",
-        "digest": "409aa357d73ea9c9192f77025c5c52da67275dc4255a678f34923e9095c236bd",
-        "ended_at": "2026-09-05T08:30:49.269685Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-6ef1037853264fa8aab411b526f3b0cc",
+        "digest": "3cdcf25a136cd9682c63d4b429707b76509bb995cfb48bdc0eccf6b55b84ebe2",
+        "ended_at": "2026-09-05T08:46:30.515606Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "ddc384001e1f4adda45178d1792ac8ce",
+        "execution_nonce": "ca4744e150d140fdaf3c7fcba3f7db6c",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -920,100 +920,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-54bd8f90dea9443da8df6887b58e1a50",
+        "receipt_id": "attempt-939201012cd84902b372b32005db276b",
         "replay_acknowledged": true,
         "role": "candidate",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:49.121353Z",
+            "ended_at": "2026-09-05T08:46:30.370726Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "631badbe578448cdbb5fdfee16b4c243",
+            "ipc_session_id": "5a51bc3fdcb9418785811ad0b0f379d1",
             "phase": "first",
-            "pid": 64401,
-            "process_group_id": 64401,
+            "pid": 74215,
+            "process_group_id": 74215,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:49.017750Z",
+            "started_at": "2026-09-05T08:46:30.258154Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "3876ad89a0f149d28e3dc2e747288004"
+            "worker_nonce": "fe9993f0dc6c494cb47eb696ea26868e"
           },
           {
-            "ended_at": "2026-09-05T08:30:49.268175Z",
+            "ended_at": "2026-09-05T08:46:30.514633Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "2dc67385b90345da89693f25a5eb26a1",
+            "ipc_session_id": "257dffb0ce5b42a6b3d2fd60b1ed43be",
             "phase": "replay",
-            "pid": 64406,
-            "process_group_id": 64406,
+            "pid": 74223,
+            "process_group_id": 74223,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:49.125350Z",
+            "started_at": "2026-09-05T08:46:30.377715Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "4f8ba5c2ad9d44ec87f425ed1aa39b5f"
+            "worker_nonce": "c4475648de6e43aab894a95667ddd620"
           }
         ],
-        "started_at": "2026-09-05T08:30:49.003763Z",
+        "started_at": "2026-09-05T08:46:30.245537Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:49.003763Z"
+            "timestamp": "2026-09-05T08:46:30.245537Z"
           },
           {
-            "detail": "db-aa567b493ed544279a55e13679b38046",
+            "detail": "db-6ef1037853264fa8aab411b526f3b0cc",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:49.013062Z"
+            "timestamp": "2026-09-05T08:46:30.255519Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:49.016191Z"
+            "timestamp": "2026-09-05T08:46:30.256062Z"
           },
           {
-            "detail": "64401",
+            "detail": "74215",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.017973Z"
+            "timestamp": "2026-09-05T08:46:30.258423Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:49.119822Z"
+            "timestamp": "2026-09-05T08:46:30.369141Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:49.121355Z"
+            "timestamp": "2026-09-05T08:46:30.370727Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:49.123741Z"
+            "timestamp": "2026-09-05T08:46:30.376119Z"
           },
           {
-            "detail": "64406",
+            "detail": "74223",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.125624Z"
+            "timestamp": "2026-09-05T08:46:30.378025Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:49.269270Z"
+            "timestamp": "2026-09-05T08:46:30.515093Z"
           },
           {
             "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:49.269273Z"
+            "timestamp": "2026-09-05T08:46:30.515099Z"
           },
           {
             "detail": "DUPLICATE_EFFECT",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:49.269685Z"
+            "timestamp": "2026-09-05T08:46:30.515606Z"
           }
         ],
         "transport": "LOCAL",
@@ -1022,7 +1022,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -1032,12 +1032,12 @@
           "event_marker_count": 0
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-93d159740a5740cba396664fda14d854",
-        "digest": "53f59527ff8f0b9b2c282e28ca57c502721387f896e00118ba663eb1b5a89173",
-        "ended_at": "2026-09-05T08:30:49.268571Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-db1fdd9f5a61453ea1369f71a5e091cd",
+        "digest": "691515183661e4d7468c277a1d1bd9f2378c8c14f3585f430302c4826f423b8b",
+        "ended_at": "2026-09-05T08:46:30.521193Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "df087a1777a54f34ac4567349493ab27",
+        "execution_nonce": "cae831a7a5af4153b8508e74a4233ed3",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -1073,100 +1073,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-e91a64bbf18e4f8e9912f9ac34b57f2e",
+        "receipt_id": "attempt-58eca46832f6423497f07e5cda0ad766",
         "replay_acknowledged": true,
         "role": "candidate",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:49.121260Z",
+            "ended_at": "2026-09-05T08:46:30.374270Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "cde05ade2da243e8a0a69e4bb8a9e673",
+            "ipc_session_id": "1b93ebd0a95a46bb8d3b1ffee8c53d55",
             "phase": "first",
-            "pid": 64402,
-            "process_group_id": 64402,
+            "pid": 74219,
+            "process_group_id": 74219,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:49.019346Z",
+            "started_at": "2026-09-05T08:46:30.264646Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "ba4bae8eac7a46688f75105c0aa9e233"
+            "worker_nonce": "f42a9dcf1d0a4a96852d20307e638e0d"
           },
           {
-            "ended_at": "2026-09-05T08:30:49.267473Z",
+            "ended_at": "2026-09-05T08:46:30.519745Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "2c42c8d682c243f8b8fcb188d70882df",
+            "ipc_session_id": "cbe01e98795a419280fdd67d4a42fcc8",
             "phase": "replay",
-            "pid": 64405,
-            "process_group_id": 64405,
+            "pid": 74224,
+            "process_group_id": 74224,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:49.123330Z",
+            "started_at": "2026-09-05T08:46:30.379483Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "c6767437ac7d498bb34f36f2b7942f77"
+            "worker_nonce": "e5db0793a8f24126a15cf695f5041939"
           }
         ],
-        "started_at": "2026-09-05T08:30:49.003853Z",
+        "started_at": "2026-09-05T08:46:30.245618Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:49.003853Z"
+            "timestamp": "2026-09-05T08:46:30.245618Z"
           },
           {
-            "detail": "db-93d159740a5740cba396664fda14d854",
+            "detail": "db-db1fdd9f5a61453ea1369f71a5e091cd",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:49.014191Z"
+            "timestamp": "2026-09-05T08:46:30.256129Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:49.018091Z"
+            "timestamp": "2026-09-05T08:46:30.259788Z"
           },
           {
-            "detail": "64402",
+            "detail": "74219",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.020778Z"
+            "timestamp": "2026-09-05T08:46:30.264963Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:49.119694Z"
+            "timestamp": "2026-09-05T08:46:30.369067Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:49.121261Z"
+            "timestamp": "2026-09-05T08:46:30.374281Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:49.121510Z"
+            "timestamp": "2026-09-05T08:46:30.378099Z"
           },
           {
-            "detail": "64405",
+            "detail": "74224",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.123608Z"
+            "timestamp": "2026-09-05T08:46:30.379797Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:49.267912Z"
+            "timestamp": "2026-09-05T08:46:30.520795Z"
           },
           {
             "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:49.267917Z"
+            "timestamp": "2026-09-05T08:46:30.520798Z"
           },
           {
             "detail": "DUPLICATE_EFFECT",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:49.268571Z"
+            "timestamp": "2026-09-05T08:46:30.521193Z"
           }
         ],
         "transport": "LOCAL",
@@ -1175,7 +1175,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -1185,12 +1185,12 @@
           "event_marker_count": 0
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-8156a7f1553248179ef88021479fc6ab",
-        "digest": "d4ebd8b2a3f662dd1a6a922af953b713cf7aca2819a9a01ec5efdc176e2a3cb5",
-        "ended_at": "2026-09-05T08:30:49.253053Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-f0a72790b20f408d9fc2f1c634060d96",
+        "digest": "254bdc48a042ad1b92c49877d917a258d7d2aa3658453368f3e42b336c847d9f",
+        "ended_at": "2026-09-05T08:46:30.519918Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "d164fdbb8e7042a09e638d550181009a",
+        "execution_nonce": "a4a1f7fe93a949feb4758040fc5a7f39",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -1226,100 +1226,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-35f14da8a9bc4949b30cf3ba76dd13d1",
+        "receipt_id": "attempt-f9eb8caa1efa44c493ed2d3ca723327c",
         "replay_acknowledged": true,
         "role": "candidate",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:49.128462Z",
+            "ended_at": "2026-09-05T08:46:30.370696Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "26763e2299a84634b0f7188da76ef651",
+            "ipc_session_id": "5a6c5701a4464f6ebcacbf5bfaba28e6",
             "phase": "first",
-            "pid": 64403,
-            "process_group_id": 64403,
+            "pid": 74217,
+            "process_group_id": 74217,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:49.023329Z",
+            "started_at": "2026-09-05T08:46:30.261155Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "bb9b7726785c4450a36990dd5d27846d"
+            "worker_nonce": "cf9395fd0fee4901ad86e977d8c19a05"
           },
           {
-            "ended_at": "2026-09-05T08:30:49.252040Z",
+            "ended_at": "2026-09-05T08:46:30.518948Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "7411f5e58ac74cc89d9d4fb40604545b",
+            "ipc_session_id": "449ee0cf10944b9aaa01fd3050967d4e",
             "phase": "replay",
-            "pid": 64408,
-            "process_group_id": 64408,
+            "pid": 74222,
+            "process_group_id": 74222,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:49.131205Z",
+            "started_at": "2026-09-05T08:46:30.375998Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "0e465f18e0264c1094b23031d1f6d7d6"
+            "worker_nonce": "5354c0ddcae34082b919255f723dab14"
           }
         ],
-        "started_at": "2026-09-05T08:30:49.004035Z",
+        "started_at": "2026-09-05T08:46:30.245722Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:49.004035Z"
+            "timestamp": "2026-09-05T08:46:30.245722Z"
           },
           {
-            "detail": "db-8156a7f1553248179ef88021479fc6ab",
+            "detail": "db-f0a72790b20f408d9fc2f1c634060d96",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:49.016416Z"
+            "timestamp": "2026-09-05T08:46:30.255924Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:49.018280Z"
+            "timestamp": "2026-09-05T08:46:30.259605Z"
           },
           {
-            "detail": "64403",
+            "detail": "74217",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.023474Z"
+            "timestamp": "2026-09-05T08:46:30.261507Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:49.127000Z"
+            "timestamp": "2026-09-05T08:46:30.369017Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:49.128463Z"
+            "timestamp": "2026-09-05T08:46:30.370699Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:49.128836Z"
+            "timestamp": "2026-09-05T08:46:30.371658Z"
           },
           {
-            "detail": "64408",
+            "detail": "74222",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.131726Z"
+            "timestamp": "2026-09-05T08:46:30.376353Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:49.252474Z"
+            "timestamp": "2026-09-05T08:46:30.519361Z"
           },
           {
             "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:49.252483Z"
+            "timestamp": "2026-09-05T08:46:30.519365Z"
           },
           {
             "detail": "DUPLICATE_EFFECT",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:49.253053Z"
+            "timestamp": "2026-09-05T08:46:30.519918Z"
           }
         ],
         "transport": "LOCAL",
@@ -1328,7 +1328,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -1338,12 +1338,12 @@
           "event_marker_count": 0
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-952ba89e7a1949959e9905ac8bf51b65",
-        "digest": "62e822a60ea9c6e742383128945ac5a3fb580515033f546a98b6de14e749c88f",
-        "ended_at": "2026-09-05T08:30:49.271042Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-bd57622e29fe4ede98492489b57a53f3",
+        "digest": "22a19b75cbc3b908edf689ec6ed98086d2ab6c50c6beca2bb4f324072914c2fb",
+        "ended_at": "2026-09-05T08:46:30.512416Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "2189fe3054b54e349c0f68e06e0bd340",
+        "execution_nonce": "8a80376aefbe4c0aa950d7873c7a345a",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -1379,100 +1379,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-06d0914de0b54db2a4560686c32e86ec",
+        "receipt_id": "attempt-d2d50c8faeb440109229ab8ef4057308",
         "replay_acknowledged": true,
         "role": "candidate",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:49.122941Z",
+            "ended_at": "2026-09-05T08:46:30.365018Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "f3d59e5dacae42248ac851d2c7e7a8fe",
+            "ipc_session_id": "716d06b845ab4e62af53c75ece940b37",
             "phase": "first",
-            "pid": 64400,
-            "process_group_id": 64400,
+            "pid": 74218,
+            "process_group_id": 74218,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:49.016336Z",
+            "started_at": "2026-09-05T08:46:30.262625Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "12e77f2b88324843a184176a1c9b501b"
+            "worker_nonce": "0538ee2fc0704caf95fc9eac2515b111"
           },
           {
-            "ended_at": "2026-09-05T08:30:49.270289Z",
+            "ended_at": "2026-09-05T08:46:30.510487Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "ad47d36c95c4427fa3a59b0399112378",
+            "ipc_session_id": "c010be06ef98435abd588e50a5f375e9",
             "phase": "replay",
-            "pid": 64407,
-            "process_group_id": 64407,
+            "pid": 74220,
+            "process_group_id": 74220,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:49.126851Z",
+            "started_at": "2026-09-05T08:46:30.367417Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "23d4583a150b4295aa2ad2656990be89"
+            "worker_nonce": "83d12f6316b941f5b3bc494cc50ec239"
           }
         ],
-        "started_at": "2026-09-05T08:30:49.004019Z",
+        "started_at": "2026-09-05T08:46:30.245883Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:49.004019Z"
+            "timestamp": "2026-09-05T08:46:30.245883Z"
           },
           {
-            "detail": "db-952ba89e7a1949959e9905ac8bf51b65",
+            "detail": "db-bd57622e29fe4ede98492489b57a53f3",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:49.013006Z"
+            "timestamp": "2026-09-05T08:46:30.255808Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:49.013718Z"
+            "timestamp": "2026-09-05T08:46:30.260016Z"
           },
           {
-            "detail": "64400",
+            "detail": "74218",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.017505Z"
+            "timestamp": "2026-09-05T08:46:30.262898Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:49.120708Z"
+            "timestamp": "2026-09-05T08:46:30.363445Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:49.122969Z"
+            "timestamp": "2026-09-05T08:46:30.365022Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:49.125311Z"
+            "timestamp": "2026-09-05T08:46:30.365594Z"
           },
           {
-            "detail": "64407",
+            "detail": "74220",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.127150Z"
+            "timestamp": "2026-09-05T08:46:30.367802Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:49.270630Z"
+            "timestamp": "2026-09-05T08:46:30.511351Z"
           },
           {
             "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:49.270632Z"
+            "timestamp": "2026-09-05T08:46:30.511362Z"
           },
           {
             "detail": "DUPLICATE_EFFECT",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:49.271042Z"
+            "timestamp": "2026-09-05T08:46:30.512416Z"
           }
         ],
         "transport": "LOCAL",
@@ -1481,7 +1481,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -1491,12 +1491,12 @@
           "event_marker_count": 0
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-0f85f5aef0fa48c6a129ab8edcff5123",
-        "digest": "33b9a529a148fa7168e6f9057fff386aca46e8c715cda7c0ae59972dcac7e751",
-        "ended_at": "2026-09-05T08:30:49.274110Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-280242cf839848c9ae30b92f9bb2e039",
+        "digest": "8a5118c4c330ea896861d5af06a1cabe4eb8f34b67b5f3d6998f2769ab8d3dfe",
+        "ended_at": "2026-09-05T08:46:30.513283Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "e19f57638bb3431fb7a87604b3c2bb80",
+        "execution_nonce": "fe8f857eea884d1fbb8ad41f949258ac",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -1532,100 +1532,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-fcf27ecbee2d46fba427150fda19daaa",
+        "receipt_id": "attempt-7be79e757e28438abe1799a23bb6351c",
         "replay_acknowledged": true,
         "role": "candidate",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:49.128497Z",
+            "ended_at": "2026-09-05T08:46:30.370746Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "b8e300edbf1a4115a092f81d699fda49",
+            "ipc_session_id": "8cf530e99205457385cb35585023af50",
             "phase": "first",
-            "pid": 64404,
-            "process_group_id": 64404,
+            "pid": 74216,
+            "process_group_id": 74216,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:49.022534Z",
+            "started_at": "2026-09-05T08:46:30.259693Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "48e06238d78c4b7eaa0fd224660771be"
+            "worker_nonce": "f1f2732ca85e4e53bdbb6aea3a41d318"
           },
           {
-            "ended_at": "2026-09-05T08:30:49.273378Z",
+            "ended_at": "2026-09-05T08:46:30.510531Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "b5503cbcd5fa4abe882090c497d42940",
+            "ipc_session_id": "798861a0a45e4cd59bff7909a785b786",
             "phase": "replay",
-            "pid": 64409,
-            "process_group_id": 64409,
+            "pid": 74221,
+            "process_group_id": 74221,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:49.131803Z",
+            "started_at": "2026-09-05T08:46:30.374341Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "b203c9a5bcee482794d4a468559cbe6a"
+            "worker_nonce": "57c2ff017e294187b04a98cd2a366263"
           }
         ],
-        "started_at": "2026-09-05T08:30:49.004292Z",
+        "started_at": "2026-09-05T08:46:30.245902Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:49.004292Z"
+            "timestamp": "2026-09-05T08:46:30.245902Z"
           },
           {
-            "detail": "db-0f85f5aef0fa48c6a129ab8edcff5123",
+            "detail": "db-280242cf839848c9ae30b92f9bb2e039",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:49.017867Z"
+            "timestamp": "2026-09-05T08:46:30.255634Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:49.021000Z"
+            "timestamp": "2026-09-05T08:46:30.256266Z"
           },
           {
-            "detail": "64404",
+            "detail": "74216",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.022859Z"
+            "timestamp": "2026-09-05T08:46:30.261286Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:49.126785Z"
+            "timestamp": "2026-09-05T08:46:30.369110Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:49.128499Z"
+            "timestamp": "2026-09-05T08:46:30.370747Z"
           },
           {
             "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:49.128955Z"
+            "timestamp": "2026-09-05T08:46:30.371525Z"
           },
           {
-            "detail": "64409",
+            "detail": "74221",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.131893Z"
+            "timestamp": "2026-09-05T08:46:30.375782Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:49.273716Z"
+            "timestamp": "2026-09-05T08:46:30.511421Z"
           },
           {
             "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:49.273719Z"
+            "timestamp": "2026-09-05T08:46:30.511426Z"
           },
           {
             "detail": "DUPLICATE_EFFECT",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:49.274110Z"
+            "timestamp": "2026-09-05T08:46:30.513283Z"
           }
         ],
         "transport": "LOCAL",
@@ -1634,7 +1634,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -1644,12 +1644,12 @@
           "event_marker_count": 1
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-1d38ef9b20354efc9708f2642f04f552",
-        "digest": "5980dd854562984e82016c54f70877b4782fe8cc2acd32bfb3be6220b0ee8b5f",
-        "ended_at": "2026-09-05T08:30:49.516512Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-77c1869bf521497099b2c1c0d2ef0896",
+        "digest": "636d1b497fad30315b5bd76fcc619dca74e7214849c43dad56423a5ed6539556",
+        "ended_at": "2026-09-05T08:46:30.784092Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "438b8160c66f4fa58531d2474b6d0bff",
+        "execution_nonce": "59432158ff6f48c68e035405b7a20950",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -1685,100 +1685,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-dce221e64a4f4078b4c5a22eced6c96b",
+        "receipt_id": "attempt-bf7e79eb6774415e97c96795fc653917",
         "replay_acknowledged": true,
         "role": "corrected",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:49.393940Z",
+            "ended_at": "2026-09-05T08:46:30.645210Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "06ff9af4fbe749fcb15c6a71a9bffc2c",
+            "ipc_session_id": "bf49bc0ed9164267b72d1cc015d6abb4",
             "phase": "first",
-            "pid": 64410,
-            "process_group_id": 64410,
+            "pid": 74229,
+            "process_group_id": 74229,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:49.289015Z",
+            "started_at": "2026-09-05T08:46:30.541901Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "12d6beeb98aa42f5ac9698969a41488f"
+            "worker_nonce": "f79ec4fd9bde4fe1b35dddd6958acde2"
           },
           {
-            "ended_at": "2026-09-05T08:30:49.512614Z",
+            "ended_at": "2026-09-05T08:46:30.781622Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "732400ae982b49f4a03ced2ab415d87f",
+            "ipc_session_id": "140ebb95901d42d6b7fff34726129a24",
             "phase": "replay",
-            "pid": 64418,
-            "process_group_id": 64418,
+            "pid": 74234,
+            "process_group_id": 74234,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:49.396604Z",
+            "started_at": "2026-09-05T08:46:30.655511Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "4a89ed747a924e15a81cbf7d85015dab"
+            "worker_nonce": "8f37b30aa5b04d88a2d4a0845794be07"
           }
         ],
-        "started_at": "2026-09-05T08:30:49.276930Z",
+        "started_at": "2026-09-05T08:46:30.523993Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:49.276930Z"
+            "timestamp": "2026-09-05T08:46:30.523993Z"
           },
           {
-            "detail": "db-1d38ef9b20354efc9708f2642f04f552",
+            "detail": "db-77c1869bf521497099b2c1c0d2ef0896",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:49.285826Z"
+            "timestamp": "2026-09-05T08:46:30.535700Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:49.286456Z"
+            "timestamp": "2026-09-05T08:46:30.540531Z"
           },
           {
-            "detail": "64410",
+            "detail": "74229",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.290698Z"
+            "timestamp": "2026-09-05T08:46:30.542226Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:49.389627Z"
+            "timestamp": "2026-09-05T08:46:30.641292Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:49.393947Z"
+            "timestamp": "2026-09-05T08:46:30.645212Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:49.394730Z"
+            "timestamp": "2026-09-05T08:46:30.653034Z"
           },
           {
-            "detail": "64418",
+            "detail": "74234",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.396819Z"
+            "timestamp": "2026-09-05T08:46:30.655699Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:49.513734Z"
+            "timestamp": "2026-09-05T08:46:30.782576Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:49.513738Z"
+            "timestamp": "2026-09-05T08:46:30.782581Z"
           },
           {
             "detail": "EXACTLY_ONCE",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:49.516512Z"
+            "timestamp": "2026-09-05T08:46:30.784092Z"
           }
         ],
         "transport": "LOCAL",
@@ -1787,7 +1787,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -1797,12 +1797,12 @@
           "event_marker_count": 1
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-6a923b7687b24d86b7e22f3f1439542e",
-        "digest": "d2649742a757d8c6806dd80bdfe102744f986b77603a16f0bf19036835c8a94c",
-        "ended_at": "2026-09-05T08:30:49.515980Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-5cc286cba81f4b38b8f99e2f5163ccbf",
+        "digest": "1c90cbef7aaea3a3974bcbc9f7962a8788bbd30c172dae647af9348193856762",
+        "ended_at": "2026-09-05T08:46:30.783470Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "3d08f53dd9924d7aa253c0d3b5006893",
+        "execution_nonce": "396da1c7964b473095ae5538d65a15db",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -1838,100 +1838,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-c8049308ad604c87a2d866e869f163cf",
+        "receipt_id": "attempt-784760931f58447fad2d7229f398242d",
         "replay_acknowledged": true,
         "role": "corrected",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:49.394087Z",
+            "ended_at": "2026-09-05T08:46:30.646767Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "918a89305d3f479cbe750e8a260c45bb",
+            "ipc_session_id": "519a9a022bde47c4bd94ac431ec6c78a",
             "phase": "first",
-            "pid": 64411,
-            "process_group_id": 64411,
+            "pid": 74225,
+            "process_group_id": 74225,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:49.290053Z",
+            "started_at": "2026-09-05T08:46:30.535755Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "9d868dcf198243e99b3ed41d1740ca7b"
+            "worker_nonce": "641baa7431ba4e3cb7825179d4aba9a9"
           },
           {
-            "ended_at": "2026-09-05T08:30:49.512678Z",
+            "ended_at": "2026-09-05T08:46:30.781665Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "92d0ff90039e485f8a948df4b1201815",
+            "ipc_session_id": "671cae5e99ad4488b1d5cd8db3153222",
             "phase": "replay",
-            "pid": 64417,
-            "process_group_id": 64417,
+            "pid": 74233,
+            "process_group_id": 74233,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:49.396407Z",
+            "started_at": "2026-09-05T08:46:30.653351Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "1ff90fe037924c4bb3ec6e32a5e9e1bf"
+            "worker_nonce": "85633808d6a848189bb23c68de949564"
           }
         ],
-        "started_at": "2026-09-05T08:30:49.276993Z",
+        "started_at": "2026-09-05T08:46:30.524181Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:49.276993Z"
+            "timestamp": "2026-09-05T08:46:30.524181Z"
           },
           {
-            "detail": "db-6a923b7687b24d86b7e22f3f1439542e",
+            "detail": "db-5cc286cba81f4b38b8f99e2f5163ccbf",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:49.285678Z"
+            "timestamp": "2026-09-05T08:46:30.533180Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:49.286377Z"
+            "timestamp": "2026-09-05T08:46:30.533526Z"
           },
           {
-            "detail": "64411",
+            "detail": "74225",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.290804Z"
+            "timestamp": "2026-09-05T08:46:30.537330Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:49.389730Z"
+            "timestamp": "2026-09-05T08:46:30.640904Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:49.394089Z"
+            "timestamp": "2026-09-05T08:46:30.646798Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:49.394632Z"
+            "timestamp": "2026-09-05T08:46:30.650016Z"
           },
           {
-            "detail": "64417",
+            "detail": "74233",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.397075Z"
+            "timestamp": "2026-09-05T08:46:30.655111Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:49.513651Z"
+            "timestamp": "2026-09-05T08:46:30.782496Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:49.513657Z"
+            "timestamp": "2026-09-05T08:46:30.782502Z"
           },
           {
             "detail": "EXACTLY_ONCE",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:49.515980Z"
+            "timestamp": "2026-09-05T08:46:30.783470Z"
           }
         ],
         "transport": "LOCAL",
@@ -1940,7 +1940,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -1950,12 +1950,12 @@
           "event_marker_count": 1
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-b845eb41065f430198ed4eee1dc8aa7f",
-        "digest": "1be28be8d50a33719d49037a8f4b2a0e28ebf999d95f72c0dbfc65c5c64f9e37",
-        "ended_at": "2026-09-05T08:30:49.532118Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-459ac705b1f24b01ae90beb866b680bd",
+        "digest": "28702ac79bd216848fa4e27fb1e470ff7f2e5bb2662d606a735c0184b44834c2",
+        "ended_at": "2026-09-05T08:46:30.792779Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "dcffc94c26b141ad91fe839667fdb25b",
+        "execution_nonce": "72337c75a27c4bc8a59c7f43a9a7410b",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -1991,100 +1991,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-e4df77181bb84090933f80bb60362b5a",
+        "receipt_id": "attempt-6d3e3d81eb8e4918aa7d5b6d4ae62cdb",
         "replay_acknowledged": true,
         "role": "corrected",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:49.390792Z",
+            "ended_at": "2026-09-05T08:46:30.647154Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "7194357793e64b76a195bccb55679bf7",
+            "ipc_session_id": "95bd4c38335e4ac88d804248c3e5d286",
             "phase": "first",
-            "pid": 64413,
-            "process_group_id": 64413,
+            "pid": 74226,
+            "process_group_id": 74226,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:49.292047Z",
+            "started_at": "2026-09-05T08:46:30.538376Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "60ac289108f841878688978111e0b650"
+            "worker_nonce": "a23e872d638447af80d7cad236ef3022"
           },
           {
-            "ended_at": "2026-09-05T08:30:49.531444Z",
+            "ended_at": "2026-09-05T08:46:30.792034Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "2f228efee6674def9a103a07f5d15560",
+            "ipc_session_id": "66cf793a7aaf4853be67676bd03a25f7",
             "phase": "replay",
-            "pid": 64415,
-            "process_group_id": 64415,
+            "pid": 74232,
+            "process_group_id": 74232,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:49.393616Z",
+            "started_at": "2026-09-05T08:46:30.654864Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "4ff2a780a659419e8470c6912b23afe8"
+            "worker_nonce": "982269711bfe48b88afe7083b35d3827"
           }
         ],
-        "started_at": "2026-09-05T08:30:49.277045Z",
+        "started_at": "2026-09-05T08:46:30.524206Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:49.277045Z"
+            "timestamp": "2026-09-05T08:46:30.524206Z"
           },
           {
-            "detail": "db-b845eb41065f430198ed4eee1dc8aa7f",
+            "detail": "db-459ac705b1f24b01ae90beb866b680bd",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:49.286027Z"
+            "timestamp": "2026-09-05T08:46:30.533290Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:49.290443Z"
+            "timestamp": "2026-09-05T08:46:30.535662Z"
           },
           {
-            "detail": "64413",
+            "detail": "74226",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.293321Z"
+            "timestamp": "2026-09-05T08:46:30.539791Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:49.389192Z"
+            "timestamp": "2026-09-05T08:46:30.640945Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:49.390794Z"
+            "timestamp": "2026-09-05T08:46:30.647155Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:49.391201Z"
+            "timestamp": "2026-09-05T08:46:30.650284Z"
           },
           {
-            "detail": "64415",
+            "detail": "74232",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.394444Z"
+            "timestamp": "2026-09-05T08:46:30.655247Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:49.531710Z"
+            "timestamp": "2026-09-05T08:46:30.792375Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:49.531713Z"
+            "timestamp": "2026-09-05T08:46:30.792378Z"
           },
           {
             "detail": "EXACTLY_ONCE",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:49.532118Z"
+            "timestamp": "2026-09-05T08:46:30.792779Z"
           }
         ],
         "transport": "LOCAL",
@@ -2093,7 +2093,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -2103,12 +2103,12 @@
           "event_marker_count": 1
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-a5c71e30a01a489d88b85ba6cc1a98b1",
-        "digest": "6870fbf2e003ddca17155b4dd7c4b7d1d8b1f3b0ff9c5bdccb1b28dd3036b6e9",
-        "ended_at": "2026-09-05T08:30:49.515300Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-9a811842c3504d9c858cf1252f12d471",
+        "digest": "ea479d16ddbeec9245835925760d4a4dd28c281891dda89ba309f489c1f195a4",
+        "ended_at": "2026-09-05T08:46:30.802018Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "df46957f8f8a4f2db6e647801939ef9e",
+        "execution_nonce": "ad60e7729d2642f88b81149b18875cb9",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -2144,100 +2144,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-db8275b9f1a64517ab050d543068802c",
+        "receipt_id": "attempt-62cca144781e443d8a358af4a0137e26",
         "replay_acknowledged": true,
         "role": "corrected",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:49.394063Z",
+            "ended_at": "2026-09-05T08:46:30.645365Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "eb98e966fb1d456590b9d44a867137b6",
+            "ipc_session_id": "8d9a2a8b820a40d0af047b3b7dfa2865",
             "phase": "first",
-            "pid": 64414,
-            "process_group_id": 64414,
+            "pid": 74228,
+            "process_group_id": 74228,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:49.293553Z",
+            "started_at": "2026-09-05T08:46:30.540002Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "291417c9066d4b6ca6cfa78da5a78d61"
+            "worker_nonce": "45bff4d237f84bacbdfab848306996ab"
           },
           {
-            "ended_at": "2026-09-05T08:30:49.512735Z",
+            "ended_at": "2026-09-05T08:46:30.801285Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "a9d14dd2e1fc482ab71be4394ee1fbaf",
+            "ipc_session_id": "63d1e251be564a0da6a7a0d76eee38c3",
             "phase": "replay",
-            "pid": 64419,
-            "process_group_id": 64419,
+            "pid": 74231,
+            "process_group_id": 74231,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:49.398287Z",
+            "started_at": "2026-09-05T08:46:30.650372Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "ac366777b2f14616be9feb3f5165ccc6"
+            "worker_nonce": "3fbe7e8649844c7d8432f7a5ac48b010"
           }
         ],
-        "started_at": "2026-09-05T08:30:49.277348Z",
+        "started_at": "2026-09-05T08:46:30.524263Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:49.277348Z"
+            "timestamp": "2026-09-05T08:46:30.524263Z"
           },
           {
-            "detail": "db-a5c71e30a01a489d88b85ba6cc1a98b1",
+            "detail": "db-9a811842c3504d9c858cf1252f12d471",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:49.286257Z"
+            "timestamp": "2026-09-05T08:46:30.533799Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:49.290858Z"
+            "timestamp": "2026-09-05T08:46:30.537495Z"
           },
           {
-            "detail": "64414",
+            "detail": "74228",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.293683Z"
+            "timestamp": "2026-09-05T08:46:30.543325Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:49.389682Z"
+            "timestamp": "2026-09-05T08:46:30.640715Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:49.394065Z"
+            "timestamp": "2026-09-05T08:46:30.645366Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:49.396959Z"
+            "timestamp": "2026-09-05T08:46:30.648481Z"
           },
           {
-            "detail": "64419",
+            "detail": "74231",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.398599Z"
+            "timestamp": "2026-09-05T08:46:30.653267Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:49.513551Z"
+            "timestamp": "2026-09-05T08:46:30.801624Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:49.513563Z"
+            "timestamp": "2026-09-05T08:46:30.801627Z"
           },
           {
             "detail": "EXACTLY_ONCE",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:49.515300Z"
+            "timestamp": "2026-09-05T08:46:30.802018Z"
           }
         ],
         "transport": "LOCAL",
@@ -2246,7 +2246,7 @@
       {
         "amount_cents": 2500,
         "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "checkpoint_reached": true,
         "checkpoint_snapshot": {
           "account_balance_cents": 2500,
@@ -2256,12 +2256,12 @@
           "event_marker_count": 1
         },
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "database_id": "db-865065a7dcba40a88e4b4b4bbdc1bda5",
-        "digest": "9c86d73cbb89633310d1c4e2fbc0af7f25e49dd388a652a07ca1dab0bbd1c744",
-        "ended_at": "2026-09-05T08:30:49.533914Z",
-        "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+        "database_id": "db-98cf7b6d1153458abad3c077d7730583",
+        "digest": "9ae59d595d95748069f3263414d5e156991bc21d91f20eb10244a940ab269fb2",
+        "ended_at": "2026-09-05T08:46:30.777660Z",
+        "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
         "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-        "execution_nonce": "4d3d29dbcbd9470fb1dd4865af2b7fc5",
+        "execution_nonce": "3e381b141eb949a7b1b2c3834ab5c0cb",
         "execution_status": "COMPLETED",
         "failure_detail": null,
         "final_snapshot": {
@@ -2297,100 +2297,100 @@
         },
         "provider_image_id": null,
         "provider_operation_id": null,
-        "receipt_id": "attempt-7f7f6da02699489d94d3ff9c4da7cead",
+        "receipt_id": "attempt-d13ba23bc3ae4fa1b13b4a6e242aea69",
         "replay_acknowledged": true,
         "role": "corrected",
         "schema_version": "1",
         "spawns": [
           {
-            "ended_at": "2026-09-05T08:30:49.391032Z",
+            "ended_at": "2026-09-05T08:46:30.644741Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": -9,
-            "ipc_session_id": "e35f54fcb9d844daaa1cc8a658c8720c",
+            "ipc_session_id": "aec8db1e1ae2461983ae511cde9b2cc9",
             "phase": "first",
-            "pid": 64412,
-            "process_group_id": 64412,
+            "pid": 74227,
+            "process_group_id": 74227,
             "spawn_index": 1,
-            "started_at": "2026-09-05T08:30:49.290465Z",
+            "started_at": "2026-09-05T08:46:30.538845Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "3cd1d4014a344da6b8f92e9c8ba406fc"
+            "worker_nonce": "2ca4e3ea9ab5428b88d5a19e787e45e3"
           },
           {
-            "ended_at": "2026-09-05T08:30:49.533311Z",
+            "ended_at": "2026-09-05T08:46:30.775917Z",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "exit_code": 0,
-            "ipc_session_id": "3971507b0b214ee9bff3009fe06432a3",
+            "ipc_session_id": "0b8034fd230b4bc1b418f22494706e9c",
             "phase": "replay",
-            "pid": 64416,
-            "process_group_id": 64416,
+            "pid": 74230,
+            "process_group_id": 74230,
             "spawn_index": 2,
-            "started_at": "2026-09-05T08:30:49.394104Z",
+            "started_at": "2026-09-05T08:46:30.647208Z",
             "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
             "stderr_excerpt": "",
             "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "stdout_excerpt": "",
-            "worker_nonce": "ec103b5d63b5444d9f1db18cbf4f66c1"
+            "worker_nonce": "a75bad73e6db438e99e0a8db3cb348de"
           }
         ],
-        "started_at": "2026-09-05T08:30:49.277514Z",
+        "started_at": "2026-09-05T08:46:30.524365Z",
         "timeline": [
           {
             "detail": "",
             "state": "PREFLIGHT",
-            "timestamp": "2026-09-05T08:30:49.277514Z"
+            "timestamp": "2026-09-05T08:46:30.524365Z"
           },
           {
-            "detail": "db-865065a7dcba40a88e4b4b4bbdc1bda5",
+            "detail": "db-98cf7b6d1153458abad3c077d7730583",
             "state": "DATABASE_SEEDED",
-            "timestamp": "2026-09-05T08:30:49.286122Z"
+            "timestamp": "2026-09-05T08:46:30.533661Z"
           },
           {
             "detail": "",
             "state": "PRE_CRASH_PROBED",
-            "timestamp": "2026-09-05T08:30:49.286653Z"
+            "timestamp": "2026-09-05T08:46:30.535975Z"
           },
           {
-            "detail": "64412",
+            "detail": "74227",
             "state": "FIRST_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.293808Z"
+            "timestamp": "2026-09-05T08:46:30.540619Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "CHECKPOINT_REACHED",
-            "timestamp": "2026-09-05T08:30:49.389501Z"
+            "timestamp": "2026-09-05T08:46:30.641091Z"
           },
           {
             "detail": "-9",
             "state": "WORKER_KILLED",
-            "timestamp": "2026-09-05T08:30:49.391034Z"
+            "timestamp": "2026-09-05T08:46:30.644743Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "POST_KILL_PROBED",
-            "timestamp": "2026-09-05T08:30:49.391332Z"
+            "timestamp": "2026-09-05T08:46:30.645164Z"
           },
           {
-            "detail": "64416",
+            "detail": "74230",
             "state": "REPLAY_WORKER_STARTED",
-            "timestamp": "2026-09-05T08:30:49.394314Z"
+            "timestamp": "2026-09-05T08:46:30.647703Z"
           },
           {
             "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
             "state": "EVENT_REPLAYED",
-            "timestamp": "2026-09-05T08:30:49.533516Z"
+            "timestamp": "2026-09-05T08:46:30.776937Z"
           },
           {
             "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
             "state": "FINAL_STATE_PROBED",
-            "timestamp": "2026-09-05T08:30:49.533519Z"
+            "timestamp": "2026-09-05T08:46:30.776947Z"
           },
           {
             "detail": "EXACTLY_ONCE",
             "state": "COMPLETE",
-            "timestamp": "2026-09-05T08:30:49.533914Z"
+            "timestamp": "2026-09-05T08:46:30.777660Z"
           }
         ],
         "transport": "LOCAL",
@@ -2439,18 +2439,18 @@
       }
     ],
     "candidate_author": null,
-    "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
-    "digest": "5f1532ecfc619525a4ee2dd1ff586972b879e64ed3f709b457a03f3932ea174e",
-    "ended_at": "2026-09-05T08:30:49.976284Z",
-    "engine_code_digest": "6f733e24221930ccc6f39f10055b4b627ca627836e144218db2217cf4b04c876",
-    "engine_source_commit": "e4ad2d9116816a51b178687b92debbcfbbee2548",
+    "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
+    "digest": "85f7f98ba6021baaf381f3650d2f46ab9c686b68d1144c026623812bf281843a",
+    "ended_at": "2026-09-05T08:46:31.244568Z",
+    "engine_code_digest": "99ef8ade38b4616013c2d68ca9b1e8179041bf6b03aae0a58ef54928a59e1c22",
+    "engine_source_commit": "305667621ef62b49523d35a65491dafbf1e779ef",
     "execution_status": "COMPLETED",
     "hypothesis_receipts": [
       {
         "attempt": {
           "amount_cents": 2500,
           "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
-          "capsule_digest": "d624646ef88f6fb2f0c6f81ee2d3766dbb68dc04e1361ff1905b3f178152fcec",
+          "capsule_digest": "4552f5cc3f185f0af8b38d4b7fd005ee7580bfb4b0988d06f55557ee6643334a",
           "checkpoint_reached": true,
           "checkpoint_snapshot": {
             "account_balance_cents": 2500,
@@ -2460,12 +2460,12 @@
             "event_marker_count": 0
           },
           "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-          "database_id": "db-b7681e97a94f4a7196d345d835cd70dd",
-          "digest": "3219cef3bfb3aa0ac4658888b873bce6488df06362bc5dc7f1ce434cb5399970",
-          "ended_at": "2026-09-05T08:30:48.503495Z",
-          "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+          "database_id": "db-7e41b80798444aeb84d738e2843975d1",
+          "digest": "56dfe3fea73e30ab9f68471d78b1606ebbb2ee8cdb94bcffe41269732d7d293d",
+          "ended_at": "2026-09-05T08:46:29.721963Z",
+          "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
           "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-          "execution_nonce": "536ff51db7f34dac9fd672adeba189d3",
+          "execution_nonce": "da962bbfa1f3435ebef5ae431079aadd",
           "execution_status": "COMPLETED",
           "failure_detail": null,
           "final_snapshot": {
@@ -2501,100 +2501,100 @@
           },
           "provider_image_id": null,
           "provider_operation_id": null,
-          "receipt_id": "attempt-2cabaffc79694af88d8bb5ba0cd74231",
+          "receipt_id": "attempt-23bf656e4c7f40a3ac784e005a17a61f",
           "replay_acknowledged": true,
           "role": "base",
           "schema_version": "1",
           "spawns": [
             {
-              "ended_at": "2026-09-05T08:30:48.385044Z",
+              "ended_at": "2026-09-05T08:46:29.604461Z",
               "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
               "exit_code": -9,
-              "ipc_session_id": "ad69b880bc9e4f9c85d24c7d68ff1f15",
+              "ipc_session_id": "4576549ce83f48159d246ac16abf8ec7",
               "phase": "first",
-              "pid": 64380,
-              "process_group_id": 64380,
+              "pid": 74197,
+              "process_group_id": 74197,
               "spawn_index": 1,
-              "started_at": "2026-09-05T08:30:48.290603Z",
+              "started_at": "2026-09-05T08:46:29.509038Z",
               "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
               "stderr_excerpt": "",
               "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
               "stdout_excerpt": "",
-              "worker_nonce": "31db6ce7c5614405a49183948548ae33"
+              "worker_nonce": "4f8e0efc734d4b0cbfeb0579cfdb91d7"
             },
             {
-              "ended_at": "2026-09-05T08:30:48.501401Z",
+              "ended_at": "2026-09-05T08:46:29.720199Z",
               "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
               "exit_code": 0,
-              "ipc_session_id": "04b7f8b78baa462f9b7a24dc7a391a85",
+              "ipc_session_id": "16649c8656ac4ecfb36e6af4c1cee277",
               "phase": "replay",
-              "pid": 64382,
-              "process_group_id": 64382,
+              "pid": 74198,
+              "process_group_id": 74198,
               "spawn_index": 2,
-              "started_at": "2026-09-05T08:30:48.386695Z",
+              "started_at": "2026-09-05T08:46:29.606605Z",
               "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
               "stderr_excerpt": "",
               "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
               "stdout_excerpt": "",
-              "worker_nonce": "c0f6536feb7e42b2ac550641520236d5"
+              "worker_nonce": "c8b3cfe6388942ddb02d32903a7148c8"
             }
           ],
-          "started_at": "2026-09-05T08:30:48.283465Z",
+          "started_at": "2026-09-05T08:46:29.500534Z",
           "timeline": [
             {
               "detail": "",
               "state": "PREFLIGHT",
-              "timestamp": "2026-09-05T08:30:48.283465Z"
+              "timestamp": "2026-09-05T08:46:29.500534Z"
             },
             {
-              "detail": "db-b7681e97a94f4a7196d345d835cd70dd",
+              "detail": "db-7e41b80798444aeb84d738e2843975d1",
               "state": "DATABASE_SEEDED",
-              "timestamp": "2026-09-05T08:30:48.288109Z"
+              "timestamp": "2026-09-05T08:46:29.505744Z"
             },
             {
               "detail": "",
               "state": "PRE_CRASH_PROBED",
-              "timestamp": "2026-09-05T08:30:48.288404Z"
+              "timestamp": "2026-09-05T08:46:29.507693Z"
             },
             {
-              "detail": "64380",
+              "detail": "74197",
               "state": "FIRST_WORKER_STARTED",
-              "timestamp": "2026-09-05T08:30:48.291678Z"
+              "timestamp": "2026-09-05T08:46:29.509229Z"
             },
             {
               "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
               "state": "CHECKPOINT_REACHED",
-              "timestamp": "2026-09-05T08:30:48.383444Z"
+              "timestamp": "2026-09-05T08:46:29.602851Z"
             },
             {
               "detail": "-9",
               "state": "WORKER_KILLED",
-              "timestamp": "2026-09-05T08:30:48.385048Z"
+              "timestamp": "2026-09-05T08:46:29.604467Z"
             },
             {
               "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
               "state": "POST_KILL_PROBED",
-              "timestamp": "2026-09-05T08:30:48.385290Z"
+              "timestamp": "2026-09-05T08:46:29.604851Z"
             },
             {
-              "detail": "64382",
+              "detail": "74198",
               "state": "REPLAY_WORKER_STARTED",
-              "timestamp": "2026-09-05T08:30:48.386893Z"
+              "timestamp": "2026-09-05T08:46:29.606895Z"
             },
             {
               "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
               "state": "EVENT_REPLAYED",
-              "timestamp": "2026-09-05T08:30:48.501790Z"
+              "timestamp": "2026-09-05T08:46:29.720995Z"
             },
             {
               "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
               "state": "FINAL_STATE_PROBED",
-              "timestamp": "2026-09-05T08:30:48.501795Z"
+              "timestamp": "2026-09-05T08:46:29.721004Z"
             },
             {
               "detail": "DUPLICATE_EFFECT",
               "state": "COMPLETE",
-              "timestamp": "2026-09-05T08:30:48.503495Z"
+              "timestamp": "2026-09-05T08:46:29.721963Z"
             }
           ],
           "transport": "LOCAL",
@@ -2602,11 +2602,11 @@
         },
         "canonical_rank": 1,
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "digest": "b3f1ba47d62675e71f05f4b23181ff3a055a0531f57967af32672a1b8dcbf189",
+        "digest": "2f07b4b6713de747ff94a05509732549e3502b95ac726088f753b31f04d93ac5",
         "fault_boundary": "effect-commit",
         "hypothesis_id": "effect-commit-v1",
         "originating_base_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
-        "provisional_capsule_digest": "d624646ef88f6fb2f0c6f81ee2d3766dbb68dc04e1361ff1905b3f178152fcec",
+        "provisional_capsule_digest": "4552f5cc3f185f0af8b38d4b7fd005ee7580bfb4b0988d06f55557ee6643334a",
         "reproduced": true,
         "schema_version": "1",
         "selected": true,
@@ -2616,7 +2616,7 @@
         "attempt": {
           "amount_cents": 2500,
           "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
-          "capsule_digest": "3763b1644d0c9da28015563a8bd08ce276e21d6fc04e7ee20ce5107529f3d12d",
+          "capsule_digest": "cb99ae64b93e05b84b7ec46adbba7867991ec0c0f74525ec7086c5b567d48f42",
           "checkpoint_reached": true,
           "checkpoint_snapshot": {
             "account_balance_cents": 2500,
@@ -2626,12 +2626,12 @@
             "event_marker_count": 1
           },
           "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-          "database_id": "db-cae64033fd7948388c5412ca36733785",
-          "digest": "fd0fa7c0b5597af46dd8fcfe0b8fe28f50960798418847f6bd145d052a6c5728",
-          "ended_at": "2026-09-05T08:30:48.502460Z",
-          "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+          "database_id": "db-3cbb2459426043b8add7cdca057dcbe4",
+          "digest": "c24dcc49327a7bdcfa59f0e88f6d9e8230620328fa40acfdaa62146bd437032f",
+          "ended_at": "2026-09-05T08:46:29.722973Z",
+          "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
           "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-          "execution_nonce": "ff5cacadb7764243a07028af2248380b",
+          "execution_nonce": "32a2e1a3f52e433fa048167e9a2ee790",
           "execution_status": "COMPLETED",
           "failure_detail": null,
           "final_snapshot": {
@@ -2668,100 +2668,100 @@
           },
           "provider_image_id": null,
           "provider_operation_id": null,
-          "receipt_id": "attempt-c3f4d54e49b943458df08bb658fe763d",
+          "receipt_id": "attempt-f473b8e9a15443aa85db022e131b5433",
           "replay_acknowledged": true,
           "role": "base",
           "schema_version": "1",
           "spawns": [
             {
-              "ended_at": "2026-09-05T08:30:48.386396Z",
+              "ended_at": "2026-09-05T08:46:29.605981Z",
               "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
               "exit_code": -9,
-              "ipc_session_id": "cc401ba38f64455ea6f326fbf5a03274",
+              "ipc_session_id": "8fd1fcef7bf544c4a0aaca1dd609fdf5",
               "phase": "first",
-              "pid": 64381,
-              "process_group_id": 64381,
+              "pid": 74196,
+              "process_group_id": 74196,
               "spawn_index": 1,
-              "started_at": "2026-09-05T08:30:48.291770Z",
+              "started_at": "2026-09-05T08:46:29.507794Z",
               "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
               "stderr_excerpt": "",
               "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
               "stdout_excerpt": "",
-              "worker_nonce": "7b29f9a8db364b919308204dae6285a8"
+              "worker_nonce": "f99d1f00079446dba4d1ce59681edf3c"
             },
             {
-              "ended_at": "2026-09-05T08:30:48.500993Z",
+              "ended_at": "2026-09-05T08:46:29.720230Z",
               "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
               "exit_code": 0,
-              "ipc_session_id": "d74cd0a4a3084fca8c066b2cd3c5b4c5",
+              "ipc_session_id": "45862c5f42ba49d08ea0ca8ea9d3b0c5",
               "phase": "replay",
-              "pid": 64383,
-              "process_group_id": 64383,
+              "pid": 74199,
+              "process_group_id": 74199,
               "spawn_index": 2,
-              "started_at": "2026-09-05T08:30:48.387979Z",
+              "started_at": "2026-09-05T08:46:29.608222Z",
               "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
               "stderr_excerpt": "",
               "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
               "stdout_excerpt": "",
-              "worker_nonce": "1b78e86201414d57bbc8d56603f7b99c"
+              "worker_nonce": "6473a37f3f924bb4b0819eec6b623502"
             }
           ],
-          "started_at": "2026-09-05T08:30:48.283814Z",
+          "started_at": "2026-09-05T08:46:29.500818Z",
           "timeline": [
             {
               "detail": "",
               "state": "PREFLIGHT",
-              "timestamp": "2026-09-05T08:30:48.283814Z"
+              "timestamp": "2026-09-05T08:46:29.500818Z"
             },
             {
-              "detail": "db-cae64033fd7948388c5412ca36733785",
+              "detail": "db-3cbb2459426043b8add7cdca057dcbe4",
               "state": "DATABASE_SEEDED",
-              "timestamp": "2026-09-05T08:30:48.288258Z"
+              "timestamp": "2026-09-05T08:46:29.505556Z"
             },
             {
               "detail": "",
               "state": "PRE_CRASH_PROBED",
-              "timestamp": "2026-09-05T08:30:48.290428Z"
+              "timestamp": "2026-09-05T08:46:29.505921Z"
             },
             {
-              "detail": "64381",
+              "detail": "74196",
               "state": "FIRST_WORKER_STARTED",
-              "timestamp": "2026-09-05T08:30:48.291834Z"
+              "timestamp": "2026-09-05T08:46:29.508805Z"
             },
             {
               "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
               "state": "CHECKPOINT_REACHED",
-              "timestamp": "2026-09-05T08:30:48.384290Z"
+              "timestamp": "2026-09-05T08:46:29.603603Z"
             },
             {
               "detail": "-9",
               "state": "WORKER_KILLED",
-              "timestamp": "2026-09-05T08:30:48.386419Z"
+              "timestamp": "2026-09-05T08:46:29.606055Z"
             },
             {
               "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
               "state": "POST_KILL_PROBED",
-              "timestamp": "2026-09-05T08:30:48.387005Z"
+              "timestamp": "2026-09-05T08:46:29.607015Z"
             },
             {
-              "detail": "64383",
+              "detail": "74199",
               "state": "REPLAY_WORKER_STARTED",
-              "timestamp": "2026-09-05T08:30:48.388151Z"
+              "timestamp": "2026-09-05T08:46:29.608411Z"
             },
             {
               "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
               "state": "EVENT_REPLAYED",
-              "timestamp": "2026-09-05T08:30:48.501346Z"
+              "timestamp": "2026-09-05T08:46:29.721060Z"
             },
             {
               "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
               "state": "FINAL_STATE_PROBED",
-              "timestamp": "2026-09-05T08:30:48.501354Z"
+              "timestamp": "2026-09-05T08:46:29.721064Z"
             },
             {
               "detail": "EXACTLY_ONCE",
               "state": "COMPLETE",
-              "timestamp": "2026-09-05T08:30:48.502460Z"
+              "timestamp": "2026-09-05T08:46:29.722973Z"
             }
           ],
           "transport": "LOCAL",
@@ -2769,11 +2769,11 @@
         },
         "canonical_rank": 2,
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-        "digest": "28db22f6c5ade69894b41e09a92eafc49836cf7e9239368f68948299c97aecf8",
+        "digest": "803fd913f6afd9a3e6bc739e7bdbba1f84bce173138dbc22ff33cb4ba032ab3c",
         "fault_boundary": "marker-commit",
         "hypothesis_id": "marker-commit-v1",
         "originating_base_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
-        "provisional_capsule_digest": "3763b1644d0c9da28015563a8bd08ce276e21d6fc04e7ee20ce5107529f3d12d",
+        "provisional_capsule_digest": "cb99ae64b93e05b84b7ec46adbba7867991ec0c0f74525ec7086c5b567d48f42",
         "reproduced": false,
         "schema_version": "1",
         "selected": false,
@@ -2789,12 +2789,12 @@
             "amount_cents": 2500,
             "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
             "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-            "database_id": "db-fb7dec4ba63547d7b22818f1979ba61c",
-            "digest": "da3c5aee2bbafe00131bac4244c8a46400c5e7a32cd9c4f2818e29af9f682559",
-            "ended_at": "2026-09-05T08:30:48.745270Z",
-            "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+            "database_id": "db-aab4999e30c440ff878917f44f9e709a",
+            "digest": "a7828e9fd40ce1444eb26e46cccf0be85f50da802b7fe4a7771f1d92a8fdacd2",
+            "ended_at": "2026-09-05T08:46:29.964193Z",
+            "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-            "execution_nonce": "502bb805b6b34ec690dca37567b11d1c",
+            "execution_nonce": "db96a5a8e5cd48b59eade08910f56092",
             "execution_status": "COMPLETED",
             "failure_detail": null,
             "final_snapshot": {
@@ -2827,48 +2827,48 @@
             },
             "integrity_status": "VALID",
             "observation": "EXACTLY_ONCE",
-            "parent_capsule_digest": "d624646ef88f6fb2f0c6f81ee2d3766dbb68dc04e1361ff1905b3f178152fcec",
+            "parent_capsule_digest": "4552f5cc3f185f0af8b38d4b7fd005ee7580bfb4b0988d06f55557ee6643334a",
             "post_execution_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
-            "receipt_id": "no-fault-3155ff9d0b6f449b8c0a5ace899c003d",
+            "receipt_id": "no-fault-c4e37e5db723408f92befda5c4f21c1d",
             "replay_commit_count": 0,
             "replay_operations": [],
             "role": "base",
             "schema_version": "2",
             "spawns": [
               {
-                "ended_at": "2026-09-05T08:30:48.629074Z",
+                "ended_at": "2026-09-05T08:46:29.846932Z",
                 "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
                 "exit_code": 0,
-                "ipc_session_id": "2c22fe4c8fb44a1b9c667160c9bee80f",
+                "ipc_session_id": "60d8273360174c78b2fd8e9b6598b2d8",
                 "phase": "first",
-                "pid": 64385,
-                "process_group_id": 64385,
+                "pid": 74201,
+                "process_group_id": 74201,
                 "spawn_index": 1,
-                "started_at": "2026-09-05T08:30:48.515136Z",
+                "started_at": "2026-09-05T08:46:29.734085Z",
                 "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
                 "stderr_excerpt": "",
                 "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "stdout_excerpt": "",
-                "worker_nonce": "45073627a5644a75adecb526dd0c9886"
+                "worker_nonce": "4535566a28594784be1176c95baf4d13"
               },
               {
-                "ended_at": "2026-09-05T08:30:48.743690Z",
+                "ended_at": "2026-09-05T08:46:29.962448Z",
                 "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
                 "exit_code": 0,
-                "ipc_session_id": "2f406528f5a145138ed71754cc5385af",
+                "ipc_session_id": "5623409cc6714ca1bb1d7440bdb896cb",
                 "phase": "replay",
-                "pid": 64386,
-                "process_group_id": 64386,
+                "pid": 74202,
+                "process_group_id": 74202,
                 "spawn_index": 2,
-                "started_at": "2026-09-05T08:30:48.630981Z",
+                "started_at": "2026-09-05T08:46:29.849045Z",
                 "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
                 "stderr_excerpt": "",
                 "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "stdout_excerpt": "",
-                "worker_nonce": "55068d0787ae41db8ff747f2d36f7129"
+                "worker_nonce": "aed132df4cce45f89dbc219db21f089d"
               }
             ],
-            "started_at": "2026-09-05T08:30:48.507224Z",
+            "started_at": "2026-09-05T08:46:29.726707Z",
             "transport": "LOCAL",
             "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
           },
@@ -2876,12 +2876,12 @@
             "amount_cents": 2500,
             "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
             "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-            "database_id": "db-a493378654cf4dfcbf9a88a5273bc8ea",
-            "digest": "407fb5727ee3a7ed8dfebbd3c582e9a05935358c64190bc98c06a4253cecd943",
-            "ended_at": "2026-09-05T08:30:48.746155Z",
-            "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+            "database_id": "db-b0a2c9f216734f1b9ffcd54999ee202b",
+            "digest": "1b3d7eb06d439daa80dba6548948b20657ff1524d0e23ad7da0a7867f0f93161",
+            "ended_at": "2026-09-05T08:46:29.965684Z",
+            "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-            "execution_nonce": "912b5f60c3c84cf9b0d560a39434a2b9",
+            "execution_nonce": "fc1ebe00c35045328c742da02a926706",
             "execution_status": "COMPLETED",
             "failure_detail": null,
             "final_snapshot": {
@@ -2914,70 +2914,70 @@
             },
             "integrity_status": "VALID",
             "observation": "EXACTLY_ONCE",
-            "parent_capsule_digest": "d624646ef88f6fb2f0c6f81ee2d3766dbb68dc04e1361ff1905b3f178152fcec",
+            "parent_capsule_digest": "4552f5cc3f185f0af8b38d4b7fd005ee7580bfb4b0988d06f55557ee6643334a",
             "post_execution_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
-            "receipt_id": "no-fault-0596a07e021a4199ac4be5aa349a5168",
+            "receipt_id": "no-fault-5c6e58f5fc294d3e90bc538e96cb924d",
             "replay_commit_count": 0,
             "replay_operations": [],
             "role": "base",
             "schema_version": "2",
             "spawns": [
               {
-                "ended_at": "2026-09-05T08:30:48.630908Z",
+                "ended_at": "2026-09-05T08:46:29.849215Z",
                 "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
                 "exit_code": 0,
-                "ipc_session_id": "2748ea5dea7d4cde9d8feb1c818b77ab",
+                "ipc_session_id": "66905ea79281416c954b5a603e7a3c64",
                 "phase": "first",
-                "pid": 64384,
-                "process_group_id": 64384,
+                "pid": 74200,
+                "process_group_id": 74200,
                 "spawn_index": 1,
-                "started_at": "2026-09-05T08:30:48.514864Z",
+                "started_at": "2026-09-05T08:46:29.732951Z",
                 "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
                 "stderr_excerpt": "",
                 "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "stdout_excerpt": "",
-                "worker_nonce": "5528ee3a846444c980f36b7e5d064cba"
+                "worker_nonce": "d0f4a798c03d48cba2ac4bd9a4416293"
               },
               {
-                "ended_at": "2026-09-05T08:30:48.744253Z",
+                "ended_at": "2026-09-05T08:46:29.962367Z",
                 "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
                 "exit_code": 0,
-                "ipc_session_id": "fd10c392d7f44098b58e929d53744d19",
+                "ipc_session_id": "b6e44a767c7d42f096e7eec91f79036c",
                 "phase": "replay",
-                "pid": 64388,
-                "process_group_id": 64388,
+                "pid": 74203,
+                "process_group_id": 74203,
                 "spawn_index": 2,
-                "started_at": "2026-09-05T08:30:48.632699Z",
+                "started_at": "2026-09-05T08:46:29.850960Z",
                 "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
                 "stderr_excerpt": "",
                 "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "stdout_excerpt": "",
-                "worker_nonce": "c3186e2e91fd4cb1bf3cba227dc687e9"
+                "worker_nonce": "3217dda538aa4bebbed4420b154c08d9"
               }
             ],
-            "started_at": "2026-09-05T08:30:48.507301Z",
+            "started_at": "2026-09-05T08:46:29.726808Z",
             "transport": "LOCAL",
             "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
           }
         ],
         "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
         "deletion_accepted": false,
-        "digest": "8129ef18565abe2fd924189ffefd2ff77c4708e18bd766e28f5dae8155866b87",
+        "digest": "983157c6e23be081621d2ed863116e4381648886d57b82bfd12ef228689a072a",
         "empty_schedule_reproduced_duplicate": false,
         "originating_base_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
-        "parent_capsule_digest": "d624646ef88f6fb2f0c6f81ee2d3766dbb68dc04e1361ff1905b3f178152fcec",
+        "parent_capsule_digest": "4552f5cc3f185f0af8b38d4b7fd005ee7580bfb4b0988d06f55557ee6643334a",
         "parent_schedule": [
           "effect-commit"
         ],
         "removed_fault": "effect-commit",
         "schema_version": "2",
         "sole_fault_action_necessary_for_fixture": true,
-        "trace_digest": "9b0afc1eabed5169f43102c5cd7311efcf816b18c07ab001c6670ae9022fc453"
+        "trace_digest": "cffdf35983e4a2ca1e25867bf212004b1821be100d53e00bbc404336e78392ea"
       }
     ],
-    "run_id": "local-20260905T083048-803ee878",
+    "run_id": "local-20260905T084629-5830de69",
     "schema_version": "1",
-    "started_at": "2026-09-05T08:30:48.275408Z",
+    "started_at": "2026-09-05T08:46:29.491883Z",
     "summary": "The candidate replayed evt_1042 to a durable +$50 duplicate effect.",
     "sweeps": [
       {
@@ -2985,7 +2985,7 @@
           {
             "amount_cents": 2500,
             "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
-            "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+            "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
             "checkpoint_reached": true,
             "checkpoint_snapshot": {
               "account_balance_cents": 2500,
@@ -2995,12 +2995,12 @@
               "event_marker_count": 1
             },
             "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-            "database_id": "db-5d64d36c73474080bc58fe68f690b96b",
-            "digest": "58e089c20cce3e78df7daeaa926d008e8e61c4d15a69ffe2ad59b010ef7d7788",
-            "ended_at": "2026-09-05T08:30:49.973789Z",
-            "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+            "database_id": "db-5bb24ca83ac64711a648e04bc2f550b8",
+            "digest": "99be8e7e0ca7bbd3798ab54fcaf788618e452e602d7aa85d2ff76395eb7fd468",
+            "ended_at": "2026-09-05T08:46:31.240864Z",
+            "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
             "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-            "execution_nonce": "3e352bd9536f4411abacec932f5af11b",
+            "execution_nonce": "ea0180a452b7483ea763f648dd336cdd",
             "execution_status": "COMPLETED",
             "failure_detail": null,
             "final_snapshot": {
@@ -3036,100 +3036,100 @@
             },
             "provider_image_id": null,
             "provider_operation_id": null,
-            "receipt_id": "attempt-104f4d2ef6e745fe93749e979e378ccd",
+            "receipt_id": "attempt-82600486c26e418bb293f2c3bd487ca8",
             "replay_acknowledged": true,
             "role": "corrected",
             "schema_version": "1",
             "spawns": [
               {
-                "ended_at": "2026-09-05T08:30:49.861737Z",
+                "ended_at": "2026-09-05T08:46:31.125765Z",
                 "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
                 "exit_code": -9,
-                "ipc_session_id": "4e7baddee4a743e4b89e789f4bfcc21f",
+                "ipc_session_id": "dbff45a8cf7c4badb4fc0d3d7806634e",
                 "phase": "first",
-                "pid": 64422,
-                "process_group_id": 64422,
+                "pid": 74237,
+                "process_group_id": 74237,
                 "spawn_index": 1,
-                "started_at": "2026-09-05T08:30:49.772355Z",
+                "started_at": "2026-09-05T08:46:31.035206Z",
                 "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
                 "stderr_excerpt": "",
                 "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "stdout_excerpt": "",
-                "worker_nonce": "6e22a2f586764e59bc9107aedb19742d"
+                "worker_nonce": "2745f1d05b12415999eb3355386a4aa9"
               },
               {
-                "ended_at": "2026-09-05T08:30:49.972742Z",
+                "ended_at": "2026-09-05T08:46:31.239643Z",
                 "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
                 "exit_code": 0,
-                "ipc_session_id": "f629cbf0ba73443d972c3c79341b0124",
+                "ipc_session_id": "985dc0010fed455bac1a7e090c319bb5",
                 "phase": "replay",
-                "pid": 64423,
-                "process_group_id": 64423,
+                "pid": 74238,
+                "process_group_id": 74238,
                 "spawn_index": 2,
-                "started_at": "2026-09-05T08:30:49.863422Z",
+                "started_at": "2026-09-05T08:46:31.127726Z",
                 "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
                 "stderr_excerpt": "",
                 "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "stdout_excerpt": "",
-                "worker_nonce": "c301ca1c39334b6ebe5e64c09c157cb8"
+                "worker_nonce": "563f141bf8d3457e86865b6ffb13fa01"
               }
             ],
-            "started_at": "2026-09-05T08:30:49.766929Z",
+            "started_at": "2026-09-05T08:46:31.029639Z",
             "timeline": [
               {
                 "detail": "",
                 "state": "PREFLIGHT",
-                "timestamp": "2026-09-05T08:30:49.766929Z"
+                "timestamp": "2026-09-05T08:46:31.029639Z"
               },
               {
-                "detail": "db-5d64d36c73474080bc58fe68f690b96b",
+                "detail": "db-5bb24ca83ac64711a648e04bc2f550b8",
                 "state": "DATABASE_SEEDED",
-                "timestamp": "2026-09-05T08:30:49.770464Z"
+                "timestamp": "2026-09-05T08:46:31.033267Z"
               },
               {
                 "detail": "",
                 "state": "PRE_CRASH_PROBED",
-                "timestamp": "2026-09-05T08:30:49.770659Z"
+                "timestamp": "2026-09-05T08:46:31.033428Z"
               },
               {
-                "detail": "64422",
+                "detail": "74237",
                 "state": "FIRST_WORKER_STARTED",
-                "timestamp": "2026-09-05T08:30:49.772561Z"
+                "timestamp": "2026-09-05T08:46:31.035410Z"
               },
               {
                 "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
                 "state": "CHECKPOINT_REACHED",
-                "timestamp": "2026-09-05T08:30:49.860178Z"
+                "timestamp": "2026-09-05T08:46:31.124200Z"
               },
               {
                 "detail": "-9",
                 "state": "WORKER_KILLED",
-                "timestamp": "2026-09-05T08:30:49.861740Z"
+                "timestamp": "2026-09-05T08:46:31.125767Z"
               },
               {
                 "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
                 "state": "POST_KILL_PROBED",
-                "timestamp": "2026-09-05T08:30:49.861919Z"
+                "timestamp": "2026-09-05T08:46:31.126089Z"
               },
               {
-                "detail": "64423",
+                "detail": "74238",
                 "state": "REPLAY_WORKER_STARTED",
-                "timestamp": "2026-09-05T08:30:49.863603Z"
+                "timestamp": "2026-09-05T08:46:31.127934Z"
               },
               {
                 "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
                 "state": "EVENT_REPLAYED",
-                "timestamp": "2026-09-05T08:30:49.973256Z"
+                "timestamp": "2026-09-05T08:46:31.240312Z"
               },
               {
                 "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
                 "state": "FINAL_STATE_PROBED",
-                "timestamp": "2026-09-05T08:30:49.973266Z"
+                "timestamp": "2026-09-05T08:46:31.240320Z"
               },
               {
                 "detail": "EXACTLY_ONCE",
                 "state": "COMPLETE",
-                "timestamp": "2026-09-05T08:30:49.973789Z"
+                "timestamp": "2026-09-05T08:46:31.240864Z"
               }
             ],
             "transport": "LOCAL",
@@ -3137,17 +3137,17 @@
           }
         ],
         "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
-        "capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+        "capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
         "census": {
           "amount_cents": 2500,
           "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
           "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
-          "database_id": "db-18232b54036347dbba79f87154b6ef57",
-          "digest": "e988be53dfb81ebce0bbd09644b13ad948acb06ab52b2013c808e41d4ed435f4",
-          "ended_at": "2026-09-05T08:30:49.766258Z",
-          "environment_digest": "5566630881086ba8a8d7dbecefdfff1dd01748218d9e60ef96b2d4b3a9361d18",
+          "database_id": "db-74375ac2ebe54ad99cef05e5c99ac66d",
+          "digest": "b706e59d9ed6f4a146f10490dc0dca64bead9a282cc3194c6381702474363e01",
+          "ended_at": "2026-09-05T08:46:31.028974Z",
+          "environment_digest": "b9da475de5a9021faa7e1cadde46b12c5313ac8278d8b94f79cc5a4f0784e9d9",
           "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
-          "execution_nonce": "1759f340a27a4049bf6e998c8e07b4e5",
+          "execution_nonce": "f8add2e324514ec382938772beef457f",
           "execution_status": "COMPLETED",
           "failure_detail": null,
           "final_snapshot": {
@@ -3179,52 +3179,52 @@
           },
           "integrity_status": "VALID",
           "observation": "EXACTLY_ONCE",
-          "parent_capsule_digest": "0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6",
+          "parent_capsule_digest": "41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c",
           "post_execution_tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de",
-          "receipt_id": "no-fault-9320700f8efb427293562deb668c488d",
+          "receipt_id": "no-fault-1c9dee2f30424b52a2a28bea4e244be7",
           "replay_commit_count": 0,
           "replay_operations": [],
           "role": "corrected",
           "schema_version": "2",
           "spawns": [
             {
-              "ended_at": "2026-09-05T08:30:49.653643Z",
+              "ended_at": "2026-09-05T08:46:30.919306Z",
               "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
               "exit_code": 0,
-              "ipc_session_id": "6cbf28317f3f46a5b47dc22816cf6a88",
+              "ipc_session_id": "2ad8d409a619418f87cb6b2224247ef9",
               "phase": "first",
-              "pid": 64420,
-              "process_group_id": 64420,
+              "pid": 74235,
+              "process_group_id": 74235,
               "spawn_index": 1,
-              "started_at": "2026-09-05T08:30:49.540276Z",
+              "started_at": "2026-09-05T08:46:30.808138Z",
               "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
               "stderr_excerpt": "",
               "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
               "stdout_excerpt": "",
-              "worker_nonce": "0dd7ba05d9704d1cac802bdfc5e73c7f"
+              "worker_nonce": "082c9eb9fc7d4476b6cbf8e51ef973fd"
             },
             {
-              "ended_at": "2026-09-05T08:30:49.765291Z",
+              "ended_at": "2026-09-05T08:46:31.027774Z",
               "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
               "exit_code": 0,
-              "ipc_session_id": "15481ef19cc64ae890a800c7979f4938",
+              "ipc_session_id": "0ee1a8463d3244b2812f4473c0c1e7e3",
               "phase": "replay",
-              "pid": 64421,
-              "process_group_id": 64421,
+              "pid": 74236,
+              "process_group_id": 74236,
               "spawn_index": 2,
-              "started_at": "2026-09-05T08:30:49.655523Z",
+              "started_at": "2026-09-05T08:46:30.921418Z",
               "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
               "stderr_excerpt": "",
               "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
               "stdout_excerpt": "",
-              "worker_nonce": "62fd2f4a76844cc5b2824b3e4969d9f1"
+              "worker_nonce": "2edc1c59b3224e22aff030779a731711"
             }
           ],
-          "started_at": "2026-09-05T08:30:49.534597Z",
+          "started_at": "2026-09-05T08:46:30.802657Z",
           "transport": "LOCAL",
           "tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de"
         },
-        "digest": "f71a5f3a0005e5fefd1ec1022aac6aef1bc6ea5a04f643a6ccd97a7421247392",
+        "digest": "e9ba3fda74634d278947d0171cd72f448ff45fa5410d5f733159ce67a5474652",
         "observation": "EXACTLY_ONCE",
         "role": "corrected",
         "schema_version": "1"

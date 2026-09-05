@@ -1,8 +1,8 @@
 # Proof ledger
 
 This ledger separates observed behavior from transport and product claims. The committed evidence
-was executed from clean source `e4ad2d9116816a51b178687b92debbcfbbee2548` on 2026-09-05 at engine
-`6f733e24221930ccc6f39f10055b4b627ca627836e144218db2217cf4b04c876` and published by the commit
+was executed from clean source `305667621ef62b49523d35a65491dafbf1e779ef` on 2026-09-05 at engine
+`99ef8ade38b4616013c2d68ca9b1e8179041bf6b03aae0a58ef54928a59e1c22` and published by the commit
 that follows it on `overnight/hardening`. Later commits may change engine bytes (the current engine
 code digest is `99ef8ade38b4616013c2d68ca9b1e8179041bf6b03aae0a58ef54928a59e1c22`); when they do,
 `tests/test_static_hero.py` checks the committed receipts structurally rather than against the live
@@ -17,9 +17,9 @@ prints its own capsule and engine digests and is never relabelled.
 | Exact anchor mapping | `VERIFIED` | Unique mappings bind exact tree digests; zero, multiple, and invalid (async or wrong-arity) supported mappings publish `EVIDENCE_INCOMPLETE` plus `anchor-resolution.json`, each exercised through `check`. |
 | No-crash control (the base's duplicate needs the crash) | `VERIFIED` | 2/2 fresh no-kill base deliveries are `EXACTLY_ONCE`; the receipt still carries the older field name `sole_fault_action_necessary_for_fixture`. |
 | Base/candidate/corrected verdicts | `LOCAL` / `FIXTURE` / `VALID` | Five fresh valid worlds per role: buggy and misleading-green duplicate; atomic completes exactly once, and its commit sweep (census `credit_and_mark`, one kill point) ends exactly once. |
-| Repro Capsule | `VERIFIED` | Capsule `0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6`, engine digest `6f733e24…`, exact event/environment/seed/tree identities. |
+| Repro Capsule | `VERIFIED` | Capsule `41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c`, engine digest `99ef8ade…`, exact event/environment/seed/tree identities. |
 | Installed-wheel replay and regression | `VERIFIED` | External temp install: base/candidate/corrected replay exits `1`/`1`/`0`; exported regression fails candidate and passes atomic. In-suite: base-role replay yields `BUG_REPRODUCED`, a fixed tree under `--role base` is `EVIDENCE_INCOMPLETE`, and an over-crediting candidate is `INVARIANT_FAILED`, never proven. |
-| Measured benchmark | `LOCAL` / `FIXTURE` | Result `293e5b397021878ae57cc560c08663e9b29dee25361184ab7015a3bd6b7807ae`; strict schema/digest validation passes. |
+| Measured benchmark | `LOCAL` / `FIXTURE` | Result `fe98afd23f5a5bf3b5cf72a52a42558f2fb6d32ef848392fbc7f6dd26b51f8ef`; strict schema/digest validation passes. |
 | Static one-minute viewer | `LOCAL` / `FIXTURE` | Verdict-first five-beat viewer with stepped replay and a pinned `LOCAL` / `FIXTURE` bar, exact receipt bindings, fail-closed runtime, and explicit “Replay fixture evidence” control. |
 | Project gates | `VERIFIED` | Locked sync, formatting, Ruff, mypy, 364 local tests, sdist, and wheel pass. |
 | GitHub composite Action | `VERIFIED_WITH_BOUNDARY` | Exact-SHA CI executes `uses: ./`, expected candidate rejection, artifact validation, installed-wheel smoke, and corrected replay. The copyable workflow pins engine `f05ae921…`. Not exercised by CI: remote-action download, real upload transfer, and the action's Git-ref branch (resolving `base` to a commit SHA and reading the base-owned `.nemisis/config.json`), which every real pull request takes; that branch is covered only by the Python-level Git materialization tests. |
@@ -52,9 +52,9 @@ is represented as `LIVE` or `RECORDED_LIVE`.
 
 - [measured benchmark](../benchmarks/results/crashcheck-v1.json)
 - [viewer](assets/crashcheck-hero/index.html)
-- [run manifest](assets/crashcheck-hero/runs/local-20260905T083048-803ee878/manifest.json)
-- [full receipt](assets/crashcheck-hero/runs/local-20260905T083048-803ee878/report.html)
-- [capsule](assets/crashcheck-hero/repros/double-credit/0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6/capsule.json)
+- [run manifest](assets/crashcheck-hero/runs/local-20260905T084629-5830de69/manifest.json)
+- [full receipt](assets/crashcheck-hero/runs/local-20260905T084629-5830de69/report.html)
+- [capsule](assets/crashcheck-hero/repros/double-credit/41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c/capsule.json)
 - [live prerequisites](LIVE_RUNBOOK.md)
 - [turnkey live setup](LIVE_SETUP.md)
 - [screenshots and recording](assets/screenshots/)

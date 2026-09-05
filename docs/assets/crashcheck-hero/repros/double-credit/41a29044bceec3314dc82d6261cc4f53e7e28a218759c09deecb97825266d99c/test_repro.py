@@ -1,6 +1,6 @@
 """Nemisis integration/fault regression.
 
-Capsule: 0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6
+Capsule: 41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c
 This test requires the trusted Nemisis process-kill runner; it is not a unit test.
 """
 

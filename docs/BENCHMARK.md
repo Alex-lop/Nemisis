@@ -1,7 +1,7 @@
 # CrashCheck benchmark
 
 Status: measured `LOCAL` / `FIXTURE` evidence generated on 2026-09-05 from clean source commit
-`e4ad2d9116816a51b178687b92debbcfbbee2548`. The result is
+`305667621ef62b49523d35a65491dafbf1e779ef`. The result is
 [`benchmarks/results/crashcheck-v1.json`](../benchmarks/results/crashcheck-v1.json).
 
 This benchmark compares ordinary green checks with the real process-kill counterexample for the
@@ -25,9 +25,9 @@ fresh confirmation worlds are required for each base, candidate, and corrected r
 
 | Variant | Existing test | Sequential duplicate | CrashCheck | Valid worlds | CrashCheck wall |
 | --- | --- | --- | --- | ---: | ---: |
-| `buggy` | PASS (1/1, 119.896 ms) | PASS / exactly once (1.111 ms) | `DUPLICATE_EFFECT` | 5/5 | 258.938 ms |
-| `misleading-green` | PASS (1/1, 99.467 ms) | PASS / exactly once (0.547 ms) | `DUPLICATE_EFFECT` | 5/5 | 270.135 ms |
-| `atomic` | PASS (1/1, 88.632 ms) | PASS / exactly once (0.481 ms) | `EXACTLY_ONCE` | 5/5 | 257.787 ms |
+| `buggy` | PASS (1/1, 113.670 ms) | PASS / exactly once (1.192 ms) | `DUPLICATE_EFFECT` | 5/5 | 271.661 ms |
+| `misleading-green` | PASS (1/1, 98.296 ms) | PASS / exactly once (0.576 ms) | `DUPLICATE_EFFECT` | 5/5 | 265.878 ms |
+| `atomic` | PASS (1/1, 98.683 ms) | PASS / exactly once (0.545 ms) | `EXACTLY_ONCE` | 5/5 | 256.213 ms |
 
 The `buggy` and `misleading-green` rows are identical by design: both trees carry the same
 check-then-act guard (`if processed: return`, credit, mark) written two ways, so every ordinary check
@@ -43,21 +43,21 @@ attributed to the crash. (The JSON still names this the deletion trial.)
 
 Measured local timing:
 
-- time to first base witness: 225.325 ms;
-- two-world no-crash control: 239.795 ms;
-- complete CrashCheck portion (including the corrected tree's commit sweep): 1.775 s; and
-- total benchmark: 2.124 s.
+- time to first base witness: 259.309 ms;
+- two-world no-crash control: 238.623 ms;
+- complete CrashCheck portion (including the corrected tree's commit sweep): 1.809 s; and
+- total benchmark: 2.163 s.
 
 Timing is diagnostic only. It came from CPython 3.12.13, SQLite 3.53.1, Pytest 9.1.1, Darwin/arm64;
 host load can change it. No provider latency, concurrency limit, or cost was measured.
 
 ## Exact bindings
 
-- source commit: `e4ad2d9116816a51b178687b92debbcfbbee2548`
+- source commit: `305667621ef62b49523d35a65491dafbf1e779ef`
 - engine code digest: `a9b1227d5c32db9500232be0a161906a23128f7c95d5d9e06c82a26bc34897ad`
-- capsule digest: `0a14b6283f842776be2dd872988d775ed486a20ed796a78afd2f4dc4cb5d29a6`
+- capsule digest: `41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c`
 - event digest: `4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293`
-- result digest: `293e5b397021878ae57cc560c08663e9b29dee25361184ab7015a3bd6b7807ae`
+- result digest: `fe98afd23f5a5bf3b5cf72a52a42558f2fb6d32ef848392fbc7f6dd26b51f8ef`
 
 The evidence commit necessarily follows the clean measured source commit. The JSON retains that
 immediately preceding SHA rather than pretending the unexecuted evidence commit measured itself.
