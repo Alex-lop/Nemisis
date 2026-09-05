@@ -247,24 +247,95 @@ def test_leftover_credit_after_the_atomic_call_is_a_duplicate_not_a_validation_e
     assert cli._exit_code(result.verdict) == 1
 
 
-@pytest.mark.parametrize(
-    ("name", "source"),
-    [("chatty-logger", CHATTY_LOGGER), ("audit-file", AUDIT_FILE)],
-)
-def test_correct_handlers_with_noisy_side_channels_are_still_proven(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, source: str
+def test_a_chatty_correct_handler_is_still_proven(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Red-team false fails: a handler that logs more than one pipe buffer used to block on a
-    full pipe and time out; one that appends a relative audit file used to dirty the bound tree
-    because the worker ran inside it. Neither touches the money."""
+    """Red-team false fail: a handler that logs more than one pipe buffer used to block on a full
+    pipe and time out. Output is drained now, and stdout is not durable state."""
     monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
-    candidate = _tree(tmp_path, name, source)
+    candidate = _tree(tmp_path, "chatty-logger", CHATTY_LOGGER)
 
     result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
 
     assert result.verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE, result.summary
     assert cli._exit_code(result.verdict) == 0
-    assert not list(candidate.rglob("audit.log"))
+
+
+INFLIGHT_FILE_GUARD = """import os
+
+
+def apply_credit(store, event):
+    event_id = event["event_id"]
+    if store.processed(event_id):
+        return
+    inflight = "inflight-" + event_id
+    if os.path.exists(inflight):
+        return
+    with open(inflight, "w") as handle:
+        handle.write("x")
+    store.credit_and_mark(event["account_id"], event_id, event["amount_cents"])
+"""
+
+
+@pytest.mark.parametrize(
+    ("name", "source"),
+    [("audit-file", AUDIT_FILE), ("inflight-guard", INFLIGHT_FILE_GUARD)],
+)
+def test_durable_files_beside_the_database_forfeit_the_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, source: str
+) -> None:
+    """Red team, round two: a dedup file written before the atomic call has a crash window (file
+    written, credit not committed, redelivery skips) that no store-commit kill point can reach, and
+    the sweep blessed it. Any file the handler writes beside the database now forfeits the verdict
+    with a message that says why; an audit log pays the same price because the tool cannot tell
+    them apart. The bound source tree is never touched either way."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, name, source)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert "wrote durable files outside the store" in result.summary
+    assert "cannot be reached" in result.summary
+    boundary = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
+    assert {a.execution_status for a in boundary} == {ExecutionStatus.UNSUPPORTED}
+    assert not list(candidate.rglob("audit.log")) and not list(candidate.rglob("inflight-*"))
+    assert cli._exit_code(result.verdict) == 2
+
+
+MARK_ON_REDELIVERY = """def apply_credit(store, event):
+    event_id = event["event_id"]
+    if store.processed(event_id):
+        return
+    store.credit(event["account_id"], event_id, event["amount_cents"])
+"""
+
+
+def test_a_delivery_that_leaves_the_marker_for_later_fails_the_census(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Red team, round two: a single no-crash delivery must already be exactly once. This handler
+    credits and never marks, so it is caught at the boundary; the census rule is exercised directly
+    on its receipts below."""
+    from nemisis.crash_models import CreditSnapshot, classify_delivery
+
+    once = CreditSnapshot.with_digest(
+        account_balance_cents=2500,
+        event_ledger_count=1,
+        event_ledger_total_cents=2500,
+        event_marker_count=1,
+    )
+    unmarked = CreditSnapshot.with_digest(
+        account_balance_cents=2500,
+        event_ledger_count=1,
+        event_ledger_total_cents=2500,
+        event_marker_count=0,
+    )
+    assert classify_delivery(once, once, 2500) is CrashObservation.EXACTLY_ONCE
+    assert classify_delivery(unmarked, once, 2500) is CrashObservation.INVARIANT_FAILED
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    result = check(BUGGY_REF, _tree(tmp_path, "mark-later", MARK_ON_REDELIVERY), SCENARIO_ID)
+    assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
 
 
 @pytest.mark.parametrize(

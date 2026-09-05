@@ -43,6 +43,7 @@ from nemisis.crash_models import (
     TimelineState,
     WorkerSpawnReceipt,
     WorldRole,
+    classify_delivery,
     classify_final,
 )
 from nemisis.hashing import canonical_json, sha256_bytes, sha256_json, sha256_tree
@@ -391,6 +392,7 @@ def execute_attempt(
                 "source tree changed during trusted execution",
                 integrity=IntegrityStatus.INVALID,
             )
+        _require_only_the_store_wrote(work_dir.resolve(), database)
         observation = _observation(final, capsule.amount_cents)
     except _AttemptFailure as error:
         status, integrity, failure_detail = error.status, error.integrity, error.detail
@@ -533,7 +535,8 @@ def execute_no_fault_replay(
                 "source tree changed during no-fault replay",
                 integrity=IntegrityStatus.INVALID,
             )
-        observation = _observation(final, capsule.amount_cents)
+        _require_only_the_store_wrote(work_dir.resolve(), database)
+        observation = classify_delivery(first_delivery, final, capsule.amount_cents)
     except _AttemptFailure as error:
         status, integrity, failure_detail = error.status, error.integrity, error.detail
     except (OSError, sqlite3.Error, ValueError) as error:
@@ -578,6 +581,29 @@ def execute_no_fault_replay(
         final_snapshot=final,
         failure_detail=failure_detail,
     )
+
+
+def _require_only_the_store_wrote(work_dir: Path, database: Path) -> None:
+    """Refuse handlers that keep durable state beside the database.
+
+    Kill points are store commits. A dedup file or journal written in the worker's directory has
+    crash windows the sweep cannot reach, so such a handler cannot earn a verdict. Writes elsewhere
+    on the machine are outside what local mode can see and are a documented boundary.
+    """
+    expected = {database.name, f"{database.name}-wal", f"{database.name}-shm"}
+    extra = sorted(
+        path.relative_to(work_dir).as_posix()
+        for path in work_dir.rglob("*")
+        if path.name not in expected and not path.is_dir()
+    )
+    if extra:
+        shown = ", ".join(extra[:5]) + (", …" if len(extra) > 5 else "")
+        raise _AttemptFailure(
+            ExecutionStatus.UNSUPPORTED,
+            f"the handler wrote durable files outside the store ({shown}); kill points are store "
+            "commits, so crash windows around that state cannot be reached and no verdict is "
+            "issued",
+        )
 
 
 def _after_cleanup(

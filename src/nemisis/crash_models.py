@@ -297,6 +297,25 @@ class CreditSnapshot(_DigestedModel):
     event_marker_count: int = Field(ge=0, le=1)
 
 
+def classify_delivery(
+    first: CreditSnapshot, final: CreditSnapshot, amount_cents: int
+) -> CrashObservation:
+    """A no-kill run is exactly once only if one delivery already is and the redelivery keeps it.
+
+    A handler that credits on the first delivery and leaves the marker for a redelivery is wrong on
+    the plain path even though the state after two deliveries looks right.
+    """
+    after_redelivery = classify_final(final, amount_cents)
+    if after_redelivery is not CrashObservation.EXACTLY_ONCE:
+        return after_redelivery
+    after_one = classify_final(first, amount_cents)
+    return (
+        CrashObservation.EXACTLY_ONCE
+        if after_one is CrashObservation.EXACTLY_ONCE
+        else CrashObservation.INVARIANT_FAILED
+    )
+
+
 def classify_final(snapshot: CreditSnapshot, amount_cents: int) -> CrashObservation:
     """The only rule that turns a final durable state into an observation."""
     state = _snapshot_state(snapshot)
@@ -514,8 +533,10 @@ class NoFaultReplayReceipt(_DigestedModel):
                 raise ValueError("completed no-fault replay lacks exact two-process evidence")
             if _snapshot_state(self.initial_snapshot) != (0, 0, 0, 0):
                 raise ValueError("no-fault replay did not begin from the seeded state")
-            if self.observation is not classify_final(self.final_snapshot, self.amount_cents):
-                raise ValueError("no-fault replay observation contradicts its final state")
+            if self.observation is not classify_delivery(
+                self.first_delivery_snapshot, self.final_snapshot, self.amount_cents
+            ):
+                raise ValueError("no-fault replay observation contradicts its delivery states")
             if not self.first_delivery_operations:
                 raise ValueError("completed no-fault replay recorded no store commits")
             if self.first_delivery_commit_count < len(self.first_delivery_operations):
@@ -1272,6 +1293,7 @@ __all__ = [
     "ReproCapsule",
     "RetryContract",
     "WorldRole",
+    "classify_delivery",
     "classify_final",
     "effective_observation",
     "sweep_observation",
