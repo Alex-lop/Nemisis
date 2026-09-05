@@ -112,7 +112,9 @@ def test_attributed_probe_accepts_only_the_delta_its_operation_explains(tmp_path
     seeded = _probe(database, event)
 
     # Nothing changed, and mark_processed claims a marker: unattributed.
-    with pytest.raises(_AttemptFailure, match="outside the trusted store") as unattributed:
+    with pytest.raises(
+        _AttemptFailure, match="was not the one mark_processed makes"
+    ) as unattributed:
         _attributed_probe(database, event, seeded, {"operation": "mark_processed"})
     assert unattributed.value.status is ExecutionStatus.INTEGRITY_ERROR
     assert unattributed.value.integrity is IntegrityStatus.INVALID
@@ -128,6 +130,40 @@ def test_attributed_probe_accepts_only_the_delta_its_operation_explains(tmp_path
         connection.commit()
     marked = _attributed_probe(database, event, seeded, {"operation": "mark_processed"})
     assert marked.event_marker_count == 1
+
+
+def test_store_requires_exact_types_and_values(tmp_path: Path) -> None:
+    from nemisis.sqlite_credit import CreditStore
+
+    event = {"account_id": "acct_7", "amount_cents": 2500, "event_id": "evt_1042"}
+    database = tmp_path / "store.sqlite3"
+    _seed_database(database, event)
+    controller, worker = socket.socketpair()
+    store = CreditStore(database, worker, event)
+
+    class Lying(str):
+        def __eq__(self, other: object) -> bool:
+            return True
+
+        def __hash__(self) -> int:
+            return 0
+
+    try:
+        for bad in (
+            lambda: store.mark_processed(None),  # type: ignore[arg-type]
+            lambda: store.processed(Lying("other")),
+            lambda: store.credit(Lying("shadow"), "evt_1042", 2500),
+            lambda: store.credit("acct_7", "evt_1042", True),
+            lambda: store.credit("acct_7", "evt_1042", 2500.0),  # type: ignore[arg-type]
+            lambda: store.credit_and_mark("acct_7", b"evt_1042", 2500),  # type: ignore[arg-type]
+        ):
+            with pytest.raises(ValueError, match="outside the accepted contract"):
+                bad()
+        assert store.processed("evt_1042") is False
+        assert _probe(database, event).event_marker_count == 0
+    finally:
+        controller.close()
+        worker.close()
 
 
 def test_receive_preserves_a_coalesced_second_frame() -> None:

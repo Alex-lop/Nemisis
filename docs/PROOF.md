@@ -4,7 +4,7 @@ This ledger separates observed behavior from transport and product claims. The c
 was executed from clean source `0b29f3381ce3c8188cef521de7726d0b02af55b3` on 2026-09-05 at engine
 `a9b1227d5c32db9500232be0a161906a23128f7c95d5d9e06c82a26bc34897ad` and published by the commit
 that follows it on `overnight/hardening`. Later commits may change engine bytes (the current engine
-code digest is `3f4c7568f58a6ebf172c76a6a69fca590adbc3a99810e65a15baf607790c4732`); when they do,
+code digest is `287fdf46da3717cd82200e8149aa8c7077c961a695347f99c90f6b7f66da279b`); when they do,
 `tests/test_static_hero.py` checks the committed receipts structurally rather than against the live
 strict models, and the hero stays bound to its own engine. A fresh `check` at any later engine
 prints its own capsule and engine digests and is never relabelled.
@@ -21,7 +21,7 @@ prints its own capsule and engine digests and is never relabelled.
 | Installed-wheel replay and regression | `VERIFIED` | External temp install: base/candidate/corrected replay exits `1`/`1`/`0`; exported regression fails candidate and passes atomic. In-suite: base-role replay yields `BUG_REPRODUCED`, a fixed tree under `--role base` is `EVIDENCE_INCOMPLETE`, and an over-crediting candidate is `INVARIANT_FAILED`, never proven. |
 | Measured benchmark | `LOCAL` / `FIXTURE` | Result `9b455bdee94234178b158d513a033924996dca4a6213b1513aa61acdca480973`; strict schema/digest validation passes. |
 | Static one-minute viewer | `LOCAL` / `FIXTURE` | Verdict-first five-beat viewer with stepped replay and a pinned `LOCAL` / `FIXTURE` bar, exact receipt bindings, fail-closed runtime, and explicit “Replay fixture evidence” control. |
-| Project gates | `VERIFIED` | Locked sync, formatting, Ruff, mypy, 350 local tests, sdist, and wheel pass. |
+| Project gates | `VERIFIED` | Locked sync, formatting, Ruff, mypy, 353 local tests, sdist, and wheel pass. |
 | GitHub composite Action | `VERIFIED_WITH_BOUNDARY` | Exact-SHA CI executes `uses: ./`, expected candidate rejection, artifact validation, installed-wheel smoke, and corrected replay. The copyable workflow pins engine `f05ae921…`. Not exercised by CI: remote-action download, real upload transfer, and the action's Git-ref branch (resolving `base` to a commit SHA and reading the base-owned `.nemisis/config.json`), which every real pull request takes; that branch is covered only by the Python-level Git materialization tests. |
 | Nemotron as coding agent (`propose-patch`) | `MOCKED` / `BLOCKED` | Wired into the CLI, the candidate tree (`.nemisis/agent-patch.json`), the check manifest, and the report; injected-client tests prove the prompt is checker-blind, unsafe modules write nothing, a model-written fix is proven, and a model-written mark-first patch fails the commit sweep. No `NEBIUS_API_KEY` here, so no `LIVE` authorship receipt. |
 | Commit sweep and red-team zoo | `LOCAL` / `FIXTURE` / `VERIFIED` | Every claimed fix is killed once after each of its store commits; three red-team handlers that fooled or nearly fooled the earlier engine are packaged as `fixture:sqlite-credit-v1/{mark-first,leftover-credit,never-marks}` with pinned verdicts. |

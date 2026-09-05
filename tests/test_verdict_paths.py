@@ -366,8 +366,8 @@ def test_candidate_that_never_marks_still_duplicates_and_fails(
 @pytest.mark.parametrize(
     ("name", "source", "detail"),
     [
-        ("direct-sql", DIRECT_SQL_EFFECT, "mark_processed reported, but the database moved"),
-        ("drift", DRIFT_AFTER_LAST_COMMIT, "after its last reported commit"),
+        ("direct-sql", DIRECT_SQL_EFFECT, "the durable change after mark_processed was not"),
+        ("drift", DRIFT_AFTER_LAST_COMMIT, "after the worker's last reported store commit"),
     ],
 )
 def test_effects_committed_outside_the_trusted_store_are_an_integrity_failure(
@@ -385,12 +385,60 @@ def test_effects_committed_outside_the_trusted_store_are_an_integrity_failure(
 
     assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
     assert result.integrity_status.value == "INVALID"
-    assert "outside the trusted store" in result.summary
+    assert "around the trusted store" in result.summary
     assert detail in result.summary
     candidate_attempts = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
     assert len(candidate_attempts) == 5
     assert all(a.execution_status is ExecutionStatus.INTEGRITY_ERROR for a in candidate_attempts)
     assert cli._exit_code(result.verdict) == 2
+
+
+LYING_STR_ACCOUNT = """class Acct(str):
+    def __eq__(self, other):
+        return True
+
+    def __hash__(self):
+        return 0
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(Acct("acct_shadow"), event["event_id"], event["amount_cents"])
+"""
+
+NULL_MARKER = """def apply_credit(store, event):
+    event_id = event["event_id"]
+    if store.processed(event_id):
+        return
+    store.credit(event["account_id"], event_id, event["amount_cents"])
+    store.mark_processed(None)
+"""
+
+
+@pytest.mark.parametrize(
+    ("name", "source", "status"),
+    [
+        ("lying-str", LYING_STR_ACCOUNT, ExecutionStatus.CHECKPOINT_NOT_REACHED),
+        ("null-marker", NULL_MARKER, ExecutionStatus.REPLAY_ERROR),
+    ],
+)
+def test_store_refuses_look_alike_arguments_instead_of_writing_them(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, source: str, status: ExecutionStatus
+) -> None:
+    """Red team, round two: a str subclass with a lying __eq__ used to bind a shadow account into
+    the store's own SQL, and mark_processed(None) used to commit a NULL marker row. Both were then
+    blamed on 'writes outside the trusted store'. The store now rejects them as ValueErrors."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, name, source)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    candidate_attempts = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
+    assert {a.execution_status for a in candidate_attempts} == {status}
+    assert result.integrity_status.value == "INCOMPLETE"
+    assert "outside the trusted store" not in result.summary
 
 
 def test_replay_base_role_can_reproduce_but_never_prove_a_fix(

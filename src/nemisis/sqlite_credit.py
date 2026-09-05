@@ -911,7 +911,8 @@ def _finish_replay(
     if final.digest != previous.digest:
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
-            "durable state changed outside the trusted store after its last reported commit",
+            "the database changed after the worker's last reported store commit; something wrote "
+            "around the trusted store (an exit hook, a thread, a child, or a direct connection)",
             integrity=IntegrityStatus.INVALID,
         )
     return final
@@ -960,11 +961,14 @@ def _attributed_probe(
         snapshot.event_marker_count - previous.event_marker_count,
     )
     if observed != expected(amount):
+        wanted = expected(amount)
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
-            f"durable state changed outside the trusted store: {operation} reported, but the "
-            f"database moved by balance {observed[0]:+d}, ledger rows {observed[1]:+d}, "
-            f"marker {observed[3]:+d}",
+            f"the durable change after {operation} was not the one {operation} makes: the probe "
+            f"saw balance {observed[0]:+d}, ledger rows {observed[1]:+d}, marker {observed[3]:+d} "
+            f"for this event, not balance {wanted[0]:+d}, ledger rows {wanted[1]:+d}, marker "
+            f"{wanted[3]:+d}; either something wrote around the trusted store or a store call "
+            "was made with values that are not this event's",
             integrity=IntegrityStatus.INVALID,
         )
     return snapshot
@@ -1098,6 +1102,9 @@ def _entry(state: TimelineState, detail: str = "") -> TimelineEntry:
     return TimelineEntry(state=state, timestamp=datetime.now(UTC), detail=detail)
 
 
+_UNSET: object = object()
+
+
 class CreditStore:
     """Fixed trusted store exposed to the candidate handler."""
 
@@ -1161,14 +1168,23 @@ class CreditStore:
 
     def _require(
         self,
-        account_id: str | None = None,
-        event_id: str | None = None,
-        amount_cents: int | None = None,
+        account_id: object = _UNSET,
+        event_id: object = _UNSET,
+        amount_cents: object = _UNSET,
     ) -> None:
+        """Every supplied value must be the event's exact value and exact type.
+
+        ``type(x) is str`` (not ``isinstance``, not ``==``) so a ``str`` subclass with a lying
+        ``__eq__``, an object with ``__conform__``, a ``bool``, or ``None`` cannot smuggle a
+        different row or a NULL into the trusted store's own SQL.
+        """
+        expected = self._event
         checks = (
-            account_id is None or account_id == self._event["account_id"],
-            event_id is None or event_id == self._event["event_id"],
-            amount_cents is None or amount_cents == self._event["amount_cents"],
+            account_id is _UNSET
+            or (type(account_id) is str and account_id == expected["account_id"]),
+            event_id is _UNSET or (type(event_id) is str and event_id == expected["event_id"]),
+            amount_cents is _UNSET
+            or (type(amount_cents) is int and amount_cents == expected["amount_cents"]),
         )
         if not all(checks):
             raise ValueError("handler attempted an event outside the accepted contract")
