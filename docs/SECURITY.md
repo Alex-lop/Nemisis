@@ -67,6 +67,15 @@ because the kill point could no longer be trusted to sit where the money moved. 
 forges the IPC message on the store's private channel is hostile code, which local mode does not
 claim to contain.
 
+Kill points are store commits, and only store commits. A handler that keeps its own durable
+state (a dedup file, a second database, a journal written before the credit) has crash windows the
+commit sweep cannot reach, because nothing tells the controller those writes happened. CrashCheck
+does not claim to find them; it proves exactly-once across every store commit the handler makes.
+Every world the handler runs in is named by an opaque identifier, so a handler cannot tell a census
+delivery from a kill world. It can still tell that it is inside CrashCheck (the store object is in
+its hands), which is the boundary of in-process instrumentation: a handler that is correct only
+when it detects the harness is hostile code, and local mode assumes a trusted checkout.
+
 Exactly one trusted, tree-bound `AnchorBinding` must validate. Candidate output cannot acknowledge
 success or authorize an anchor.
 

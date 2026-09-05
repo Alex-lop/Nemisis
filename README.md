@@ -143,7 +143,9 @@ kill/restart/replay kernel is not tied to credits, but today's catalog is.
 - Never lets a model near the verdict. Models write patches or propose catalog IDs; deterministic
   code owns probes, kill points, and decisions.
 - Not a sandbox. Local mode is for a trusted checkout; the GitHub Action refuses fork PRs until
-  the kernel runs inside a Token Factory Sandbox.
+  the kernel runs inside a Token Factory Sandbox. Kill points are store commits, so durable state a
+  handler keeps outside the store (a dedup file, another database) has windows CrashCheck cannot
+  reach, and says so.
 
 ## Verify the project
 
