@@ -396,6 +396,18 @@ def check(
         sweeps: list[CommitSweepReceipt] = []
         candidate_observation = _confirmed_observation(candidate_attempts, capsule)
         if candidate_observation is CrashObservation.NOT_OBSERVED:
+            # The crash test could not run. If that is because the handler never reached the
+            # credit, a no-kill census still tells the user what the money did.
+            if _never_reached_checkpoint(candidate_attempts):
+                sweeps.append(
+                    _execute_sweep(
+                        capsule,
+                        candidate_binding,
+                        candidate_source.path,
+                        root / "candidate-sweep",
+                        WorldRole.CANDIDATE,
+                    )
+                )
             return publish(
                 run_id,
                 started_at,
@@ -404,9 +416,10 @@ def check(
                 tuple(bindings),
                 tuple(attempts),
                 CrashVerdict.EVIDENCE_INCOMPLETE,
-                _unsupported_observation_summary(candidate_observation, candidate_attempts),
+                _unreached_summary(candidate_attempts, sweeps[-1] if sweeps else None, capsule),
                 hypothesis_receipts=hypothesis_receipts,
                 minimization_receipts=minimization_receipts,
+                sweeps=tuple(sweeps),
             )
         candidate_sweep: CommitSweepReceipt | None = None
         if candidate_observation is CrashObservation.EXACTLY_ONCE:
@@ -1269,6 +1282,38 @@ def _claimed_fix_verdict(
     if sweep is not None and boundary is CrashObservation.EXACTLY_ONCE:
         return CrashVerdict.EVIDENCE_INCOMPLETE, _sweep_summary(sweep, capsule)
     return CrashVerdict.EVIDENCE_INCOMPLETE, _unsupported_observation_summary(observation, attempts)
+
+
+def _never_reached_checkpoint(attempts: tuple[AttemptReceipt, ...]) -> bool:
+    return bool(attempts) and all(
+        attempt.execution_status is ExecutionStatus.CHECKPOINT_NOT_REACHED for attempt in attempts
+    )
+
+
+def _unreached_summary(
+    attempts: tuple[AttemptReceipt, ...], sweep: CommitSweepReceipt | None, capsule: ReproCapsule
+) -> str:
+    base = _unsupported_observation_summary(CrashObservation.NOT_OBSERVED, attempts)
+    if sweep is None:
+        return base
+    census = sweep.census
+    if census.final_snapshot is not None:
+        observed = (
+            f"Delivering {capsule.event_id} twice with no crash at all ended at "
+            f"{_describe_final(census.final_snapshot, capsule)}"
+        )
+    elif census.first_delivery_snapshot is not None:
+        redelivery = census.failure_detail or "the redelivery did not complete"
+        observed = (
+            f"Delivering {capsule.event_id} once with no crash at all ended at "
+            f"{_describe_final(census.first_delivery_snapshot, capsule)}, and {redelivery}"
+        )
+    else:
+        return base
+    return (
+        f"{base} {observed}; the crash test could not run because the handler never reached the "
+        "credit, so this is reported, not judged."
+    )
 
 
 def _sweep_summary(sweep: CommitSweepReceipt, capsule: ReproCapsule) -> str:

@@ -117,6 +117,11 @@ AUDIT_FILE = """def apply_credit(store, event):
     store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
 """
 
+MARK_THEN_ATOMIC = """def apply_credit(store, event):
+    store.mark_processed(event["event_id"])
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
 THREE_ARGUMENT = """def apply_credit(store, event, extra=None):
     store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
 """
@@ -289,6 +294,31 @@ def test_packaged_zoo_variants_get_the_verdict_they_earned(
     assert result.verdict is verdict, result.summary
     assert fragment in result.summary, result.summary
     assert cli._exit_code(result.verdict) == 1
+
+
+def test_handler_that_never_credits_is_reported_with_its_no_crash_money(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The kill point is never reached, so there is no crash verdict; the census still says what
+    the money did with no crash at all, and the receipt carries it."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "mark-then-atomic", MARK_THEN_ATOMIC)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert "without ever committing the credit" in result.summary
+    assert "$0.00 instead of $25.00" in result.summary
+    assert "never credited" in result.summary
+    assert "reported, not judged" in result.summary
+    sweep = result.sweeps[0]
+    assert sweep.role is WorldRole.CANDIDATE
+    assert sweep.census.first_delivery_operations == ("mark_processed",)
+    first = sweep.census.first_delivery_snapshot
+    assert first is not None and (first.account_balance_cents, first.event_marker_count) == (0, 1)
+    # The redelivery marks the event a second time and raises, so the census itself is incomplete.
+    assert sweep.census.execution_status is ExecutionStatus.REPLAY_ERROR
+    assert cli._exit_code(result.verdict) == 2
 
 
 def test_worlds_that_disagree_are_named_not_averaged() -> None:
