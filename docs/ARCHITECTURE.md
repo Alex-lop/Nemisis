@@ -30,6 +30,7 @@ the claim matrix. Its Python surface is:
 ```python
 initialize(issue, target, base, scenario_id) -> Path
 propose_contract(issue, target, base, scenario_id, client=None) -> ContractProposal
+propose_patch(issue, base, output, scenario_id, client=None) -> PatchProposal
 check(base, candidate, scenario, corrected=None, mode="local") -> CrashCheckResult
 replay(capsule, source, role="candidate", mode="local") -> CrashCheckResult
 ```
@@ -41,6 +42,12 @@ The core records are:
 - `ContractProposal`: the candidate-blind Nemotron receipt for a draft: offered and proposed catalog
   IDs, audited and proposed `amount_cents`, the fixed accept/refuse decision, and the sanitized
   `ModelCallReceipt`. Provenance only; it is outside the capsule address.
+- `PatchProposal`: the receipt for a candidate tree whose handler Nemotron wrote (`propose-patch`):
+  base and candidate tree digests, module digest, rationale, and the sanitized `ModelCallReceipt`.
+  It lives at `.nemisis/agent-patch.json` inside the candidate tree, is excluded from the tree
+  digest, and is attached to a `check` only when it binds that exact tree.
+- `CommitSweepReceipt`: for a claimed fix, the census delivery's commit schedule plus one kill
+  world per commit; `FIX_PROVEN_FOR_THIS_CAPSULE` requires all of them to end exactly once.
 - `AnchorBinding`: handler mapping plus supplied source ref, resolved source identity, and exact tree
   digest.
 - `HypothesisReceipt`: one candidate-blind base attempt, its fixed crash boundary and canonical

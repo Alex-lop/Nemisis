@@ -53,6 +53,20 @@ The bounded Nemotron contract adapter may select only audited catalog IDs and in
 `init --nemotron` puts it on the CrashCheck CLI path as provenance for a draft; see the decision
 below. No live generation is claimed until a genuine receipt exists.
 
+## Nemotron plays the coding agent, never the judge
+
+The thesis is that AI-written retry patches look green and still lose money. The honest,
+load-bearing job for NVIDIA's model is therefore to write the patch. `nemisis propose-patch`
+gives Nemotron the bug report, the base module, and the storage API, and nothing else: no kill
+points, no catalog, no verdict rules. Its module is accepted only after deterministic AST checks
+(one synchronous `(store, event)` handler, `typing` imports only, no private attributes, no
+dangerous builtins) and is then an ordinary candidate tree. The authorship receipt is provenance in
+the manifest and report; the verdict comes from executing the tree. This keeps the authority model
+intact: the model proposes the thing under test, deterministic code decides what happened to it.
+
+Without a `NEBIUS_API_KEY` the command exits `2` and writes nothing. Injected clients yield a
+`MOCKED` receipt, which the report labels as such. No `LIVE` authorship receipt exists in this tree.
+
 ## Nemotron proposes at init, never at check
 
 The model's one CrashCheck role is to turn the issue and the exact base handler into a typed

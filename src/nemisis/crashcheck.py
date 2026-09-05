@@ -46,6 +46,7 @@ from nemisis.crash_models import (
     IntegrityStatus,
     MinimizationReceipt,
     NoFaultReplayReceipt,
+    PatchProposal,
     ReproCapsule,
     RetryContract,
     TimelineEntry,
@@ -117,6 +118,9 @@ def engine_code_digest() -> str:
     return sha256_json(hashes)
 
 
+AUTHOR_RECEIPT_PATH = Path(".nemisis/agent-patch.json")
+
+
 @dataclass(frozen=True)
 class _Source:
     ref: str
@@ -124,6 +128,7 @@ class _Source:
     tree_digest: str
     resolved_identity: str
     config_bytes: bytes | None
+    author_bytes: bytes | None = None
 
 
 def initialize(issue: str | Path, target: str, base: str | Path, scenario_id: str) -> Path:
@@ -355,6 +360,7 @@ def check(
 
         # Candidate materialization deliberately begins only after the base witness is frozen.
         candidate_source = _materialize_source(candidate, root / "source-candidate")
+        publish = partial(publish, author=_load_author(candidate_source, contract))
         candidate_anchor = _bind_anchor(
             contract,
             candidate_source,
@@ -652,6 +658,24 @@ def _proposal_for_check(
     if isinstance(scenario, RetryContract) or str(scenario) == SCENARIO_ID:
         return None
     return _load_proposal(Path(str(scenario)).with_name("proposal.json"), contract)
+
+
+def _load_author(source: _Source, contract: RetryContract) -> PatchProposal | None:
+    """Attach the Nemotron authorship receipt only when it binds this exact candidate tree."""
+    if source.author_bytes is None:
+        return None
+    if len(source.author_bytes) > MAX_CONFIG_BYTES:
+        raise CrashCheckError("candidate authorship receipt is oversized")
+    try:
+        author = PatchProposal.model_validate_json(source.author_bytes)
+    except ValueError as error:
+        raise CrashCheckError("candidate authorship receipt failed strict validation") from error
+    bound = (
+        author.scenario_id == contract.scenario_id
+        and author.candidate_tree_digest == source.tree_digest
+        and author.base_tree_digest == contract.originating_base_tree_digest
+    )
+    return author if bound else None
 
 
 def _load_proposal(path: Path, contract: RetryContract) -> ContractProposal | None:
@@ -1400,6 +1424,7 @@ def _publish(
     transport: TruthLabel | None = None,
     proposal: ContractProposal | None = None,
     sweeps: tuple[CommitSweepReceipt, ...] = (),
+    author: PatchProposal | None = None,
 ) -> CrashCheckResult:
     if capsule.engine_code_digest != engine_code_digest():
         raise CrashCheckError("capsule engine digest differs from the installed engine")
@@ -1478,6 +1503,7 @@ def _publish(
         bindings=bindings,
         attempts=attempts,
         sweeps=sweeps,
+        candidate_author=author,
         started_at=started_at,
         ended_at=datetime.now(UTC),
         summary=summary,
@@ -1567,9 +1593,10 @@ def _materialize_source(value: str | Path, destination: Path) -> _Source:
     if path_status is not None and stat.S_ISDIR(path_status.st_mode):
         source = path.resolve()
         config = _read_source_config(source)
+        author = _read_source_file(source, AUTHOR_RECEIPT_PATH)
         _copy_tree(source, destination)
         digest = sha256_tree(destination)
-        return _Source(str(path), destination.resolve(), digest, digest, config)
+        return _Source(str(path), destination.resolve(), digest, digest, config, author)
     try:
         repository = _git_repository()
         commit = (
@@ -1592,29 +1619,34 @@ def _materialize_source(value: str | Path, destination: Path) -> _Source:
     archive = _git(repository, "archive", "--format=tar", commit)
     if not archive or len(archive) > MAX_SOURCE_ARCHIVE_BYTES:
         raise CrashCheckError("resolved Git source archive is empty or oversized")
-    config = _extract_archive(archive, destination)
-    return _Source(ref, destination.resolve(), sha256_tree(destination), commit, config)
+    config, author = _extract_archive(archive, destination)
+    return _Source(ref, destination.resolve(), sha256_tree(destination), commit, config, author)
 
 
 def _read_source_config(source: Path) -> bytes | None:
-    metadata = source / CONFIG_PATH.parent
+    return _read_source_file(source, CONFIG_PATH)
+
+
+def _read_source_file(source: Path, relative: Path) -> bytes | None:
+    """Read one bounded regular file under a source's ``.nemisis`` directory, if present."""
+    metadata = source / relative.parent
     try:
         metadata_status = metadata.lstat()
     except FileNotFoundError:
         return None
     if not stat.S_ISDIR(metadata_status.st_mode):
         raise CrashCheckError("base .nemisis metadata path is not a regular directory")
-    config = source / CONFIG_PATH
+    target = source / relative
     try:
-        config_status = config.lstat()
+        target_status = target.lstat()
     except FileNotFoundError:
         return None
-    if not stat.S_ISREG(config_status.st_mode) or config_status.st_size > MAX_CONFIG_BYTES:
-        raise CrashCheckError("base .nemisis/config.json is not a bounded regular file")
+    if not stat.S_ISREG(target_status.st_mode) or target_status.st_size > MAX_CONFIG_BYTES:
+        raise CrashCheckError(f"base {relative.as_posix()} is not a bounded regular file")
     try:
-        return config.read_bytes()
+        return target.read_bytes()
     except OSError as error:
-        raise CrashCheckError("base .nemisis/config.json could not be read") from error
+        raise CrashCheckError(f"base {relative.as_posix()} could not be read") from error
 
 
 def _copy_tree(source: Path, destination: Path) -> None:
@@ -1641,26 +1673,30 @@ def _copy_tree(source: Path, destination: Path) -> None:
         shutil.copyfile(path, output)
 
 
-def _extract_archive(content: bytes, destination: Path) -> bytes | None:
+def _extract_archive(content: bytes, destination: Path) -> tuple[bytes | None, bytes | None]:
     destination.mkdir(parents=True, exist_ok=False)
-    config: bytes | None = None
+    sidecars: dict[str, bytes] = {}
+    sidecar_names = {CONFIG_PATH.as_posix(): "config", AUTHOR_RECEIPT_PATH.as_posix(): "author"}
     file_count = 0
     try:
         with tarfile.open(fileobj=BytesIO(content), mode="r:") as archive:
             for member in archive.getmembers():
                 relative = safe_relative_path(member.name)
-                if relative.as_posix() == CONFIG_PATH.as_posix():
-                    if config is not None or not member.isfile():
-                        raise CrashCheckError("Git base config is duplicated or not a regular file")
+                if relative.as_posix() in sidecar_names:
+                    name = sidecar_names[relative.as_posix()]
+                    if name in sidecars or not member.isfile():
+                        raise CrashCheckError(
+                            f"Git {name} sidecar is duplicated or not a regular file"
+                        )
                     file_count += 1
                     if file_count > MAX_SOURCE_FILES:
                         raise CrashCheckError("Git source archive exceeds the supported file limit")
                     extracted = archive.extractfile(member)
                     if extracted is None:
-                        raise CrashCheckError("Git base config is unreadable")
-                    config = extracted.read(MAX_CONFIG_BYTES + 1)
-                    if len(config) > MAX_CONFIG_BYTES:
-                        raise CrashCheckError("Git base config is oversized")
+                        raise CrashCheckError(f"Git {name} sidecar is unreadable")
+                    sidecars[name] = extracted.read(MAX_CONFIG_BYTES + 1)
+                    if len(sidecars[name]) > MAX_CONFIG_BYTES:
+                        raise CrashCheckError(f"Git {name} sidecar is oversized")
                     continue
                 if any(part in _IGNORED for part in relative.parts):
                     continue
@@ -1679,7 +1715,7 @@ def _extract_archive(content: bytes, destination: Path) -> bytes | None:
                 output.write_bytes(extracted.read())
     except tarfile.TarError as error:
         raise CrashCheckError("Git source archive is malformed") from error
-    return config
+    return sidecars.get("config"), sidecars.get("author")
 
 
 def _warn_if_working_tree_is_dirty(repository: Path, ref: str, commit: str) -> None:

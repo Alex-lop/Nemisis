@@ -61,6 +61,18 @@ def _parser() -> argparse.ArgumentParser:
     )
     init.add_argument("--json", action="store_true")
 
+    propose = commands.add_parser(
+        "propose-patch",
+        help="ask Nemotron on Token Factory to write the fix; the result is an ordinary candidate",
+    )
+    propose.add_argument("--issue", type=Path, required=True, help="UTF-8 bug report file")
+    propose.add_argument("--base", required=True, help=f"exact base source: {ref_help}")
+    propose.add_argument(
+        "--out", type=Path, required=True, help="new directory for the candidate tree"
+    )
+    propose.add_argument("--scenario", default=SCENARIO_ID, choices=[SCENARIO_ID])
+    propose.add_argument("--json", action="store_true")
+
     crashcheck = commands.add_parser("check", help="run a crash/retry counterexample")
     crashcheck.add_argument("--base", required=True, help=f"exact base source: {ref_help}")
     crashcheck.add_argument(
@@ -229,6 +241,12 @@ def _print_crash_result(
                 f"{money(checkpoint.account_balance_cents)} durable -> {signal_name} -> "
                 f"fresh worker -> {money(final.account_balance_cents)}"
             )
+    author = getattr(result, "candidate_author", None)
+    if author is not None:
+        print(
+            f"author: {author.model_call.model_id} ({author.model_call.truth_label.value}) wrote "
+            f"{author.handler_path}; receipt {author.digest}"
+        )
     for binding in result.bindings:
         print(
             f"source: {binding.source_ref} -> {binding.resolved_source_identity} "
@@ -404,6 +422,40 @@ def main() -> None:
                 proposal_path=proposal_path,
                 accepted_draft=args.accept_contract,
             )
+            return
+
+        if args.command == "propose-patch":
+            from nemisis.agent_patch import PatchError, describe, propose_patch
+            from nemisis.nemotron import NemotronError
+
+            try:
+                patch = propose_patch(args.issue, args.base, args.out, args.scenario)
+            except (NemotronError, PatchError) as error:
+                _fail(
+                    f"NEMOTRON PATCH REJECTED: {error}. No candidate was written.",
+                    as_json=args.json,
+                    crashcheck=False,
+                )
+            if args.json:
+                print(
+                    canonical_json(
+                        {
+                            "candidate": str(args.out),
+                            "patch_proposal": patch.model_dump(mode="json"),
+                        }
+                    ).decode()
+                )
+                return
+            receipt = patch.model_call
+            print(f"candidate: {args.out}")
+            print(
+                f"nemotron: {receipt.model_id} · {receipt.endpoint_region} · "
+                f"{receipt.truth_label.value} · schema valid · {receipt.latency_ms} ms · "
+                f"receipt {patch.digest}"
+            )
+            print(f"patch: {describe(patch)}")
+            print(f"rationale: {patch.rationale}")
+            print(f"next: nemisis check --base {args.base} --candidate {args.out} --mode local")
             return
 
         if args.command == "doctor":

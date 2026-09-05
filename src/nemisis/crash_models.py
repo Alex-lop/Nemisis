@@ -198,6 +198,39 @@ class ContractProposal(_DigestedModel):
         return self
 
 
+class PatchProposal(_DigestedModel):
+    """Receipt for a candidate tree whose handler module Nemotron wrote.
+
+    The model played the coding agent: it saw the bug report, the base module, and the store API,
+    and nothing about how CrashCheck kills or judges. Deterministic rules accepted the module
+    only if it kept the handler signature, imported nothing but ``typing``, and touched no
+    private attribute or dangerous builtin. The receipt is provenance for the candidate; the
+    verdict comes from executing the tree like any other.
+    """
+
+    schema_version: Literal["nemisis.patch-proposal.v1"] = "nemisis.patch-proposal.v1"
+    scenario_id: SafeId
+    issue_digest: Sha256
+    base_ref: str = Field(min_length=1, max_length=500)
+    base_tree_digest: Sha256
+    handler_path: str = Field(min_length=4, max_length=240, pattern=r"^[A-Za-z0-9_./-]+\.py$")
+    module_digest: Sha256
+    candidate_tree_digest: Sha256
+    rationale: str = Field(min_length=1, max_length=1_000)
+    model_call: ModelCallReceipt
+
+    @model_validator(mode="after")
+    def proposal_is_coherent(self) -> PatchProposal:
+        safe_relative_path(self.handler_path)
+        if self.model_call.truth_label not in {TruthLabel.LIVE, TruthLabel.MOCKED}:
+            raise ValueError("patch receipt must come from a live or injected model client")
+        if not self.model_call.schema_valid or self.model_call.outcome != "success":
+            raise ValueError("patch receipt must record a schema-valid successful call")
+        if self.candidate_tree_digest == self.base_tree_digest:
+            raise ValueError("patch proposal did not change the base tree")
+        return self
+
+
 class AnchorBinding(_DigestedModel):
     """One deterministic handler mapping bound to one exact source tree."""
 
@@ -770,6 +803,7 @@ class CrashCheckResult(_DigestedModel):
     bindings: tuple[AnchorBinding, ...] = Field(default=(), max_length=3)
     attempts: tuple[AttemptReceipt, ...] = Field(default=(), max_length=24)
     sweeps: tuple[CommitSweepReceipt, ...] = Field(default=(), max_length=2)
+    candidate_author: PatchProposal | None = None
     started_at: datetime
     ended_at: datetime
     summary: str = Field(min_length=1, max_length=1_000)
@@ -794,6 +828,8 @@ class CrashCheckResult(_DigestedModel):
             anchor_resolution._require_canonical_digest()
         for sweep in self.sweeps:
             sweep._require_canonical_digest()
+        if self.candidate_author is not None:
+            self.candidate_author._require_canonical_digest()
         for artifact_path in self.artifacts.values():
             safe_relative_path(artifact_path)
         _validate_anchor_resolution_context(self)
@@ -1226,6 +1262,7 @@ __all__ = [
     "FaultBoundary",
     "HypothesisReceipt",
     "IntegrityStatus",
+    "PatchProposal",
     "REQUIRED_CONFIRMATIONS",
     "ReproCapsule",
     "RetryContract",

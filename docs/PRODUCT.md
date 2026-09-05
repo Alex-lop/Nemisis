@@ -72,7 +72,19 @@ An accepted catalog target whose exact-tree anchor has zero, multiple, or invali
 
 ## Model and isolation roles
 
-`nemisis init --nemotron` is CrashCheck's Nemotron role: bounded base-only context (issue text and
+Nemotron has two jobs, and neither touches a verdict, a probe, a SQL statement, or an assertion.
+
+`nemisis propose-patch` is the load-bearing one: Nemotron plays the coding agent. It receives the
+bug report, the base handler module, and the storage API, and returns a complete replacement
+module. It sees nothing about how CrashCheck kills or judges. Deterministic rules accept the module
+only if it keeps the exact `(store, event)` signature, imports nothing but `typing`, and touches no
+private attribute or dangerous builtin; a rejected module writes nothing. An accepted module becomes
+an ordinary candidate tree with a sanitized `.nemisis/agent-patch.json` receipt, and `check`
+executes that tree exactly like a human's patch, carrying the receipt into the manifest and report
+as the candidate's author (`LIVE` for a real Token Factory call, `MOCKED` for an injected client).
+The model that wrote the patch is never the thing that judges it.
+
+`nemisis init --nemotron` is the smaller role: bounded base-only context (issue text and
 the exact base handler) becomes a typed catalog proposal plus one bounded scalar. That call may not
 emit commands, probes, SQL, assertions, or verdicts. Deterministic code accepts the proposal only
 when it selects the audited fault intent and the exact `amount_cents`; otherwise no contract is

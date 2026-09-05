@@ -11,6 +11,7 @@ from nemisis.crash_models import (
     ContractProposal,
     CrashCheckResult,
     CreditSnapshot,
+    PatchProposal,
     ReproCapsule,
 )
 from nemisis.models import ArtifactStatus, RunManifest
@@ -105,7 +106,9 @@ fault action in {len(minimization.confirmations)} fresh base worlds. The empty s
 <code>{escape(minimization.trace_digest)}</code></p></section>"""
     else:
         minimization_section = ""
-    proposal_section = _proposal_section(proposal)
+    proposal_section = _proposal_section(proposal) + _author_section(
+        getattr(result, "candidate_author", None)
+    )
     sweep_section = "".join(_sweep_section(sweep) for sweep in getattr(result, "sweeps", ()))
     representative = next(
         (attempt for attempt in result.attempts if attempt.execution_status.value != "COMPLETED"),
@@ -319,6 +322,30 @@ proves it did not trade it for a new one.</p>
 <thead><tr><th scope="col">Kill point</th><th scope="col">Operation</th>
 <th scope="col">Checkpoint</th><th scope="col">Final</th><th scope="col">Observation</th></tr>
 </thead><tbody>{rows}</tbody></table></div></section>"""
+
+
+def _author_section(author: PatchProposal | None) -> str:
+    if author is None:
+        return ""
+    receipt = author.model_call
+    label = escape(receipt.truth_label.value)
+    return f"""<section class="card" aria-labelledby="candidate-author">
+<h2 id="candidate-author">Candidate author · {label} Nemotron receipt</h2>
+<p>The candidate's <code>{escape(author.handler_path)}</code> was written by \
+<code>{escape(receipt.model_id)}</code> on Token Factory \
+(<code>{escape(receipt.endpoint_region)}</code>) from the bug report and the base module. \
+The model saw nothing about how CrashCheck kills or judges; its module was accepted only after \
+deterministic checks on signature, imports, and attribute access. The verdict above comes from \
+executing that tree, not from the model.</p>
+<blockquote>{escape(author.rationale)}</blockquote>
+<dl class="identity" aria-label="Author receipt">
+<div><dt>Truth label</dt><dd><code>{label}</code></dd></div>
+<div><dt>Module digest</dt><dd><code>{escape(author.module_digest)}</code></dd></div>
+<div><dt>Candidate tree</dt><dd><code>{escape(author.candidate_tree_digest)}</code></dd></div>
+<div><dt>Prompt digest</dt><dd><code>{escape(receipt.prompt_template_digest)}</code></dd></div>
+<div><dt>Response digest</dt><dd><code>{escape(receipt.response_digest or "none")}</code></dd></div>
+<div><dt>Receipt digest</dt><dd><code>{escape(author.digest)}</code></dd></div>
+</dl></section>"""
 
 
 def _proposal_section(proposal: ContractProposal | None) -> str:
