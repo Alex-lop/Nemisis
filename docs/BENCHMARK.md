@@ -29,9 +29,12 @@ fresh confirmation worlds are required for each base, candidate, and corrected r
 | `misleading-green` | PASS (1/1, 113.530 ms) | PASS / exactly once (0.611 ms) | `DUPLICATE_EFFECT` | 5/5 | 414.171 ms |
 | `atomic` | PASS (1/1, 112.197 ms) | PASS / exactly once (0.597 ms) | `EXACTLY_ONCE` | 5/5 | 345.884 ms |
 
-The misleading-green candidate therefore receives `PATCH_FAILED_STILL_REPRODUCES`: every crash
-world ends at `$50`, two ledger effects, and one marker. Every corrected world ends at `$25`, one
-effect, and one marker.
+The `buggy` and `misleading-green` rows are identical by design: both trees carry the same
+check-then-act guard (`if processed: return`, credit, mark) written two ways, so every ordinary check
+passes on both and only the crash separates them from `atomic`, which commits the credit and the
+marker together. The misleading-green candidate therefore receives `PATCH_FAILED_STILL_REPRODUCES`:
+every crash world ends at `$50`, two ledger effects, and one marker. Every corrected world ends at
+`$25`, one effect, and one marker.
 
 The hypothesis hunt produced one reproducer from two valid worlds and selected
 `effect-commit-v1` by fixed catalog rank. One sole-fault-action deletion trial then observed

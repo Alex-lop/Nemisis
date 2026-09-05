@@ -89,10 +89,13 @@ uv run nemisis check \
   --mode local
 ```
 
-The packaged SQLite case applies event `evt_1042`, which should grant one `$25` credit. The
-misleading-green revision is the buggy handler rewritten into the same check → credit → mark shape;
-it passes its small existing suite and an ordinary sequential duplicate check, yet still reaches
-`$50` after a real `SIGKILL` and retry. The atomic revision ends at `$25`,
+The packaged SQLite case applies event `evt_1042`, which should grant one `$25` credit. Both `buggy`
+and `misleading-green` carry the same check-then-act guard (`if processed: return`, then credit,
+then mark) written two ways; the guard itself is the bug, because a crash between the credit and
+the marker leaves the effect without its marker. The misleading-green revision passes its small
+existing suite and an ordinary sequential duplicate check, yet still reaches `$50` after a real
+`SIGKILL` and retry. Only `atomic`, which commits the credit and the marker together through
+`credit_and_mark`, changes the outcome. The atomic revision ends at `$25`,
 one ledger effect, and one processed marker under the same capsule. The measured comparison is
 published by `uv run nemisis benchmark`; CrashCheck receipts themselves remain limited to the
 kill/restart/replay evidence.
