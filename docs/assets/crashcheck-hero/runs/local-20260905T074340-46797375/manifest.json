@@ -1,0 +1,3176 @@
+{
+  "bindings": [
+    {
+      "adapter_id": "credit-store-v1",
+      "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+      "digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
+      "fault_intent_id": "first-credit-effect-commit-v1",
+      "handler_path": "app/credits.py",
+      "handler_symbol": "apply_credit",
+      "resolved_source_identity": "fixture:sqlite-credit-v1/buggy",
+      "scenario_id": "sqlite-credit-v1",
+      "schema_version": "1",
+      "source_ref": "fixture:sqlite-credit-v1/buggy",
+      "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
+    },
+    {
+      "adapter_id": "credit-store-v1",
+      "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+      "digest": "dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40",
+      "fault_intent_id": "first-credit-effect-commit-v1",
+      "handler_path": "app/credits.py",
+      "handler_symbol": "apply_credit",
+      "resolved_source_identity": "fixture:sqlite-credit-v1/misleading-green",
+      "scenario_id": "sqlite-credit-v1",
+      "schema_version": "1",
+      "source_ref": "fixture:sqlite-credit-v1/misleading-green",
+      "tree_digest": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f"
+    },
+    {
+      "adapter_id": "credit-store-v1",
+      "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+      "digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
+      "fault_intent_id": "first-credit-effect-commit-v1",
+      "handler_path": "app/credits.py",
+      "handler_symbol": "apply_credit",
+      "resolved_source_identity": "fixture:sqlite-credit-v1/atomic",
+      "scenario_id": "sqlite-credit-v1",
+      "schema_version": "1",
+      "source_ref": "fixture:sqlite-credit-v1/atomic",
+      "tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de"
+    }
+  ],
+  "capsule": {
+    "account_id": "acct_7",
+    "amount_cents": 2500,
+    "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+    "digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+    "engine_code_digest": "a9b1227d5c32db9500232be0a161906a23128f7c95d5d9e06c82a26bc34897ad",
+    "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+    "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+    "event_id": "evt_1042",
+    "fault_boundary": "effect-commit",
+    "fault_intent_id": "first-credit-effect-commit-v1",
+    "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+    "minimization_trace": [
+      "3b70baa1f386f909338ca3ec40c6171e88ccbde6efe314060be3e3d65505bc5e"
+    ],
+    "originating_base_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+    "predicate_ids": [
+      "single-credit-and-marker-v1"
+    ],
+    "probe_id": "credit-state-v1",
+    "runner_id": "sqlite-credit-runner-v1",
+    "runner_version": "1",
+    "scenario_id": "sqlite-credit-v1",
+    "scenario_version": "1",
+    "schema_version": "1",
+    "truth_label": "FIXTURE"
+  },
+  "contract": {
+    "accepted": true,
+    "adapter_id": "credit-store-v1",
+    "digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+    "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+    "event_fixture_id": "evt-1042-v1",
+    "fault_intent_id": "first-credit-effect-commit-v1",
+    "issue_digest": "dca9933dc39177cd391972f8ec6945b01a27d3559990566788cabb12c51c0f77",
+    "originating_base_ref": "fixture:sqlite-credit-v1/buggy",
+    "originating_base_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+    "predicate_ids": [
+      "single-credit-and-marker-v1"
+    ],
+    "probe_id": "credit-state-v1",
+    "scenario_id": "sqlite-credit-v1",
+    "schema_version": "1",
+    "target": "app.credits:apply_credit",
+    "truth_label": "FIXTURE"
+  },
+  "contract_proposal": null,
+  "result": {
+    "anchor_resolutions": [],
+    "artifacts": {
+      "capsule": "repros/double-credit/6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d/capsule.json",
+      "contract": "repros/double-credit/6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d/contract.json",
+      "event": "repros/double-credit/6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d/event.json",
+      "hunt": "repros/double-credit/6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d/hunt.json",
+      "manifest": "runs/local-20260905T074340-46797375/manifest.json",
+      "metadata": "repros/double-credit/6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d/metadata.json",
+      "minimization": "runs/local-20260905T074340-46797375/minimization.json",
+      "regression_test": "repros/double-credit/6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d/test_repro.py",
+      "report": "runs/local-20260905T074340-46797375/report.html"
+    },
+    "attempts": [
+      {
+        "amount_cents": 2500,
+        "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-a99ab252d83d42218483ef72745aec75",
+        "digest": "02d38695453e1003fe08cc0dc300b2ff03df9c553a417da15b5b558aa0b56fa7",
+        "ended_at": "2026-09-05T07:43:40.857903Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "base-1-b8e7e11cc8f2450794192845f3ce3e55",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 5000,
+          "digest": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+          "event_ledger_count": 2,
+          "event_ledger_total_cents": 5000,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "DUPLICATE_EFFECT",
+        "post_execution_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-24530bffaee648fca21ac060576a2d1c",
+        "replay_acknowledged": true,
+        "role": "base",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:40.725556Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "c43b5cbe4f3e49368228c05cf9dc1034",
+            "phase": "first",
+            "pid": 27935,
+            "process_group_id": 27935,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:40.612798Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "36f8c520887c4d0396dfc9ec6e5fb722"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:40.852685Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "20496a7de4c2495b871180cef7136ffb",
+            "phase": "replay",
+            "pid": 27940,
+            "process_group_id": 27940,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:40.728370Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "b9713be1d1dc49a5a9a9a93d60cb794c"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:40.601182Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:40.601182Z"
+          },
+          {
+            "detail": "db-a99ab252d83d42218483ef72745aec75",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:40.610510Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:40.610943Z"
+          },
+          {
+            "detail": "27935",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.613090Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:40.724004Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:40.725558Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:40.726223Z"
+          },
+          {
+            "detail": "27940",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.729557Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:40.854176Z"
+          },
+          {
+            "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:40.854180Z"
+          },
+          {
+            "detail": "DUPLICATE_EFFECT",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:40.857903Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-2f9b71d1493346c1b1ed78433cdafd07",
+        "digest": "7a9116b506b530b652f40650a663b15e6338394d85fcb3ba1973961d3ff82e0b",
+        "ended_at": "2026-09-05T07:43:40.856174Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "base-2-642d5737f66b4aa38af8f2f57e3054d2",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 5000,
+          "digest": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+          "event_ledger_count": 2,
+          "event_ledger_total_cents": 5000,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "DUPLICATE_EFFECT",
+        "post_execution_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-3e2bf759249a4bc3ba1fee1b03a1f084",
+        "replay_acknowledged": true,
+        "role": "base",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:40.725789Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "6d0e5e62fe5441939b6990a6162cd6fe",
+            "phase": "first",
+            "pid": 27936,
+            "process_group_id": 27936,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:40.615262Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "d2f7997b8b3e4d94a59c7f8aa5f7214a"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:40.852801Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "7d434c04c32d4d74ac2f19dc29ed9ec6",
+            "phase": "replay",
+            "pid": 27942,
+            "process_group_id": 27942,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:40.731227Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "70c7bb8f93034d1783612c8154e55fbd"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:40.601349Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:40.601349Z"
+          },
+          {
+            "detail": "db-2f9b71d1493346c1b1ed78433cdafd07",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:40.610861Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:40.613338Z"
+          },
+          {
+            "detail": "27936",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.616955Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:40.721234Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:40.725791Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:40.728690Z"
+          },
+          {
+            "detail": "27942",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.731433Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:40.853623Z"
+          },
+          {
+            "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:40.853633Z"
+          },
+          {
+            "detail": "DUPLICATE_EFFECT",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:40.856174Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-523f03e732b44280867fef0d3e831889",
+        "digest": "20d3a4f6d887b6f0e9074df89b86d235596d0b9461bd6094ea8a74a3d6c988aa",
+        "ended_at": "2026-09-05T07:43:40.858582Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "base-3-10cc4fa36b1a4a1583c209b23c653bab",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 5000,
+          "digest": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+          "event_ledger_count": 2,
+          "event_ledger_total_cents": 5000,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "DUPLICATE_EFFECT",
+        "post_execution_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-78f697ebffbf430a8a328383aecdd99f",
+        "replay_acknowledged": true,
+        "role": "base",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:40.725578Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "a59c7fee64e04172b290f1651d55d781",
+            "phase": "first",
+            "pid": 27937,
+            "process_group_id": 27937,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:40.615537Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "c5094a9ee45d4878a8ba79d53ee91d8c"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:40.852647Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "e0bab3c6aa164d7db7b2a5b66bb22c61",
+            "phase": "replay",
+            "pid": 27941,
+            "process_group_id": 27941,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:40.729914Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "70dea415ffff47d8971ed7d34a56aa9d"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:40.601376Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:40.601376Z"
+          },
+          {
+            "detail": "db-523f03e732b44280867fef0d3e831889",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:40.612486Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:40.613484Z"
+          },
+          {
+            "detail": "27937",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.616774Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:40.721867Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:40.725579Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:40.726356Z"
+          },
+          {
+            "detail": "27941",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.731124Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:40.854108Z"
+          },
+          {
+            "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:40.854112Z"
+          },
+          {
+            "detail": "DUPLICATE_EFFECT",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:40.858582Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-6887a7f5490b440f9f85f9880bba685b",
+        "digest": "49d11890e46941db52ea3e63ac7cd82b539cf303a9dfabf18177a36dfcc7f64a",
+        "ended_at": "2026-09-05T07:43:40.857194Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "base-4-c564acd95e69401fb0f5de698824d35c",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 5000,
+          "digest": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+          "event_ledger_count": 2,
+          "event_ledger_total_cents": 5000,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "DUPLICATE_EFFECT",
+        "post_execution_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-a8b4333127af4622a62d330ec5dce5b7",
+        "replay_acknowledged": true,
+        "role": "base",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:40.728281Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "235d1ccb251e47399fcea8fca24a3f01",
+            "phase": "first",
+            "pid": 27939,
+            "process_group_id": 27939,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:40.618785Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "4286877868b64b87828fba86de0286ae"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:40.852736Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "39fe8e9806cf4a9db092c1c912ade14f",
+            "phase": "replay",
+            "pid": 27944,
+            "process_group_id": 27944,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:40.734799Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "eb6655c01f1747079a283f2f32622599"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:40.601324Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:40.601324Z"
+          },
+          {
+            "detail": "db-6887a7f5490b440f9f85f9880bba685b",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:40.615588Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:40.617427Z"
+          },
+          {
+            "detail": "27939",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.619010Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:40.726427Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:40.728282Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:40.731670Z"
+          },
+          {
+            "detail": "27944",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.735142Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:40.854243Z"
+          },
+          {
+            "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:40.854244Z"
+          },
+          {
+            "detail": "DUPLICATE_EFFECT",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:40.857194Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-44631d90814347588f8cceb230a74d29",
+        "digest": "48194b962245ed8549666d497b20337f6ed5d95582fee60906e5f4293e6f57a4",
+        "ended_at": "2026-09-05T07:43:40.859312Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "base-5-a308506578d04b7ab680a1b92cb81c15",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 5000,
+          "digest": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+          "event_ledger_count": 2,
+          "event_ledger_total_cents": 5000,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "DUPLICATE_EFFECT",
+        "post_execution_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-4b7f385fb7a449e4b1edb0b1a4bbccc0",
+        "replay_acknowledged": true,
+        "role": "base",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:40.728067Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "88b18b6b3c7d4c0b9eeb25d92046b3b3",
+            "phase": "first",
+            "pid": 27938,
+            "process_group_id": 27938,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:40.617004Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "16223bea42b042918ee3a0da4005e824"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:40.852851Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "e11c25d5c2c049c499df518f07bb48bb",
+            "phase": "replay",
+            "pid": 27943,
+            "process_group_id": 27943,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:40.732981Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "5aede13da79d4347aa0d482dab109f11"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:40.601431Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:40.601431Z"
+          },
+          {
+            "detail": "db-44631d90814347588f8cceb230a74d29",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:40.612882Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:40.613675Z"
+          },
+          {
+            "detail": "27938",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.617149Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:40.722168Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:40.728098Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:40.731559Z"
+          },
+          {
+            "detail": "27943",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.733264Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:40.854006Z"
+          },
+          {
+            "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:40.854010Z"
+          },
+          {
+            "detail": "DUPLICATE_EFFECT",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:40.859312Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-03fa8516ef734504828a6238877f3c24",
+        "digest": "38588b96ae481a8c8fecdf06f7a5b86b7827022998d139be048b3bb505f00a1f",
+        "ended_at": "2026-09-05T07:43:41.120542Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "candidate-1-9dbab32eaa8e44a79e96990a8bd8a39e",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 5000,
+          "digest": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+          "event_ledger_count": 2,
+          "event_ledger_total_cents": 5000,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "DUPLICATE_EFFECT",
+        "post_execution_tree_digest": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-9ae2a7764af647b499852c47b969cac0",
+        "replay_acknowledged": true,
+        "role": "candidate",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:40.977308Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "f7fb592692e5495eb6038c152f85d180",
+            "phase": "first",
+            "pid": 27949,
+            "process_group_id": 27949,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:40.878657Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "94de54e485284ccaabb001e946e96422"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:41.119782Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "26d5221aefb946e484f150a7502f7e01",
+            "phase": "replay",
+            "pid": 27954,
+            "process_group_id": 27954,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:40.984542Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "1504809aa5c348a68a9a42ecce9cab35"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:40.862411Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:40.862411Z"
+          },
+          {
+            "detail": "db-03fa8516ef734504828a6238877f3c24",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:40.873204Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:40.876477Z"
+          },
+          {
+            "detail": "27949",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.878912Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:40.975722Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:40.977309Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:40.980836Z"
+          },
+          {
+            "detail": "27954",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.984794Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:41.120169Z"
+          },
+          {
+            "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:41.120173Z"
+          },
+          {
+            "detail": "DUPLICATE_EFFECT",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:41.120542Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-ca6f62f9860f40358ddcff33ed15a621",
+        "digest": "c822c12dc0305bf4ce13b3b565b6bffb891bb6239cab6377463fb0bde7291f25",
+        "ended_at": "2026-09-05T07:43:41.104999Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "candidate-2-df0e41882410417c88dab84fd071edfb",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 5000,
+          "digest": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+          "event_ledger_count": 2,
+          "event_ledger_total_cents": 5000,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "DUPLICATE_EFFECT",
+        "post_execution_tree_digest": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-6bb6eeaf1db743a3932898435d350bef",
+        "replay_acknowledged": true,
+        "role": "candidate",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:40.977205Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "904c83b5cc084ca486c6d196ae7ae7e4",
+            "phase": "first",
+            "pid": 27947,
+            "process_group_id": 27947,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:40.878330Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "2c0a24aa36ab4ec5bc457160bd21f005"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:41.103243Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "5e85ecf64c5e4a77ac75af091d5d9ed9",
+            "phase": "replay",
+            "pid": 27953,
+            "process_group_id": 27953,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:40.984330Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "d1ca8f7451f44d74a7169de15cd37825"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:40.862533Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:40.862533Z"
+          },
+          {
+            "detail": "db-ca6f62f9860f40358ddcff33ed15a621",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:40.871512Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:40.874990Z"
+          },
+          {
+            "detail": "27947",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.878973Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:40.975665Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:40.977207Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:40.980695Z"
+          },
+          {
+            "detail": "27953",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.984775Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:41.103904Z"
+          },
+          {
+            "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:41.103908Z"
+          },
+          {
+            "detail": "DUPLICATE_EFFECT",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:41.104999Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-a75d38d227614fddb967b0441021ef7e",
+        "digest": "82897370d8d47966536979263bc5b1049faec62bb3fb7b0464ed35fa72e0af02",
+        "ended_at": "2026-09-05T07:43:41.129238Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "candidate-3-c428e60dbab14ac880e1da556d687050",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 5000,
+          "digest": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+          "event_ledger_count": 2,
+          "event_ledger_total_cents": 5000,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "DUPLICATE_EFFECT",
+        "post_execution_tree_digest": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-5e6c015eaedc4b5e9ba07b2d811f3146",
+        "replay_acknowledged": true,
+        "role": "candidate",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:40.976748Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "96a28b60679542898d4e230217be6d53",
+            "phase": "first",
+            "pid": 27946,
+            "process_group_id": 27946,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:40.875076Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "b9455169ef194fe0baaa2b8a11daa6b8"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:41.127426Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "2f951aee3cee4986b1fa41a52178e017",
+            "phase": "replay",
+            "pid": 27951,
+            "process_group_id": 27951,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:40.980611Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "4523f6775b284499801f4076646a32b9"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:40.862514Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:40.862514Z"
+          },
+          {
+            "detail": "db-a75d38d227614fddb967b0441021ef7e",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:40.871280Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:40.873655Z"
+          },
+          {
+            "detail": "27946",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.875356Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:40.975374Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:40.976750Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:40.979059Z"
+          },
+          {
+            "detail": "27951",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.982010Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:41.127915Z"
+          },
+          {
+            "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:41.127917Z"
+          },
+          {
+            "detail": "DUPLICATE_EFFECT",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:41.129238Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-9fb91b1a3d7c490cb09fae0bddcf6e10",
+        "digest": "947a48d306ac4542c35fc3890c1860dd3b9832ba9c033c39b067fbb18de2a6e3",
+        "ended_at": "2026-09-05T07:43:41.128609Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "candidate-4-6dfa5fffee7f4647aa5c4e89d8e46470",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 5000,
+          "digest": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+          "event_ledger_count": 2,
+          "event_ledger_total_cents": 5000,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "DUPLICATE_EFFECT",
+        "post_execution_tree_digest": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-aaafb2d119264f7bb87c17be82fefdc4",
+        "replay_acknowledged": true,
+        "role": "candidate",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:40.976585Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "426597db006741968a9125461d09de7c",
+            "phase": "first",
+            "pid": 27948,
+            "process_group_id": 27948,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:40.879710Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "594ff0c613ce4b19adae4976fc9d764e"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:41.127308Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "41ff971ce8894f4e845ee4f3ddbf5daf",
+            "phase": "replay",
+            "pid": 27950,
+            "process_group_id": 27950,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:40.979293Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "ebf15f28ff094037a3201f1c9788af98"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:40.862684Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:40.862684Z"
+          },
+          {
+            "detail": "db-9fb91b1a3d7c490cb09fae0bddcf6e10",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:40.873031Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:40.875401Z"
+          },
+          {
+            "detail": "27948",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.879801Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:40.975008Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:40.976588Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:40.977065Z"
+          },
+          {
+            "detail": "27950",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.980168Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:41.127813Z"
+          },
+          {
+            "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:41.127816Z"
+          },
+          {
+            "detail": "DUPLICATE_EFFECT",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:41.128609Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-5dc9d8368e2743478f55ae7ce44accc2",
+        "digest": "0e8745cc864625512682e21cfcb52ae6abafd45654e5c11d1416659f1fc080f4",
+        "ended_at": "2026-09-05T07:43:41.104062Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "candidate-5-74bdb6d1974043dfb4e5ada8e7bb938f",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 5000,
+          "digest": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+          "event_ledger_count": 2,
+          "event_ledger_total_cents": 5000,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "DUPLICATE_EFFECT",
+        "post_execution_tree_digest": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 0
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-5d66516fba674b4faf029e6bbf8faafa",
+        "replay_acknowledged": true,
+        "role": "candidate",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:40.976674Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "2bfdd30bef55407abd867cb03b69f5b8",
+            "phase": "first",
+            "pid": 27945,
+            "process_group_id": 27945,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:40.873457Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "39bf26b37a9249fdb99c7934e29e5eff"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:41.102229Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "7628a4b9e21b4838a0dbf1259604edcc",
+            "phase": "replay",
+            "pid": 27952,
+            "process_group_id": 27952,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:40.982973Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "e5a0dbc234cc4133a27736e0d11b93dd"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:40.862664Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:40.862664Z"
+          },
+          {
+            "detail": "db-5dc9d8368e2743478f55ae7ce44accc2",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:40.871129Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:40.871464Z"
+          },
+          {
+            "detail": "27945",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.873874Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:40.975122Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:40.976676Z"
+          },
+          {
+            "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:40.980472Z"
+          },
+          {
+            "detail": "27952",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:40.984143Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:41.102852Z"
+          },
+          {
+            "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:41.102867Z"
+          },
+          {
+            "detail": "DUPLICATE_EFFECT",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:41.104062Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-6107dbeec06f4eac866329d4d5b45b92",
+        "digest": "1d3fd5cc95b012ffaf7a2fa87c4e42344a8da6b3310b6064d547587c5bdfa727",
+        "ended_at": "2026-09-05T07:43:41.372165Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "corrected-1-020f474da90d458ea43c3bca0d4b4cc3",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "EXACTLY_ONCE",
+        "post_execution_tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-0dff9f089b6347adb6d5264c997d0d1d",
+        "replay_acknowledged": true,
+        "role": "corrected",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:41.248690Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "27b107e6e7c547f68506a8c083e680cc",
+            "phase": "first",
+            "pid": 27955,
+            "process_group_id": 27955,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:41.142980Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "8284c9dca39c45e58276e1b72bf48f61"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:41.370856Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "ab0668c1095646a19534c1e67d8b7655",
+            "phase": "replay",
+            "pid": 27961,
+            "process_group_id": 27961,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:41.251429Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "61879f04a0494ec18cdbd51a68a9ca2b"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:41.132352Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:41.132352Z"
+          },
+          {
+            "detail": "db-6107dbeec06f4eac866329d4d5b45b92",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:41.140703Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:41.140994Z"
+          },
+          {
+            "detail": "27955",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:41.143226Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:41.246167Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:41.248721Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:41.249913Z"
+          },
+          {
+            "detail": "27961",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:41.251814Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:41.371500Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:41.371513Z"
+          },
+          {
+            "detail": "EXACTLY_ONCE",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:41.372165Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-534d312f56a24c6a9f3ce6032ffb2041",
+        "digest": "bf0111192414b0a310ae73d66e7f75382c5cbec41c492b929ab9304ab514824d",
+        "ended_at": "2026-09-05T07:43:41.396472Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "corrected-2-22d25461394c4ad295515aa63e2bd612",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "EXACTLY_ONCE",
+        "post_execution_tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-98e74d67c3de491bbc1ab6905800b751",
+        "replay_acknowledged": true,
+        "role": "corrected",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:41.253438Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "5e6c980f2c33488c9300a5dc08cd785e",
+            "phase": "first",
+            "pid": 27958,
+            "process_group_id": 27958,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:41.147683Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "dba95fa0cf10468f9b436d6b7a9302a4"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:41.395039Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "1e5cd37326c84e0789c5f16636e8d9be",
+            "phase": "replay",
+            "pid": 27964,
+            "process_group_id": 27964,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:41.256951Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "79415b3aae3b43bbb1665b378f9ecab4"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:41.132332Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:41.132332Z"
+          },
+          {
+            "detail": "db-534d312f56a24c6a9f3ce6032ffb2041",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:41.142716Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:41.146095Z"
+          },
+          {
+            "detail": "27958",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:41.147914Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:41.251696Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:41.253495Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:41.254420Z"
+          },
+          {
+            "detail": "27964",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:41.257218Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:41.395408Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:41.395412Z"
+          },
+          {
+            "detail": "EXACTLY_ONCE",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:41.396472Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-a561099f623f4cc0817c9d6f26ce13f1",
+        "digest": "d1e3608f615e84df9edf76a7a8c8675e6a1750aba7a144b31cfe11ac37683bfc",
+        "ended_at": "2026-09-05T07:43:41.384081Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "corrected-3-4829507b7b0540688441a2b1cdd93192",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "EXACTLY_ONCE",
+        "post_execution_tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-83921c3467934bba932c46781ac00f5e",
+        "replay_acknowledged": true,
+        "role": "corrected",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:41.246954Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "9610a1ce938745e2990aa02f3eb1fa10",
+            "phase": "first",
+            "pid": 27956,
+            "process_group_id": 27956,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:41.144797Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "76be24ad5ce546e99ba3ccb987f4cca9"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:41.383470Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "e1ad29ff035d43838d65285d0cc7d5a8",
+            "phase": "replay",
+            "pid": 27960,
+            "process_group_id": 27960,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:41.249115Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "00b799f0acb2424ca7548cc7d2051535"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:41.132528Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:41.132528Z"
+          },
+          {
+            "detail": "db-a561099f623f4cc0817c9d6f26ce13f1",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:41.140822Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:41.143429Z"
+          },
+          {
+            "detail": "27956",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:41.146338Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:41.245347Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:41.246958Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:41.247341Z"
+          },
+          {
+            "detail": "27960",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:41.249573Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:41.383719Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:41.383723Z"
+          },
+          {
+            "detail": "EXACTLY_ONCE",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:41.384081Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-e0e9007febbf480dad06f190044af782",
+        "digest": "be141eddcc6420b5ba7039505bc2e0df0f0b58a3b8f2c635ef826467b2c120f8",
+        "ended_at": "2026-09-05T07:43:41.374678Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "corrected-4-65aaa09124024332b562108d7caed389",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "EXACTLY_ONCE",
+        "post_execution_tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-12941204b7784bae9060f52489de8886",
+        "replay_acknowledged": true,
+        "role": "corrected",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:41.253819Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "6e49d4b44acb4ce58b52795dc33a36a9",
+            "phase": "first",
+            "pid": 27959,
+            "process_group_id": 27959,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:41.149662Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "5c520dfbaffb4d0194e2eebb09484b28"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:41.374146Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "13c7cf6494784a4a8a71f284730d3c35",
+            "phase": "replay",
+            "pid": 27963,
+            "process_group_id": 27963,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:41.256812Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "858ed7901ac84ed1b6e27b8f43113eb5"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:41.132575Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:41.132575Z"
+          },
+          {
+            "detail": "db-e0e9007febbf480dad06f190044af782",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:41.142868Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:41.146163Z"
+          },
+          {
+            "detail": "27959",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:41.149861Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:41.252159Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:41.253820Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:41.254481Z"
+          },
+          {
+            "detail": "27963",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:41.257267Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:41.374359Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:41.374362Z"
+          },
+          {
+            "detail": "EXACTLY_ONCE",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:41.374678Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de"
+      },
+      {
+        "amount_cents": 2500,
+        "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "checkpoint_reached": true,
+        "checkpoint_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "database_id": "db-46285d9ba19d4b13b487b38d64ee38e0",
+        "digest": "fe8065ebc7d808af667c7061fcccb1568d4e3325173c374762c180d52d3bf146",
+        "ended_at": "2026-09-05T07:43:41.395972Z",
+        "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+        "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+        "execution_nonce": "corrected-5-db2e91b7c81e4e239153a1f304f19f34",
+        "execution_status": "COMPLETED",
+        "failure_detail": null,
+        "final_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+        "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+        "integrity_status": "VALID",
+        "kill_after_commit": null,
+        "kill_signal": 9,
+        "observation": "EXACTLY_ONCE",
+        "post_execution_tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de",
+        "post_kill_snapshot": {
+          "account_balance_cents": 2500,
+          "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+          "event_ledger_count": 1,
+          "event_ledger_total_cents": 2500,
+          "event_marker_count": 1
+        },
+        "pre_crash_snapshot": {
+          "account_balance_cents": 0,
+          "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+          "event_ledger_count": 0,
+          "event_ledger_total_cents": 0,
+          "event_marker_count": 0
+        },
+        "provider_image_id": null,
+        "provider_operation_id": null,
+        "receipt_id": "attempt-c139fc08d3644064b7a1b2588c0d3426",
+        "replay_acknowledged": true,
+        "role": "corrected",
+        "schema_version": "1",
+        "spawns": [
+          {
+            "ended_at": "2026-09-05T07:43:41.251792Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": -9,
+            "ipc_session_id": "5c54bb782acb4eefbfa32f0280504d65",
+            "phase": "first",
+            "pid": 27957,
+            "process_group_id": 27957,
+            "spawn_index": 1,
+            "started_at": "2026-09-05T07:43:41.146186Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "a59cbfa6794c4232a2b05d73996245c9"
+          },
+          {
+            "ended_at": "2026-09-05T07:43:41.394984Z",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "exit_code": 0,
+            "ipc_session_id": "888fda36be6c436095bc304588167bd9",
+            "phase": "replay",
+            "pid": 27962,
+            "process_group_id": 27962,
+            "spawn_index": 2,
+            "started_at": "2026-09-05T07:43:41.253646Z",
+            "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+            "stderr_excerpt": "",
+            "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "stdout_excerpt": "",
+            "worker_nonce": "dbd2fb908935454983854e91dd66c03a"
+          }
+        ],
+        "started_at": "2026-09-05T07:43:41.132833Z",
+        "timeline": [
+          {
+            "detail": "",
+            "state": "PREFLIGHT",
+            "timestamp": "2026-09-05T07:43:41.132833Z"
+          },
+          {
+            "detail": "db-46285d9ba19d4b13b487b38d64ee38e0",
+            "state": "DATABASE_SEEDED",
+            "timestamp": "2026-09-05T07:43:41.141118Z"
+          },
+          {
+            "detail": "",
+            "state": "PRE_CRASH_PROBED",
+            "timestamp": "2026-09-05T07:43:41.144665Z"
+          },
+          {
+            "detail": "27957",
+            "state": "FIRST_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:41.147786Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "CHECKPOINT_REACHED",
+            "timestamp": "2026-09-05T07:43:41.250043Z"
+          },
+          {
+            "detail": "-9",
+            "state": "WORKER_KILLED",
+            "timestamp": "2026-09-05T07:43:41.251794Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "POST_KILL_PROBED",
+            "timestamp": "2026-09-05T07:43:41.252231Z"
+          },
+          {
+            "detail": "27962",
+            "state": "REPLAY_WORKER_STARTED",
+            "timestamp": "2026-09-05T07:43:41.253985Z"
+          },
+          {
+            "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "state": "EVENT_REPLAYED",
+            "timestamp": "2026-09-05T07:43:41.395309Z"
+          },
+          {
+            "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "state": "FINAL_STATE_PROBED",
+            "timestamp": "2026-09-05T07:43:41.395311Z"
+          },
+          {
+            "detail": "EXACTLY_ONCE",
+            "state": "COMPLETE",
+            "timestamp": "2026-09-05T07:43:41.395972Z"
+          }
+        ],
+        "transport": "LOCAL",
+        "tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de"
+      }
+    ],
+    "bindings": [
+      {
+        "adapter_id": "credit-store-v1",
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
+        "fault_intent_id": "first-credit-effect-commit-v1",
+        "handler_path": "app/credits.py",
+        "handler_symbol": "apply_credit",
+        "resolved_source_identity": "fixture:sqlite-credit-v1/buggy",
+        "scenario_id": "sqlite-credit-v1",
+        "schema_version": "1",
+        "source_ref": "fixture:sqlite-credit-v1/buggy",
+        "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
+      },
+      {
+        "adapter_id": "credit-store-v1",
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "digest": "dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40",
+        "fault_intent_id": "first-credit-effect-commit-v1",
+        "handler_path": "app/credits.py",
+        "handler_symbol": "apply_credit",
+        "resolved_source_identity": "fixture:sqlite-credit-v1/misleading-green",
+        "scenario_id": "sqlite-credit-v1",
+        "schema_version": "1",
+        "source_ref": "fixture:sqlite-credit-v1/misleading-green",
+        "tree_digest": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f"
+      },
+      {
+        "adapter_id": "credit-store-v1",
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
+        "fault_intent_id": "first-credit-effect-commit-v1",
+        "handler_path": "app/credits.py",
+        "handler_symbol": "apply_credit",
+        "resolved_source_identity": "fixture:sqlite-credit-v1/atomic",
+        "scenario_id": "sqlite-credit-v1",
+        "schema_version": "1",
+        "source_ref": "fixture:sqlite-credit-v1/atomic",
+        "tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de"
+      }
+    ],
+    "candidate_author": null,
+    "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+    "digest": "2e1e9cadf51b6d6ed222cac2a9c7f70d1b3430a2badd62a7233293d34b3d0568",
+    "ended_at": "2026-09-05T07:43:41.809740Z",
+    "engine_code_digest": "a9b1227d5c32db9500232be0a161906a23128f7c95d5d9e06c82a26bc34897ad",
+    "engine_source_commit": "0b29f3381ce3c8188cef521de7726d0b02af55b3",
+    "execution_status": "COMPLETED",
+    "hypothesis_receipts": [
+      {
+        "attempt": {
+          "amount_cents": 2500,
+          "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
+          "capsule_digest": "80f4531eb2b71d9b8dd3f7bc0faa01540cb79bb5f646e6732e0f1d83dad5b0d1",
+          "checkpoint_reached": true,
+          "checkpoint_snapshot": {
+            "account_balance_cents": 2500,
+            "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "event_ledger_count": 1,
+            "event_ledger_total_cents": 2500,
+            "event_marker_count": 0
+          },
+          "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+          "database_id": "db-c5b59bb86fef4dd799527ba42df00778",
+          "digest": "3dd7811dcce8215f341b1c1865bc518bf9fbd0dfafd4d2fef479162638d40610",
+          "ended_at": "2026-09-05T07:43:40.354515Z",
+          "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+          "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+          "execution_nonce": "hunt-1-091f68e1b9a74b23aa328a9bf629312f",
+          "execution_status": "COMPLETED",
+          "failure_detail": null,
+          "final_snapshot": {
+            "account_balance_cents": 5000,
+            "digest": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+            "event_ledger_count": 2,
+            "event_ledger_total_cents": 5000,
+            "event_marker_count": 1
+          },
+          "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+          "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+          "integrity_status": "VALID",
+          "kill_after_commit": null,
+          "kill_signal": 9,
+          "observation": "DUPLICATE_EFFECT",
+          "post_execution_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+          "post_kill_snapshot": {
+            "account_balance_cents": 2500,
+            "digest": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+            "event_ledger_count": 1,
+            "event_ledger_total_cents": 2500,
+            "event_marker_count": 0
+          },
+          "pre_crash_snapshot": {
+            "account_balance_cents": 0,
+            "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+            "event_ledger_count": 0,
+            "event_ledger_total_cents": 0,
+            "event_marker_count": 0
+          },
+          "provider_image_id": null,
+          "provider_operation_id": null,
+          "receipt_id": "attempt-c10351079db94531a160d19f714a283f",
+          "replay_acknowledged": true,
+          "role": "base",
+          "schema_version": "1",
+          "spawns": [
+            {
+              "ended_at": "2026-09-05T07:43:40.235725Z",
+              "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+              "exit_code": -9,
+              "ipc_session_id": "078d876dd1ce4e389212fe79edf40f1f",
+              "phase": "first",
+              "pid": 27928,
+              "process_group_id": 27928,
+              "spawn_index": 1,
+              "started_at": "2026-09-05T07:43:40.136006Z",
+              "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+              "stderr_excerpt": "",
+              "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stdout_excerpt": "",
+              "worker_nonce": "7eb7eb9a8a944cbdade94f5420bbb94a"
+            },
+            {
+              "ended_at": "2026-09-05T07:43:40.353621Z",
+              "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+              "exit_code": 0,
+              "ipc_session_id": "2ec3a0e0970c47ec83f264d41807035f",
+              "phase": "replay",
+              "pid": 27929,
+              "process_group_id": 27929,
+              "spawn_index": 2,
+              "started_at": "2026-09-05T07:43:40.237525Z",
+              "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+              "stderr_excerpt": "",
+              "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stdout_excerpt": "",
+              "worker_nonce": "fe7908d81a7441469c34a7b946fcd152"
+            }
+          ],
+          "started_at": "2026-09-05T07:43:40.123145Z",
+          "timeline": [
+            {
+              "detail": "",
+              "state": "PREFLIGHT",
+              "timestamp": "2026-09-05T07:43:40.123145Z"
+            },
+            {
+              "detail": "db-c5b59bb86fef4dd799527ba42df00778",
+              "state": "DATABASE_SEEDED",
+              "timestamp": "2026-09-05T07:43:40.133258Z"
+            },
+            {
+              "detail": "",
+              "state": "PRE_CRASH_PROBED",
+              "timestamp": "2026-09-05T07:43:40.133576Z"
+            },
+            {
+              "detail": "27928",
+              "state": "FIRST_WORKER_STARTED",
+              "timestamp": "2026-09-05T07:43:40.136192Z"
+            },
+            {
+              "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+              "state": "CHECKPOINT_REACHED",
+              "timestamp": "2026-09-05T07:43:40.234141Z"
+            },
+            {
+              "detail": "-9",
+              "state": "WORKER_KILLED",
+              "timestamp": "2026-09-05T07:43:40.235728Z"
+            },
+            {
+              "detail": "6f61e2e3bb3580098362743e98afbf5b262bcb3e79d01ddaee3e0b4c2e9af56d",
+              "state": "POST_KILL_PROBED",
+              "timestamp": "2026-09-05T07:43:40.235987Z"
+            },
+            {
+              "detail": "27929",
+              "state": "REPLAY_WORKER_STARTED",
+              "timestamp": "2026-09-05T07:43:40.237835Z"
+            },
+            {
+              "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+              "state": "EVENT_REPLAYED",
+              "timestamp": "2026-09-05T07:43:40.354026Z"
+            },
+            {
+              "detail": "955a2e785f002d75fd51726d23bf3b7a9874720f88f148fa1aece7575cc04137",
+              "state": "FINAL_STATE_PROBED",
+              "timestamp": "2026-09-05T07:43:40.354033Z"
+            },
+            {
+              "detail": "DUPLICATE_EFFECT",
+              "state": "COMPLETE",
+              "timestamp": "2026-09-05T07:43:40.354515Z"
+            }
+          ],
+          "transport": "LOCAL",
+          "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
+        },
+        "canonical_rank": 1,
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "digest": "c66dcca367beea6110e4d283f17a7f977038cca4d6e4f5a90a8d3537a77ce919",
+        "fault_boundary": "effect-commit",
+        "hypothesis_id": "effect-commit-v1",
+        "originating_base_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+        "provisional_capsule_digest": "80f4531eb2b71d9b8dd3f7bc0faa01540cb79bb5f646e6732e0f1d83dad5b0d1",
+        "reproduced": true,
+        "schema_version": "1",
+        "selected": true,
+        "trusted_operation_count": 1
+      },
+      {
+        "attempt": {
+          "amount_cents": 2500,
+          "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
+          "capsule_digest": "46cbec00a2c253624a2f47405a7b2b4508cd0a8d72ce35fef3495c548d95a54f",
+          "checkpoint_reached": true,
+          "checkpoint_snapshot": {
+            "account_balance_cents": 2500,
+            "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "event_ledger_count": 1,
+            "event_ledger_total_cents": 2500,
+            "event_marker_count": 1
+          },
+          "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+          "database_id": "db-618ded82695b4788a2bd832c688110a2",
+          "digest": "5d5919cd0a95b930024e9c2a356c0a440dbac0465608faf23263253580b8123e",
+          "ended_at": "2026-09-05T07:43:40.356650Z",
+          "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+          "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+          "execution_nonce": "hunt-2-a1356a1b1125443480c8ca134255252d",
+          "execution_status": "COMPLETED",
+          "failure_detail": null,
+          "final_snapshot": {
+            "account_balance_cents": 2500,
+            "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "event_ledger_count": 1,
+            "event_ledger_total_cents": 2500,
+            "event_marker_count": 1
+          },
+          "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+          "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+          "integrity_status": "VALID",
+          "kill_after_commit": null,
+          "kill_signal": 9,
+          "observation": "EXACTLY_ONCE",
+          "post_execution_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+          "post_kill_snapshot": {
+            "account_balance_cents": 2500,
+            "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "event_ledger_count": 1,
+            "event_ledger_total_cents": 2500,
+            "event_marker_count": 1
+          },
+          "pre_crash_snapshot": {
+            "account_balance_cents": 0,
+            "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+            "event_ledger_count": 0,
+            "event_ledger_total_cents": 0,
+            "event_marker_count": 0
+          },
+          "provider_image_id": null,
+          "provider_operation_id": null,
+          "receipt_id": "attempt-cadb015dee7f4465a11f804d1aee7487",
+          "replay_acknowledged": true,
+          "role": "base",
+          "schema_version": "1",
+          "spawns": [
+            {
+              "ended_at": "2026-09-05T07:43:40.237160Z",
+              "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+              "exit_code": -9,
+              "ipc_session_id": "8141651cf3d44d9a8b89469d88e74585",
+              "phase": "first",
+              "pid": 27927,
+              "process_group_id": 27927,
+              "spawn_index": 1,
+              "started_at": "2026-09-05T07:43:40.135796Z",
+              "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+              "stderr_excerpt": "",
+              "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stdout_excerpt": "",
+              "worker_nonce": "5ac81ace480642c9835c319d8a9584b9"
+            },
+            {
+              "ended_at": "2026-09-05T07:43:40.356014Z",
+              "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+              "exit_code": 0,
+              "ipc_session_id": "4ba3f76f1db2401aa164902e0cd7beaf",
+              "phase": "replay",
+              "pid": 27930,
+              "process_group_id": 27930,
+              "spawn_index": 2,
+              "started_at": "2026-09-05T07:43:40.239409Z",
+              "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+              "stderr_excerpt": "",
+              "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stdout_excerpt": "",
+              "worker_nonce": "e32089c297f247e8b8a0ddd522b70e3b"
+            }
+          ],
+          "started_at": "2026-09-05T07:43:40.123297Z",
+          "timeline": [
+            {
+              "detail": "",
+              "state": "PREFLIGHT",
+              "timestamp": "2026-09-05T07:43:40.123297Z"
+            },
+            {
+              "detail": "db-618ded82695b4788a2bd832c688110a2",
+              "state": "DATABASE_SEEDED",
+              "timestamp": "2026-09-05T07:43:40.133121Z"
+            },
+            {
+              "detail": "",
+              "state": "PRE_CRASH_PROBED",
+              "timestamp": "2026-09-05T07:43:40.133514Z"
+            },
+            {
+              "detail": "27927",
+              "state": "FIRST_WORKER_STARTED",
+              "timestamp": "2026-09-05T07:43:40.136165Z"
+            },
+            {
+              "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+              "state": "CHECKPOINT_REACHED",
+              "timestamp": "2026-09-05T07:43:40.234695Z"
+            },
+            {
+              "detail": "-9",
+              "state": "WORKER_KILLED",
+              "timestamp": "2026-09-05T07:43:40.237184Z"
+            },
+            {
+              "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+              "state": "POST_KILL_PROBED",
+              "timestamp": "2026-09-05T07:43:40.238309Z"
+            },
+            {
+              "detail": "27930",
+              "state": "REPLAY_WORKER_STARTED",
+              "timestamp": "2026-09-05T07:43:40.239559Z"
+            },
+            {
+              "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+              "state": "EVENT_REPLAYED",
+              "timestamp": "2026-09-05T07:43:40.356289Z"
+            },
+            {
+              "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+              "state": "FINAL_STATE_PROBED",
+              "timestamp": "2026-09-05T07:43:40.356293Z"
+            },
+            {
+              "detail": "EXACTLY_ONCE",
+              "state": "COMPLETE",
+              "timestamp": "2026-09-05T07:43:40.356650Z"
+            }
+          ],
+          "transport": "LOCAL",
+          "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
+        },
+        "canonical_rank": 2,
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "digest": "782f148c3a0b93609c8a9e774e6774037a623d024294d5e31e392efb1f16c96b",
+        "fault_boundary": "marker-commit",
+        "hypothesis_id": "marker-commit-v1",
+        "originating_base_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+        "provisional_capsule_digest": "46cbec00a2c253624a2f47405a7b2b4508cd0a8d72ce35fef3495c548d95a54f",
+        "reproduced": false,
+        "schema_version": "1",
+        "selected": false,
+        "trusted_operation_count": 2
+      }
+    ],
+    "integrity_status": "VALID",
+    "minimization_receipts": [
+      {
+        "candidate_schedule": [],
+        "confirmations": [
+          {
+            "amount_cents": 2500,
+            "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
+            "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+            "database_id": "db-185177ae747044bba39f1cdbdeed2572",
+            "digest": "7218d9a8d01c8409bce647644c93f4f25bfded1dd60f9d9ff3b4678d8105ac35",
+            "ended_at": "2026-09-05T07:43:40.598000Z",
+            "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "execution_nonce": "minimize-1-8c46fa54387b475e897de76bca6de919",
+            "execution_status": "COMPLETED",
+            "failure_detail": null,
+            "final_snapshot": {
+              "account_balance_cents": 2500,
+              "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+              "event_ledger_count": 1,
+              "event_ledger_total_cents": 2500,
+              "event_marker_count": 1
+            },
+            "first_delivery_operations": [
+              "credit",
+              "mark_processed"
+            ],
+            "first_delivery_snapshot": {
+              "account_balance_cents": 2500,
+              "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+              "event_ledger_count": 1,
+              "event_ledger_total_cents": 2500,
+              "event_marker_count": 1
+            },
+            "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+            "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+            "initial_snapshot": {
+              "account_balance_cents": 0,
+              "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+              "event_ledger_count": 0,
+              "event_ledger_total_cents": 0,
+              "event_marker_count": 0
+            },
+            "integrity_status": "VALID",
+            "observation": "EXACTLY_ONCE",
+            "parent_capsule_digest": "80f4531eb2b71d9b8dd3f7bc0faa01540cb79bb5f646e6732e0f1d83dad5b0d1",
+            "post_execution_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+            "receipt_id": "no-fault-cf1eebe7ccfe4eb8b91f1189de2283fe",
+            "replay_operations": [],
+            "role": "base",
+            "schema_version": "2",
+            "spawns": [
+              {
+                "ended_at": "2026-09-05T07:43:40.483214Z",
+                "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+                "exit_code": 0,
+                "ipc_session_id": "3c7b183ae4d14a7c89ea885e88bf97e1",
+                "phase": "first",
+                "pid": 27932,
+                "process_group_id": 27932,
+                "spawn_index": 1,
+                "started_at": "2026-09-05T07:43:40.367677Z",
+                "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+                "stderr_excerpt": "",
+                "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "stdout_excerpt": "",
+                "worker_nonce": "037a36e5785c48c9b899a6c0ae1eff0e"
+              },
+              {
+                "ended_at": "2026-09-05T07:43:40.596772Z",
+                "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+                "exit_code": 0,
+                "ipc_session_id": "6142f8fac0204bcfa79bf24f2f083d0a",
+                "phase": "replay",
+                "pid": 27933,
+                "process_group_id": 27933,
+                "spawn_index": 2,
+                "started_at": "2026-09-05T07:43:40.485656Z",
+                "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+                "stderr_excerpt": "",
+                "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "stdout_excerpt": "",
+                "worker_nonce": "3541c0d5b14d44b8ba81e4750b81494b"
+              }
+            ],
+            "started_at": "2026-09-05T07:43:40.360560Z",
+            "transport": "LOCAL",
+            "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
+          },
+          {
+            "amount_cents": 2500,
+            "binding_digest": "2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca",
+            "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+            "database_id": "db-dda6ad28646a498db8b58246150d2600",
+            "digest": "445a179bde695067c4614bd81e0c180e433b83020bf7fca321703f3a6505a913",
+            "ended_at": "2026-09-05T07:43:40.596938Z",
+            "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "execution_nonce": "minimize-2-6f06ad975ad843c49efac130a1547fe2",
+            "execution_status": "COMPLETED",
+            "failure_detail": null,
+            "final_snapshot": {
+              "account_balance_cents": 2500,
+              "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+              "event_ledger_count": 1,
+              "event_ledger_total_cents": 2500,
+              "event_marker_count": 1
+            },
+            "first_delivery_operations": [
+              "credit",
+              "mark_processed"
+            ],
+            "first_delivery_snapshot": {
+              "account_balance_cents": 2500,
+              "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+              "event_ledger_count": 1,
+              "event_ledger_total_cents": 2500,
+              "event_marker_count": 1
+            },
+            "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+            "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+            "initial_snapshot": {
+              "account_balance_cents": 0,
+              "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+              "event_ledger_count": 0,
+              "event_ledger_total_cents": 0,
+              "event_marker_count": 0
+            },
+            "integrity_status": "VALID",
+            "observation": "EXACTLY_ONCE",
+            "parent_capsule_digest": "80f4531eb2b71d9b8dd3f7bc0faa01540cb79bb5f646e6732e0f1d83dad5b0d1",
+            "post_execution_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+            "receipt_id": "no-fault-5522ca1653a2493daf48dd2c42bccd38",
+            "replay_operations": [],
+            "role": "base",
+            "schema_version": "2",
+            "spawns": [
+              {
+                "ended_at": "2026-09-05T07:43:40.483253Z",
+                "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+                "exit_code": 0,
+                "ipc_session_id": "0948d84d3dc54b678b1d6d3a8fe961ad",
+                "phase": "first",
+                "pid": 27931,
+                "process_group_id": 27931,
+                "spawn_index": 1,
+                "started_at": "2026-09-05T07:43:40.366356Z",
+                "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+                "stderr_excerpt": "",
+                "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "stdout_excerpt": "",
+                "worker_nonce": "5baa51bf7d10472eac35cdf2ed67d33a"
+              },
+              {
+                "ended_at": "2026-09-05T07:43:40.595868Z",
+                "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+                "exit_code": 0,
+                "ipc_session_id": "b796af27d1ac41a1bfd9ffcaed858a4c",
+                "phase": "replay",
+                "pid": 27934,
+                "process_group_id": 27934,
+                "spawn_index": 2,
+                "started_at": "2026-09-05T07:43:40.485968Z",
+                "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+                "stderr_excerpt": "",
+                "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "stdout_excerpt": "",
+                "worker_nonce": "59fdd3c58c434d699e5f48e9000f1856"
+              }
+            ],
+            "started_at": "2026-09-05T07:43:40.360579Z",
+            "transport": "LOCAL",
+            "tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2"
+          }
+        ],
+        "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+        "deletion_accepted": false,
+        "digest": "6356994d6c42e3c7a8efa8d11e10881707b0da32c36a17daf80a4cbb37d687e8",
+        "empty_schedule_reproduced_duplicate": false,
+        "originating_base_tree_digest": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
+        "parent_capsule_digest": "80f4531eb2b71d9b8dd3f7bc0faa01540cb79bb5f646e6732e0f1d83dad5b0d1",
+        "parent_schedule": [
+          "effect-commit"
+        ],
+        "removed_fault": "effect-commit",
+        "schema_version": "2",
+        "sole_fault_action_necessary_for_fixture": true,
+        "trace_digest": "3b70baa1f386f909338ca3ec40c6171e88ccbde6efe314060be3e3d65505bc5e"
+      }
+    ],
+    "run_id": "local-20260905T074340-46797375",
+    "schema_version": "1",
+    "started_at": "2026-09-05T07:43:40.110753Z",
+    "summary": "The candidate replayed evt_1042 to a durable +$50 duplicate effect.",
+    "sweeps": [
+      {
+        "attempts": [
+          {
+            "amount_cents": 2500,
+            "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
+            "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+            "checkpoint_reached": true,
+            "checkpoint_snapshot": {
+              "account_balance_cents": 2500,
+              "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+              "event_ledger_count": 1,
+              "event_ledger_total_cents": 2500,
+              "event_marker_count": 1
+            },
+            "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+            "database_id": "db-295619ed5cf94243872ef1ff4e6dfa92",
+            "digest": "4ad990e7371fcff5f0186178a0c3ab109f1121f36467efb1615f4f0e69c0a98f",
+            "ended_at": "2026-09-05T07:43:41.807151Z",
+            "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+            "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+            "execution_nonce": "corrected-sweep-1-479a73f5d48d44b1b0c0eeb05458dcb2",
+            "execution_status": "COMPLETED",
+            "failure_detail": null,
+            "final_snapshot": {
+              "account_balance_cents": 2500,
+              "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+              "event_ledger_count": 1,
+              "event_ledger_total_cents": 2500,
+              "event_marker_count": 1
+            },
+            "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+            "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+            "integrity_status": "VALID",
+            "kill_after_commit": 1,
+            "kill_signal": 9,
+            "observation": "EXACTLY_ONCE",
+            "post_execution_tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de",
+            "post_kill_snapshot": {
+              "account_balance_cents": 2500,
+              "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+              "event_ledger_count": 1,
+              "event_ledger_total_cents": 2500,
+              "event_marker_count": 1
+            },
+            "pre_crash_snapshot": {
+              "account_balance_cents": 0,
+              "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+              "event_ledger_count": 0,
+              "event_ledger_total_cents": 0,
+              "event_marker_count": 0
+            },
+            "provider_image_id": null,
+            "provider_operation_id": null,
+            "receipt_id": "attempt-8912b4d2091a48049ad396bf877787e2",
+            "replay_acknowledged": true,
+            "role": "corrected",
+            "schema_version": "1",
+            "spawns": [
+              {
+                "ended_at": "2026-09-05T07:43:41.711100Z",
+                "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+                "exit_code": -9,
+                "ipc_session_id": "46c149ebc43f4faf9c5a36a66b322dcf",
+                "phase": "first",
+                "pid": 27967,
+                "process_group_id": 27967,
+                "spawn_index": 1,
+                "started_at": "2026-09-05T07:43:41.620766Z",
+                "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+                "stderr_excerpt": "",
+                "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "stdout_excerpt": "",
+                "worker_nonce": "46139ab388b4475ea0bbef9d37e4266e"
+              },
+              {
+                "ended_at": "2026-09-05T07:43:41.806080Z",
+                "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+                "exit_code": 0,
+                "ipc_session_id": "03abe545346c4b2ca463c5c1bca75cd6",
+                "phase": "replay",
+                "pid": 27968,
+                "process_group_id": 27968,
+                "spawn_index": 2,
+                "started_at": "2026-09-05T07:43:41.712904Z",
+                "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+                "stderr_excerpt": "",
+                "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "stdout_excerpt": "",
+                "worker_nonce": "1d8b50cf009a4f56bcff4a244fab08f2"
+              }
+            ],
+            "started_at": "2026-09-05T07:43:41.615120Z",
+            "timeline": [
+              {
+                "detail": "",
+                "state": "PREFLIGHT",
+                "timestamp": "2026-09-05T07:43:41.615120Z"
+              },
+              {
+                "detail": "db-295619ed5cf94243872ef1ff4e6dfa92",
+                "state": "DATABASE_SEEDED",
+                "timestamp": "2026-09-05T07:43:41.618942Z"
+              },
+              {
+                "detail": "",
+                "state": "PRE_CRASH_PROBED",
+                "timestamp": "2026-09-05T07:43:41.619118Z"
+              },
+              {
+                "detail": "27967",
+                "state": "FIRST_WORKER_STARTED",
+                "timestamp": "2026-09-05T07:43:41.620969Z"
+              },
+              {
+                "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+                "state": "CHECKPOINT_REACHED",
+                "timestamp": "2026-09-05T07:43:41.709502Z"
+              },
+              {
+                "detail": "-9",
+                "state": "WORKER_KILLED",
+                "timestamp": "2026-09-05T07:43:41.711102Z"
+              },
+              {
+                "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+                "state": "POST_KILL_PROBED",
+                "timestamp": "2026-09-05T07:43:41.711279Z"
+              },
+              {
+                "detail": "27968",
+                "state": "REPLAY_WORKER_STARTED",
+                "timestamp": "2026-09-05T07:43:41.713079Z"
+              },
+              {
+                "detail": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+                "state": "EVENT_REPLAYED",
+                "timestamp": "2026-09-05T07:43:41.806657Z"
+              },
+              {
+                "detail": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+                "state": "FINAL_STATE_PROBED",
+                "timestamp": "2026-09-05T07:43:41.806668Z"
+              },
+              {
+                "detail": "EXACTLY_ONCE",
+                "state": "COMPLETE",
+                "timestamp": "2026-09-05T07:43:41.807151Z"
+              }
+            ],
+            "transport": "LOCAL",
+            "tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de"
+          }
+        ],
+        "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
+        "capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+        "census": {
+          "amount_cents": 2500,
+          "binding_digest": "b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131",
+          "contract_digest": "a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a",
+          "database_id": "db-8703f6398aa141ac80d2e0de1dd320e4",
+          "digest": "b29c42c2caef271896bcca74b37cd336f6e25bd27df7ada4a793015fb6cafcdf",
+          "ended_at": "2026-09-05T07:43:41.614450Z",
+          "environment_digest": "dbe8e6a78cdca4b4b858aa34b3f263c5f6c6bde5c06989a36c33d1097dbbee90",
+          "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+          "execution_nonce": "corrected-census-d706ed2f5638465e98a4b22b1e4422a8",
+          "execution_status": "COMPLETED",
+          "failure_detail": null,
+          "final_snapshot": {
+            "account_balance_cents": 2500,
+            "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "event_ledger_count": 1,
+            "event_ledger_total_cents": 2500,
+            "event_marker_count": 1
+          },
+          "first_delivery_operations": [
+            "credit_and_mark"
+          ],
+          "first_delivery_snapshot": {
+            "account_balance_cents": 2500,
+            "digest": "91c9119866c0ebd50bb87c934aeec357692bef4cbbed287c3e03ba81907c0200",
+            "event_ledger_count": 1,
+            "event_ledger_total_cents": 2500,
+            "event_marker_count": 1
+          },
+          "initial_database_digest": "8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937",
+          "initial_database_file_digest": "deaf9b9ace9d1644100cafe0cf736c7e2a74ee70d9a55169086b01349260430d",
+          "initial_snapshot": {
+            "account_balance_cents": 0,
+            "digest": "fe2fb934ba1f9f7e7c7eb9b4427d7e8a18cc075b306f3b13f263c1ff579921b4",
+            "event_ledger_count": 0,
+            "event_ledger_total_cents": 0,
+            "event_marker_count": 0
+          },
+          "integrity_status": "VALID",
+          "observation": "EXACTLY_ONCE",
+          "parent_capsule_digest": "6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d",
+          "post_execution_tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de",
+          "receipt_id": "no-fault-a8fca4f0229c44fd98b242c38d2267da",
+          "replay_operations": [],
+          "role": "corrected",
+          "schema_version": "2",
+          "spawns": [
+            {
+              "ended_at": "2026-09-05T07:43:41.501078Z",
+              "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+              "exit_code": 0,
+              "ipc_session_id": "e3540f78421649d49bd6d879c79f9546",
+              "phase": "first",
+              "pid": 27965,
+              "process_group_id": 27965,
+              "spawn_index": 1,
+              "started_at": "2026-09-05T07:43:41.402737Z",
+              "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+              "stderr_excerpt": "",
+              "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stdout_excerpt": "",
+              "worker_nonce": "ff15ed255e334e12ad2010b813348133"
+            },
+            {
+              "ended_at": "2026-09-05T07:43:41.613499Z",
+              "event_digest": "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293",
+              "exit_code": 0,
+              "ipc_session_id": "0810c8cea3324fd58ebeb039e53a122d",
+              "phase": "replay",
+              "pid": 27966,
+              "process_group_id": 27966,
+              "spawn_index": 2,
+              "started_at": "2026-09-05T07:43:41.503063Z",
+              "stderr_digest": "92041b52b17dcdad902ae626a4c86f61dcc6dfbecaac367dddfc1a8943810a8c",
+              "stderr_excerpt": "",
+              "stdout_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+              "stdout_excerpt": "",
+              "worker_nonce": "7298035e6db0491d8d5069b8654ae4b2"
+            }
+          ],
+          "started_at": "2026-09-05T07:43:41.397073Z",
+          "transport": "LOCAL",
+          "tree_digest": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de"
+        },
+        "digest": "4f6e97c6919aae567df9ef83e29b3e36a3dc74c06432a159be587faf16825d88",
+        "observation": "EXACTLY_ONCE",
+        "role": "corrected",
+        "schema_version": "1"
+      }
+    ],
+    "transport": "LOCAL",
+    "verdict": "PATCH_FAILED_STILL_REPRODUCES"
+  },
+  "schema_version": "nemisis.crashcheck.run.v1"
+}

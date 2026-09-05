@@ -1,11 +1,11 @@
 # Proof ledger
 
 This ledger separates observed behavior from transport and product claims. The committed evidence
-was executed from clean source `ddaf186aa81b8a7ebd442da1f2dfeee6878e7dce` and published by
-`3d66ccd4499fae5f1d6fbe5beee4b097d3ce3949`. Later commits changed engine bytes (the current engine
-code digest is `a9b1227d5c32db9500232be0a161906a23128f7c95d5d9e06c82a26bc34897ad`); the committed hero stays
-bound to its own exact source and engine and is not relabelled. A fresh `check` at the current
-commit prints its own capsule and engine digests.
+was executed from clean source `0b29f3381ce3c8188cef521de7726d0b02af55b3` on 2026-09-05 and
+published by the commit that follows it on `overnight/hardening`. It was recorded at the current engine
+code digest is `a9b1227d5c32db9500232be0a161906a23128f7c95d5d9e06c82a26bc34897ad`, so
+`tests/test_static_hero.py` re-validates every committed receipt against the live strict models. A
+fresh `check` at any later engine prints its own capsule and engine digests and is never relabelled.
 
 | Capability | Truth state | Exact evidence |
 | --- | --- | --- |
@@ -13,11 +13,11 @@ commit prints its own capsule and engine digests.
 | Fresh replay of the identical event | `LOCAL` / `FIXTURE` / `VALID` | Every proof attempt has two distinct worker and IPC nonces with event digest `4ad9ce16…`. |
 | Candidate-blind witness selection | `VERIFIED` | Candidate-invariance and ordering tests; two base-only receipts precede candidate materialization. |
 | Exact anchor mapping | `VERIFIED` | Unique mappings bind exact tree digests; zero, multiple, and invalid (async or wrong-arity) supported mappings publish `EVIDENCE_INCOMPLETE` plus `anchor-resolution.json`, each exercised through `check`. |
-| Fixture-scoped fault-action necessity | `VERIFIED` | One deletion trial; 2/2 fresh empty-schedule base worlds are `EXACTLY_ONCE`; schema-v2 field is `sole_fault_action_necessary_for_fixture`. |
-| Base/candidate/corrected verdicts | `LOCAL` / `FIXTURE` / `VALID` | Five fresh valid worlds per role: buggy and misleading-green duplicate; atomic completes exactly once. |
-| Repro Capsule | `VERIFIED` | Capsule `1025d9c6e014394cf80629d180e7cb4fb1a77a4b7b26934980b5f5ea975069a8`, engine digest `47d78405…`, exact event/environment/seed/tree identities. |
+| No-crash control (the base's duplicate needs the crash) | `VERIFIED` | 2/2 fresh no-kill base deliveries are `EXACTLY_ONCE`; the receipt still carries the older field name `sole_fault_action_necessary_for_fixture`. |
+| Base/candidate/corrected verdicts | `LOCAL` / `FIXTURE` / `VALID` | Five fresh valid worlds per role: buggy and misleading-green duplicate; atomic completes exactly once, and its commit sweep (census `credit_and_mark`, one kill point) ends exactly once. |
+| Repro Capsule | `VERIFIED` | Capsule `6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d`, engine digest `a9b1227d…`, exact event/environment/seed/tree identities. |
 | Installed-wheel replay and regression | `VERIFIED` | External temp install: base/candidate/corrected replay exits `1`/`1`/`0`; exported regression fails candidate and passes atomic. In-suite: base-role replay yields `BUG_REPRODUCED`, a fixed tree under `--role base` is `EVIDENCE_INCOMPLETE`, and an over-crediting candidate is `INVARIANT_FAILED`, never proven. |
-| Measured benchmark | `LOCAL` / `FIXTURE` | Result `11016ce964b88961c246c91eb1ae437cf0ff9e9547a794ad845776af52af864a`; strict schema/digest validation passes. |
+| Measured benchmark | `LOCAL` / `FIXTURE` | Result `9b455bdee94234178b158d513a033924996dca4a6213b1513aa61acdca480973`; strict schema/digest validation passes. |
 | Static one-minute viewer | `LOCAL` / `FIXTURE` | Verdict-first five-beat viewer with stepped replay and a pinned `LOCAL` / `FIXTURE` bar, exact receipt bindings, fail-closed runtime, and explicit “Replay fixture evidence” control. |
 | Project gates | `VERIFIED` | Locked sync, formatting, Ruff, mypy, 348 local tests, sdist, and wheel pass. |
 | GitHub composite Action | `VERIFIED_WITH_BOUNDARY` | Exact-SHA CI executes `uses: ./`, expected candidate rejection, artifact validation, installed-wheel smoke, and corrected replay. The copyable workflow pins engine `f05ae921…`. Not exercised by CI: remote-action download, real upload transfer, and the action's Git-ref branch (resolving `base` to a commit SHA and reading the base-owned `.nemisis/config.json`), which every real pull request takes; that branch is covered only by the Python-level Git materialization tests. |
@@ -50,9 +50,9 @@ is represented as `LIVE` or `RECORDED_LIVE`.
 
 - [measured benchmark](../benchmarks/results/crashcheck-v1.json)
 - [viewer](assets/crashcheck-hero/index.html)
-- [run manifest](assets/crashcheck-hero/runs/local-20260831T020037-73e97ef2/manifest.json)
-- [full receipt](assets/crashcheck-hero/runs/local-20260831T020037-73e97ef2/report.html)
-- [capsule](assets/crashcheck-hero/repros/double-credit/1025d9c6e014394cf80629d180e7cb4fb1a77a4b7b26934980b5f5ea975069a8/capsule.json)
+- [run manifest](assets/crashcheck-hero/runs/local-20260905T074340-46797375/manifest.json)
+- [full receipt](assets/crashcheck-hero/runs/local-20260905T074340-46797375/report.html)
+- [capsule](assets/crashcheck-hero/repros/double-credit/6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d/capsule.json)
 - [live prerequisites](LIVE_RUNBOOK.md)
 - [turnkey live setup](LIVE_SETUP.md)
 - [screenshots and recording](assets/screenshots/)

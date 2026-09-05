@@ -4,21 +4,21 @@ Updated 2026-09-05 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
 
 ## Exact identities
 
-Committed hero evidence (unchanged, bound to its own exact source and engine):
+Committed hero evidence (regenerated 2026-09-05 at the current engine):
 
-- measured clean source: `ddaf186aa81b8a7ebd442da1f2dfeee6878e7dce`
-- evidence/viewer publication: `3d66ccd4499fae5f1d6fbe5beee4b097d3ce3949`
-- engine code digest at that source: `47d78405ca59dee877328e16face03b15af484e3d65811e8caf213f00d8ec912`
-- capsule digest: `1025d9c6e014394cf80629d180e7cb4fb1a77a4b7b26934980b5f5ea975069a8`
-- benchmark result digest: `11016ce964b88961c246c91eb1ae437cf0ff9e9547a794ad845776af52af864a`
+- measured clean source: `0b29f3381ce3c8188cef521de7726d0b02af55b3`
+- evidence/viewer publication: the commit that follows it on `overnight/hardening`
+- engine code digest at that source: `a9b1227d5c32db9500232be0a161906a23128f7c95d5d9e06c82a26bc34897ad`
+- capsule digest: `6b51d8f0cb06a2892cac90de36d81a378f3ea8c63d40920aec3f8b72f602c18d`
+- benchmark result digest: `9b455bdee94234178b158d513a033924996dca4a6213b1513aa61acdca480973`
 - the capsule and benchmark digests are bound to CPython 3.12.13 / SQLite 3.53.1 / Darwin arm64
   through the runner environment digest; only the engine code digest is environment-independent
 
 Current tree:
 
 - engine code digest: `a9b1227d5c32db9500232be0a161906a23128f7c95d5d9e06c82a26bc34897ad`
-  (changed by the contract-proposal and review commits; `tests/test_docs_identity.py` pins this value, so it cannot rot; a fresh `check` prints a new capsule digest bound to
-  this engine, and the committed hero is not relabelled)
+  (the same engine that recorded the committed hero; `tests/test_docs_identity.py` pins this value,
+  so it cannot rot)
 - interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence
 
 ## Product state
