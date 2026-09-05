@@ -264,6 +264,16 @@ class CreditSnapshot(_DigestedModel):
     event_marker_count: int = Field(ge=0, le=1)
 
 
+def classify_final(snapshot: CreditSnapshot, amount_cents: int) -> CrashObservation:
+    """The only rule that turns a final durable state into an observation."""
+    state = _snapshot_state(snapshot)
+    if state[:3] == (amount_cents * 2, 2, amount_cents * 2):
+        return CrashObservation.DUPLICATE_EFFECT
+    if state == (amount_cents, 1, amount_cents, 1):
+        return CrashObservation.EXACTLY_ONCE
+    return CrashObservation.INVARIANT_FAILED
+
+
 class TimelineEntry(StrictModel):
     state: TimelineState
     timestamp: datetime
@@ -310,6 +320,7 @@ class AttemptReceipt(_DigestedModel):
     post_execution_tree_digest: Sha256 | None = None
     environment_digest: Sha256
     event_digest: Sha256
+    amount_cents: int = Field(gt=0, le=1_000_000)
     initial_database_digest: Sha256
     initial_database_file_digest: Sha256 | None = None
     database_id: SafeId
@@ -388,47 +399,10 @@ class AttemptReceipt(_DigestedModel):
                 raise ValueError("completed attempt pre-crash snapshot is not the seeded state")
             if post_kill.digest != checkpoint.digest:
                 raise ValueError("completed attempt checkpoint changed after worker death")
-            checkpoint_state = _snapshot_state(checkpoint)
-            final_state = _snapshot_state(final)
-            if self.observation is CrashObservation.DUPLICATE_EFFECT:
-                expected_checkpoint = (
-                    checkpoint.account_balance_cents,
-                    1,
-                    checkpoint.account_balance_cents,
-                    0,
-                )
-                expected_finals = {
-                    (
-                        checkpoint.account_balance_cents * 2,
-                        2,
-                        checkpoint.account_balance_cents * 2,
-                        marker,
-                    )
-                    for marker in (0, 1)
-                }
-                if (
-                    checkpoint.account_balance_cents <= 0
-                    or checkpoint_state != expected_checkpoint
-                    or final_state not in expected_finals
-                ):
-                    raise ValueError("duplicate observation contradicts checkpoint or final state")
-            elif self.observation is CrashObservation.EXACTLY_ONCE:
-                expected = (
-                    checkpoint.account_balance_cents,
-                    1,
-                    checkpoint.account_balance_cents,
-                    1,
-                )
-                if (
-                    checkpoint.account_balance_cents <= 0
-                    or checkpoint_state != expected
-                    or (final_state != expected)
-                ):
-                    raise ValueError(
-                        "exactly-once observation contradicts checkpoint or final state"
-                    )
-            elif self.observation is CrashObservation.NOT_OBSERVED:
-                raise ValueError("completed attempt requires an observed final state")
+            # The checkpoint is whatever the handler had committed when it was killed; only the
+            # final state decides, through the one shared rule.
+            if self.observation is not classify_final(final, self.amount_cents):
+                raise ValueError("completed attempt observation contradicts its final state")
         elif self.failure_detail is None:
             raise ValueError("incomplete attempt requires a failure detail")
         return self
@@ -456,6 +430,7 @@ class NoFaultReplayReceipt(_DigestedModel):
     post_execution_tree_digest: Sha256 | None = None
     environment_digest: Sha256
     event_digest: Sha256
+    amount_cents: int = Field(gt=0, le=1_000_000)
     initial_database_digest: Sha256
     initial_database_file_digest: Sha256 | None = None
     database_id: SafeId
@@ -501,28 +476,10 @@ class NoFaultReplayReceipt(_DigestedModel):
                 or self.final_snapshot is None
             ):
                 raise ValueError("completed no-fault replay lacks exact two-process evidence")
-            initial = _snapshot_state(self.initial_snapshot)
-            first = _snapshot_state(self.first_delivery_snapshot)
-            final = _snapshot_state(self.final_snapshot)
-            if initial != (0, 0, 0, 0):
+            if _snapshot_state(self.initial_snapshot) != (0, 0, 0, 0):
                 raise ValueError("no-fault replay did not begin from the seeded state")
-            expected_first = (first[0], 1, first[0], 1)
-            expected = (
-                first[0] * 2,
-                2,
-                first[0] * 2,
-                1,
-            )
-            if self.observation is CrashObservation.EXACTLY_ONCE and (
-                first[0] <= 0 or first != expected_first or final != first
-            ):
-                raise ValueError("no-fault exactly-once observation contradicts final state")
-            if self.observation is CrashObservation.DUPLICATE_EFFECT and (
-                first[0] <= 0 or first != expected_first or final != expected
-            ):
-                raise ValueError("no-fault duplicate observation contradicts final state")
-            if self.observation is CrashObservation.NOT_OBSERVED:
-                raise ValueError("completed no-fault replay requires a conclusive observation")
+            if self.observation is not classify_final(self.final_snapshot, self.amount_cents):
+                raise ValueError("no-fault replay observation contradicts its final state")
             if not self.first_delivery_operations:
                 raise ValueError("completed no-fault replay recorded no store commits")
         elif self.failure_detail is None:
@@ -1273,6 +1230,7 @@ __all__ = [
     "ReproCapsule",
     "RetryContract",
     "WorldRole",
+    "classify_final",
     "effective_observation",
     "sweep_observation",
 ]

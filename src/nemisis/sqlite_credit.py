@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib.util
 import inspect
 import json
@@ -13,6 +14,7 @@ import socket
 import sqlite3
 import subprocess
 import sys
+import threading
 import uuid
 from collections.abc import Callable, Mapping
 from contextlib import suppress
@@ -41,6 +43,7 @@ from nemisis.crash_models import (
     TimelineState,
     WorkerSpawnReceipt,
     WorldRole,
+    classify_final,
 )
 from nemisis.hashing import canonical_json, sha256_bytes, sha256_json, sha256_tree
 from nemisis.models import TruthLabel
@@ -98,6 +101,34 @@ class AnchorResolutionError(ValueError):
         self.matched_paths = matched_paths
 
 
+class _Drain:
+    """Read one worker stream to EOF on a thread, hashing it, so the worker never blocks on a
+    full pipe. EOF arrives only when every holder of the write end has closed it, which is how
+    surviving descendants are detected."""
+
+    def __init__(self, stream: object) -> None:
+        self.digest = hashlib.sha256()
+        self._stream = stream
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def _run(self) -> None:
+        read = getattr(self._stream, "read", None)
+        if read is None:
+            return
+        with suppress(OSError, ValueError):
+            while chunk := read(65_536):
+                self.digest.update(chunk.encode() if isinstance(chunk, str) else chunk)
+        with suppress(OSError, ValueError):
+            close = getattr(self._stream, "close", None)
+            if close is not None:
+                close()
+
+    def finished(self, timeout: float) -> bool:
+        self.thread.join(timeout)
+        return not self.thread.is_alive()
+
+
 @dataclass
 class _Spawn:
     index: int
@@ -113,6 +144,11 @@ class _Spawn:
     ended_at: datetime | None = None
     stdout_digest: str = field(default_factory=lambda: sha256_bytes(b""))
     stderr_digest: str = field(default_factory=lambda: sha256_bytes(b""))
+    drains: tuple[_Drain, _Drain] | None = None
+
+    def __post_init__(self) -> None:
+        if self.process.stdout is not None and self.process.stderr is not None:
+            self.drains = (_Drain(self.process.stdout), _Drain(self.process.stderr))
 
 
 def initial_database_digest(event: Mapping[str, object]) -> str:
@@ -200,7 +236,8 @@ def bind_anchor(
         raise AnchorResolutionError(
             AnchorResolutionStatus.ZERO_MATCHES,
             (),
-            "supported target has no top-level handler binding in the exact tree",
+            f"supported target has no top-level `def {symbol}` in the exact tree (an alias or "
+            "re-export is not a binding)",
         )
     if len(definitions) > 1:
         raise AnchorResolutionError(
@@ -362,11 +399,9 @@ def execute_attempt(
         integrity = IntegrityStatus.INCOMPLETE
         failure_detail = f"{type(error).__name__}: {str(error)[:800]}"
 
-    cleanup_error = _cleanup(spawns)
-    if cleanup_error is not None:
-        status = ExecutionStatus.CLEANUP_ERROR
-        integrity = IntegrityStatus.INCOMPLETE
-        failure_detail = cleanup_error
+    status, integrity, failure_detail = _after_cleanup(
+        _cleanup(spawns), status, integrity, failure_detail
+    )
     ended_at = datetime.now(UTC)
     timeline.append(
         TimelineEntry(
@@ -392,6 +427,7 @@ def execute_attempt(
         post_execution_tree_digest=tree_after,
         environment_digest=capsule.environment_digest,
         event_digest=capsule.event_digest,
+        amount_cents=capsule.amount_cents,
         initial_database_digest=capsule.initial_database_digest,
         initial_database_file_digest=initial_file_digest,
         database_id=database_id,
@@ -504,11 +540,9 @@ def execute_no_fault_replay(
         integrity = IntegrityStatus.INCOMPLETE
         failure_detail = f"{type(error).__name__}: {str(error)[:800]}"
 
-    cleanup_error = _cleanup(spawns)
-    if cleanup_error is not None:
-        status = ExecutionStatus.CLEANUP_ERROR
-        integrity = IntegrityStatus.INCOMPLETE
-        failure_detail = cleanup_error
+    status, integrity, failure_detail = _after_cleanup(
+        _cleanup(spawns), status, integrity, failure_detail
+    )
     return NoFaultReplayReceipt.with_digest(
         receipt_id=f"no-fault-{uuid.uuid4().hex}",
         role=WorldRole(role),
@@ -522,6 +556,7 @@ def execute_no_fault_replay(
         post_execution_tree_digest=tree_after,
         environment_digest=capsule.environment_digest,
         event_digest=capsule.event_digest,
+        amount_cents=capsule.amount_cents,
         initial_database_digest=capsule.initial_database_digest,
         initial_database_file_digest=initial_file_digest,
         database_id=database_id,
@@ -536,6 +571,20 @@ def execute_no_fault_replay(
         final_snapshot=final,
         failure_detail=failure_detail,
     )
+
+
+def _after_cleanup(
+    cleanup_error: str | None,
+    status: ExecutionStatus,
+    integrity: IntegrityStatus,
+    failure_detail: str | None,
+) -> tuple[ExecutionStatus, IntegrityStatus, str | None]:
+    """A cleanup problem fails a completed run; it never hides an earlier failure."""
+    if cleanup_error is None:
+        return status, integrity, failure_detail
+    if status is ExecutionStatus.COMPLETED:
+        return ExecutionStatus.CLEANUP_ERROR, IntegrityStatus.INCOMPLETE, cleanup_error
+    return status, integrity, f"{failure_detail}; cleanup: {cleanup_error}"[:1_000]
 
 
 def _preflight(
@@ -689,7 +738,7 @@ def _spawn_worker(
     try:
         process = subprocess.Popen(
             argv,
-            cwd=source_tree,
+            cwd=database.parent,
             env={
                 "PATH": os.environ.get("PATH", ""),
                 "PYTHONDONTWRITEBYTECODE": "1",
@@ -788,10 +837,21 @@ def _wait_for_checkpoint(
                 return snapshot
             _send(spawn.channel, {"type": "continue"})
         elif kind in {"done", "error"}:
-            raise _AttemptFailure(
-                ExecutionStatus.CHECKPOINT_NOT_REACHED,
-                "worker ended before the durable credit checkpoint",
-            )
+            if kind == "done" and not spawn.operations:
+                detail = (
+                    "the handler finished without a single CreditStore commit; CrashCheck can "
+                    "only kill at store commits, so a handler that writes around the store "
+                    "cannot be crash-tested"
+                )
+            elif kind == "done":
+                detail = (
+                    "the handler finished without ever committing the credit "
+                    f"(commits seen: {', '.join(spawn.operations)}); check it credits at all "
+                    "before crash-testing it"
+                )
+            else:
+                detail = "the handler raised before the durable credit checkpoint"
+            raise _AttemptFailure(ExecutionStatus.CHECKPOINT_NOT_REACHED, detail)
         else:
             raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "unexpected worker message")
 
@@ -962,7 +1022,7 @@ def _cleanup(spawns: list[_Spawn]) -> str | None:
             # Deliberately unconditional: a /dev/null descendant can outlive a reaped leader in
             # the same group (tested). The window for PID reuse between reap and this call is
             # microseconds; containment wins that trade.
-            with suppress(ProcessLookupError):
+            with suppress(ProcessLookupError, PermissionError):
                 os.killpg(spawn.process.pid, signal.SIGKILL)
             if spawn.process.poll() is None:
                 spawn.process.wait(timeout=2)
@@ -978,26 +1038,35 @@ def _collect(spawn: _Spawn) -> None:
     if spawn.ended_at is not None:
         return
     descendants_survived = False
-    try:
-        stdout, stderr = spawn.process.communicate(timeout=1)
-    except subprocess.TimeoutExpired:
+    if spawn.drains is None:
+        raise _AttemptFailure(
+            ExecutionStatus.CLEANUP_ERROR, "worker output streams were not captured"
+        )
+    if not all(drain.finished(1) for drain in spawn.drains):
         descendants_survived = True
-        with suppress(ProcessLookupError):
+        with suppress(ProcessLookupError, PermissionError):
             os.killpg(spawn.process.pid, signal.SIGKILL)
-        try:
-            stdout, stderr = spawn.process.communicate(timeout=2)
-        except subprocess.TimeoutExpired as error:
+        if not all(drain.finished(2) for drain in spawn.drains):
             raise _AttemptFailure(
                 ExecutionStatus.CLEANUP_ERROR,
-                "worker process-group output pipes did not close after cleanup",
+                "a child process inherited the worker's stdout/stderr and outlived the kill; "
+                "detached helpers must not share the worker's pipes",
+            )
+    if spawn.process.poll() is None:
+        try:
+            spawn.process.wait(timeout=2)
+        except subprocess.TimeoutExpired as error:
+            raise _AttemptFailure(
+                ExecutionStatus.CLEANUP_ERROR, "worker did not exit after its output closed"
             ) from error
-    spawn.stdout_digest = sha256_bytes(stdout.encode())
-    spawn.stderr_digest = sha256_bytes(stderr.encode())
+    spawn.stdout_digest = spawn.drains[0].digest.hexdigest()
+    spawn.stderr_digest = spawn.drains[1].digest.hexdigest()
     spawn.ended_at = datetime.now(UTC)
     if descendants_survived:
         raise _AttemptFailure(
             ExecutionStatus.CLEANUP_ERROR,
-            "worker descendants survived their supervisor and were killed",
+            "worker descendants survived their supervisor and were killed; a fire-and-forget "
+            "child that shares the worker's stdout/stderr is not exactly-once evidence",
         )
 
 
@@ -1022,17 +1091,7 @@ def _spawn_receipt(spawn: _Spawn, event_digest: str) -> WorkerSpawnReceipt:
 
 
 def _observation(snapshot: CreditSnapshot, amount: int) -> CrashObservation:
-    state = (
-        snapshot.account_balance_cents,
-        snapshot.event_ledger_count,
-        snapshot.event_ledger_total_cents,
-        snapshot.event_marker_count,
-    )
-    if state[:3] == (amount * 2, 2, amount * 2):
-        return CrashObservation.DUPLICATE_EFFECT
-    if state == (amount, 1, amount, 1):
-        return CrashObservation.EXACTLY_ONCE
-    return CrashObservation.INVARIANT_FAILED
+    return classify_final(snapshot, amount)
 
 
 def _entry(state: TimelineState, detail: str = "") -> TimelineEntry:

@@ -91,6 +91,29 @@ def apply_credit(store, event):
         )
 """
 
+LEFTOVER_CREDIT = """def apply_credit(store, event):
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+CHATTY_LOGGER = """import sys
+
+
+def apply_credit(store, event):
+    for line in range(6000):
+        print("debug: about to credit", line, event["event_id"])
+        print("debug: still here", line, file=sys.stderr)
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    for line in range(6000):
+        print("debug: credited", line)
+"""
+
+AUDIT_FILE = """def apply_credit(store, event):
+    with open("audit.log", "a", encoding="utf-8") as log:
+        log.write(f"crediting {event['event_id']}\\n")
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
 THREE_ARGUMENT = """def apply_credit(store, event, extra=None):
     store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
 """
@@ -163,6 +186,46 @@ def test_mark_then_credit_passes_the_boundary_and_fails_the_commit_sweep(
     report = (tmp_path / "artifacts" / result.artifacts["report"]).read_text(encoding="utf-8")
     assert "Commit sweep · candidate" in report
     assert "after commit 1" in report
+
+
+def test_leftover_credit_after_the_atomic_call_is_a_duplicate_not_a_validation_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Red-team finding: this handler double-credits on every delivery. Before the receipts
+    validated relationally, the real evidence was rejected by a fixture-shaped validator and the
+    run said "attempt orchestration failed (ValidationError)" instead of naming the duplicate."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "leftover-credit", LEFTOVER_CREDIT)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
+    boundary = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
+    assert {a.observation for a in boundary} == {CrashObservation.DUPLICATE_EFFECT}
+    assert all(a.execution_status is ExecutionStatus.COMPLETED for a in boundary)
+    checkpoint = boundary[0].checkpoint_snapshot
+    assert checkpoint is not None and checkpoint.event_marker_count == 1
+    assert cli._exit_code(result.verdict) == 1
+
+
+@pytest.mark.parametrize(
+    ("name", "source"),
+    [("chatty-logger", CHATTY_LOGGER), ("audit-file", AUDIT_FILE)],
+)
+def test_correct_handlers_with_noisy_side_channels_are_still_proven(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, source: str
+) -> None:
+    """Red-team false fails: a handler that logs more than one pipe buffer used to block on a
+    full pipe and time out; one that appends a relative audit file used to dirty the bound tree
+    because the worker ran inside it. Neither touches the money."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, name, source)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE, result.summary
+    assert cli._exit_code(result.verdict) == 0
+    assert not list(candidate.rglob("audit.log"))
 
 
 def test_candidate_that_never_marks_still_duplicates_and_fails(

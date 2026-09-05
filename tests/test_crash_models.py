@@ -127,7 +127,10 @@ def _attempt_values(
 ) -> dict[str, object]:
     duplicate = observation is CrashObservation.DUPLICATE_EFFECT
     checkpoint = _snapshot(marker=0) if duplicate else _snapshot()
-    final = _snapshot(effects=2) if duplicate else _snapshot()
+    final = {
+        CrashObservation.DUPLICATE_EFFECT: _snapshot(effects=2),
+        CrashObservation.INVARIANT_FAILED: _snapshot(effects=3),
+    }.get(observation, _snapshot())
     return {
         "receipt_id": f"{role.value}-attempt-{index}",
         "role": role,
@@ -142,6 +145,7 @@ def _attempt_values(
         "post_execution_tree_digest": binding.tree_digest,
         "environment_digest": capsule.environment_digest,
         "event_digest": capsule.event_digest,
+        "amount_cents": capsule.amount_cents,
         "initial_database_digest": capsule.initial_database_digest,
         "initial_database_file_digest": HASHES[7],
         "database_id": f"database-{role.value}-{index}",
@@ -282,6 +286,7 @@ def _no_fault_receipt(
         post_execution_tree_digest=binding.tree_digest,
         environment_digest=capsule.environment_digest,
         event_digest=capsule.event_digest,
+        amount_cents=capsule.amount_cents,
         initial_database_digest=capsule.initial_database_digest,
         initial_database_file_digest=HASHES[7],
         database_id=f"min-database-{index}",
@@ -537,7 +542,7 @@ def test_duplicate_observation_accepts_a_missing_marker() -> None:
     assert receipt.observation is CrashObservation.DUPLICATE_EFFECT
 
     values["final_snapshot"] = _snapshot(effects=3, marker=0)
-    with pytest.raises(ValidationError, match="duplicate observation"):
+    with pytest.raises(ValidationError, match="observation contradicts its final state"):
         AttemptReceipt.with_digest(**values)
 
 
@@ -598,14 +603,19 @@ def test_completed_attempt_binds_tree_and_observation_to_snapshots() -> None:
     with pytest.raises(ValidationError, match="post-execution tree"):
         AttemptReceipt.with_digest(**wrong_tree)
 
-    wrong_exact = _attempt_values(capsule, binding)
-    wrong_exact["checkpoint_snapshot"] = _snapshot(marker=0)
-    wrong_exact["post_kill_snapshot"] = wrong_exact["checkpoint_snapshot"]
-    with pytest.raises(ValidationError, match="exactly-once observation"):
-        AttemptReceipt.with_digest(**wrong_exact)
+    # The checkpoint is whatever the handler had committed when killed; a commit-sweep kill
+    # after a marker-only commit is a legitimate (0, 0, 0, 1) checkpoint.
+    marker_only = _attempt_values(capsule, binding, observation=CrashObservation.INVARIANT_FAILED)
+    marker_only["checkpoint_snapshot"] = _snapshot(effects=0, marker=1)
+    marker_only["post_kill_snapshot"] = marker_only["checkpoint_snapshot"]
+    marker_only["final_snapshot"] = _snapshot(effects=0, marker=1)
+    assert AttemptReceipt.with_digest(**marker_only).observation is (
+        CrashObservation.INVARIANT_FAILED
+    )
+
     wrong_exact_final = _attempt_values(capsule, binding)
     wrong_exact_final["final_snapshot"] = _snapshot(effects=2)
-    with pytest.raises(ValidationError, match="exactly-once observation"):
+    with pytest.raises(ValidationError, match="observation contradicts its final state"):
         AttemptReceipt.with_digest(**wrong_exact_final)
 
     wrong_duplicate = _attempt_values(
@@ -614,17 +624,12 @@ def test_completed_attempt_binds_tree_and_observation_to_snapshots() -> None:
         observation=CrashObservation.DUPLICATE_EFFECT,
     )
     wrong_duplicate["final_snapshot"] = _snapshot()
-    with pytest.raises(ValidationError, match="duplicate observation"):
+    with pytest.raises(ValidationError, match="observation contradicts its final state"):
         AttemptReceipt.with_digest(**wrong_duplicate)
-    wrong_duplicate_checkpoint = _attempt_values(
-        capsule,
-        binding,
-        observation=CrashObservation.DUPLICATE_EFFECT,
-    )
-    wrong_duplicate_checkpoint["checkpoint_snapshot"] = _snapshot()
-    wrong_duplicate_checkpoint["post_kill_snapshot"] = _snapshot()
-    with pytest.raises(ValidationError, match="duplicate observation"):
-        AttemptReceipt.with_digest(**wrong_duplicate_checkpoint)
+    wrong_amount = _attempt_values(capsule, binding)
+    wrong_amount["amount_cents"] = 1_000
+    with pytest.raises(ValidationError, match="observation contradicts its final state"):
+        AttemptReceipt.with_digest(**wrong_amount)
 
     changed_after_kill = _attempt_values(capsule, binding)
     changed_after_kill["post_kill_snapshot"] = _snapshot(effects=2)
