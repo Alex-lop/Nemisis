@@ -59,6 +59,14 @@ integer cents, WAL and `synchronous=FULL`, and is observed through fresh read-on
 Failure to launch, checkpoint, kill, wait, probe, restart, replay, parse, or clean up makes evidence
 incomplete.
 
+Every durable change is attributed. The worker reports each trusted store commit by operation
+name; the controller probes the database at that instant and refuses any delta the named operation
+cannot explain, and again after the worker's final message. A handler that moves money through its
+own SQLite connection therefore cannot earn a verdict: its run is `INTEGRITY_ERROR` / `INVALID`,
+because the kill point could no longer be trusted to sit where the money moved. A handler that also
+forges the IPC message on the store's private channel is hostile code, which local mode does not
+claim to contain.
+
 Exactly one trusted, tree-bound `AnchorBinding` must validate. Candidate output cannot acknowledge
 success or authorize an anchor.
 

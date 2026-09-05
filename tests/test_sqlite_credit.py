@@ -28,9 +28,12 @@ from nemisis.hashing import canonical_json, sha256_bytes
 from nemisis.sqlite_credit import (
     AnchorResolutionError,
     _AttemptFailure,
+    _attributed_probe,
     _cleanup,
     _collect,
+    _probe,
     _receive,
+    _seed_database,
     _Spawn,
     _spawn_receipt,
     bind_anchor,
@@ -100,6 +103,31 @@ def test_anchor_resolution_counts_handler_definitions(tmp_path: Path) -> None:
         bind_anchor(contract, duplicate)
     assert multiple.value.status is AnchorResolutionStatus.MULTIPLE_MATCHES
     assert multiple.value.matched_paths == ("app/credits.py", "app/credits.py")
+
+
+def test_attributed_probe_accepts_only_the_delta_its_operation_explains(tmp_path: Path) -> None:
+    event = {"account_id": "acct_7", "amount_cents": 2500, "event_id": "evt_1042"}
+    database = tmp_path / "probe.sqlite3"
+    _seed_database(database, event)
+    seeded = _probe(database, event)
+
+    # Nothing changed, and mark_processed claims a marker: unattributed.
+    with pytest.raises(_AttemptFailure, match="outside the trusted store") as unattributed:
+        _attributed_probe(database, event, seeded, {"operation": "mark_processed"})
+    assert unattributed.value.status is ExecutionStatus.INTEGRITY_ERROR
+    assert unattributed.value.integrity is IntegrityStatus.INVALID
+
+    with pytest.raises(_AttemptFailure, match="unknown store operation") as unknown:
+        _attributed_probe(database, event, seeded, {"operation": "transfer"})
+    assert unknown.value.status is ExecutionStatus.PROTOCOL_ERROR
+
+    import sqlite3
+
+    with sqlite3.connect(database) as connection:
+        connection.execute("INSERT INTO processed_events(event_id) VALUES ('evt_1042')")
+        connection.commit()
+    marked = _attributed_probe(database, event, seeded, {"operation": "mark_processed"})
+    assert marked.event_marker_count == 1
 
 
 def test_receive_preserves_a_coalesced_second_frame() -> None:

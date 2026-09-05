@@ -298,7 +298,7 @@ def execute_attempt(
         timeline.append(_entry(TimelineState.FIRST_WORKER_STARTED, str(first.process.pid)))
         _expect_hello(first, capsule, execution_nonce, timeout_seconds)
         checkpoint = _wait_for_checkpoint(
-            first, database, event, capsule.fault_boundary, timeout_seconds
+            first, database, event, capsule.fault_boundary, timeout_seconds, previous=pre
         )
         checkpoint_reached = True
         timeline.append(_entry(TimelineState.CHECKPOINT_REACHED, checkpoint.digest))
@@ -326,10 +326,17 @@ def execute_attempt(
         spawns.append(replay_worker)
         timeline.append(_entry(TimelineState.REPLAY_WORKER_STARTED, str(replay_worker.process.pid)))
         _expect_hello(replay_worker, capsule, execution_nonce, timeout_seconds)
-        _finish_replay(replay_worker, capsule, execution_nonce, timeout_seconds)
+        final = _finish_replay(
+            replay_worker,
+            capsule,
+            execution_nonce,
+            timeout_seconds,
+            database=database,
+            event=event,
+            previous=post_kill,
+        )
         replay_acknowledged = True
         timeline.append(_entry(TimelineState.EVENT_REPLAYED, capsule.event_digest))
-        final = _probe(database, event)
         timeline.append(_entry(TimelineState.FINAL_STATE_PROBED, final.digest))
         tree_after = sha256_tree(root, ignored_names=frozenset({"__pycache__"}))
         if tree_after != binding.tree_digest:
@@ -441,8 +448,15 @@ def execute_no_fault_replay(
         )
         spawns.append(first)
         _expect_hello(first, capsule, execution_nonce, timeout_seconds)
-        _finish_replay(first, capsule, execution_nonce, timeout_seconds)
-        first_delivery = _probe(database, event)
+        first_delivery = _finish_replay(
+            first,
+            capsule,
+            execution_nonce,
+            timeout_seconds,
+            database=database,
+            event=event,
+            previous=initial,
+        )
 
         replay_worker = _spawn_worker(
             capsule=capsule,
@@ -455,8 +469,15 @@ def execute_no_fault_replay(
         )
         spawns.append(replay_worker)
         _expect_hello(replay_worker, capsule, execution_nonce, timeout_seconds)
-        _finish_replay(replay_worker, capsule, execution_nonce, timeout_seconds)
-        final = _probe(database, event)
+        final = _finish_replay(
+            replay_worker,
+            capsule,
+            execution_nonce,
+            timeout_seconds,
+            database=database,
+            event=event,
+            previous=first_delivery,
+        )
         tree_after = sha256_tree(root, ignored_names=frozenset({"__pycache__"}))
         if tree_after != binding.tree_digest:
             raise _AttemptFailure(
@@ -721,6 +742,8 @@ def _wait_for_checkpoint(
     event: Mapping[str, object],
     fault_boundary: FaultBoundary,
     timeout_seconds: float,
+    *,
+    previous: CreditSnapshot,
 ) -> CreditSnapshot:
     amount = _event(event)["amount_cents"]
     if not isinstance(amount, int):
@@ -730,7 +753,8 @@ def _wait_for_checkpoint(
         message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
         kind = message.get("type")
         if kind == "commit":
-            snapshot = _probe(database, event)
+            snapshot = _attributed_probe(database, event, previous, message)
+            previous = snapshot
             if (
                 snapshot.account_balance_cents == amount
                 and snapshot.event_ledger_count == 1
@@ -766,13 +790,22 @@ def _kill_and_wait(spawn: _Spawn, timeout_seconds: float) -> None:
 
 
 def _finish_replay(
-    spawn: _Spawn, capsule: ReproCapsule, execution_nonce: str, timeout_seconds: float
-) -> None:
+    spawn: _Spawn,
+    capsule: ReproCapsule,
+    execution_nonce: str,
+    timeout_seconds: float,
+    *,
+    database: Path,
+    event: Mapping[str, object],
+    previous: CreditSnapshot,
+) -> CreditSnapshot:
+    """Drive one worker to completion; every durable change must be a store commit it reported."""
     deadline = monotonic() + timeout_seconds
     while True:
         message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
         kind = message.get("type")
         if kind == "commit":
+            previous = _attributed_probe(database, event, previous, message)
             _send(spawn.channel, {"type": "continue"})
             continue
         if kind == "error":
@@ -792,6 +825,60 @@ def _finish_replay(
     _collect(spawn)
     if return_code != 0:
         raise _AttemptFailure(ExecutionStatus.REPLAY_ERROR, "replay worker returned nonzero")
+    final = _probe(database, event)
+    if final.digest != previous.digest:
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            "durable state changed outside the trusted store after its last reported commit",
+            integrity=IntegrityStatus.INVALID,
+        )
+    return final
+
+
+# What each trusted store operation may change: (balance, ledger rows, ledger total, marker).
+_STORE_DELTAS: dict[str, Callable[[int], tuple[int, int, int, int]]] = {
+    "credit": lambda amount: (amount, 1, amount, 0),
+    "mark_processed": lambda amount: (0, 0, 0, 1),
+    "credit_and_mark": lambda amount: (amount, 1, amount, 1),
+}
+
+
+def _attributed_probe(
+    database: Path,
+    event: Mapping[str, object],
+    previous: CreditSnapshot,
+    message: Mapping[str, object],
+) -> CreditSnapshot:
+    """Probe after a reported commit and refuse any change the named operation cannot explain.
+
+    A handler that writes to the database through its own connection never pauses the
+    controller, so its effect would surface here as an unattributed delta. That is an integrity
+    failure, not a verdict: the kill point can no longer be trusted to sit where the money moved.
+    """
+    amount = _event(event)["amount_cents"]
+    operation = message.get("operation")
+    snapshot = _probe(database, event)
+    expected = _STORE_DELTAS.get(str(operation))
+    if not isinstance(amount, int) or expected is None:
+        raise _AttemptFailure(
+            ExecutionStatus.PROTOCOL_ERROR,
+            f"worker reported an unknown store operation {operation!r}",
+        )
+    observed = (
+        snapshot.account_balance_cents - previous.account_balance_cents,
+        snapshot.event_ledger_count - previous.event_ledger_count,
+        snapshot.event_ledger_total_cents - previous.event_ledger_total_cents,
+        snapshot.event_marker_count - previous.event_marker_count,
+    )
+    if observed != expected(amount):
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            f"durable state changed outside the trusted store: {operation} reported, but the "
+            f"database moved by balance {observed[0]:+d}, ledger rows {observed[1]:+d}, "
+            f"marker {observed[3]:+d}",
+            integrity=IntegrityStatus.INVALID,
+        )
+    return snapshot
 
 
 def _receive(

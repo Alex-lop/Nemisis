@@ -394,7 +394,7 @@ def check(
                 tuple(bindings),
                 tuple(attempts),
                 CrashVerdict.EVIDENCE_INCOMPLETE,
-                _unsupported_observation_summary(candidate_observation),
+                _unsupported_observation_summary(candidate_observation, candidate_attempts),
                 hypothesis_receipts=hypothesis_receipts,
                 minimization_receipts=minimization_receipts,
             )
@@ -451,7 +451,7 @@ def check(
             summary = _summary(verdict)
         else:
             verdict = CrashVerdict.EVIDENCE_INCOMPLETE
-            summary = _unsupported_observation_summary(candidate_observation)
+            summary = _unsupported_observation_summary(candidate_observation, candidate_attempts)
         return publish(
             run_id,
             started_at,
@@ -550,7 +550,7 @@ def replay(
                 detail = _invariant_summary(attempts, sealed)
             else:
                 verdict = CrashVerdict.EVIDENCE_INCOMPLETE
-                detail = _unsupported_observation_summary(observation)
+                detail = _unsupported_observation_summary(observation, attempts)
         else:
             raise CrashCheckError("mode must be 'local' or 'live'")
         return _publish(
@@ -779,11 +779,23 @@ def _require_distinct_binding(
         )
 
 
-def _unsupported_observation_summary(observation: CrashObservation) -> str:
+def _unsupported_observation_summary(
+    observation: CrashObservation, attempts: tuple[AttemptReceipt, ...] = ()
+) -> str:
     if observation is CrashObservation.INVARIANT_FAILED:
         return (
             "Every world completed, but the final durable state matched neither exactly-once nor "
             "the capsule's duplicate shape: the invariant failed, so nothing is proven."
+        )
+    failures = [attempt.failure_detail for attempt in attempts if attempt.failure_detail]
+    if failures:
+        detail, count = max(
+            ((item, failures.count(item)) for item in set(failures)), key=lambda x: x[1]
+        )
+        role = attempts[0].role.value
+        return (
+            f"{count} of {len(attempts)} {role} worlds did not complete: {detail}. "
+            "No verdict is issued from incomplete or contradictory evidence."
         )
     return "Execution completed without one stable supported observation."
 

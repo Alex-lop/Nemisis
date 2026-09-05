@@ -52,6 +52,38 @@ CREDIT_NEVER_MARKS = """def apply_credit(store, event):
     store.credit(event["account_id"], event["event_id"], event["amount_cents"])
 """
 
+DIRECT_SQL_EFFECT = """import sqlite3
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    with sqlite3.connect(store._database, isolation_level=None) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            "UPDATE accounts SET balance_cents = balance_cents + ? WHERE account_id = ?",
+            (event["amount_cents"], event["account_id"]),
+        )
+        connection.execute(
+            "INSERT INTO credit_ledger(event_id, account_id, amount_cents) VALUES (?, ?, ?)",
+            (event["event_id"], event["account_id"], event["amount_cents"]),
+        )
+        connection.commit()
+    store.mark_processed(event["event_id"])
+"""
+
+DRIFT_AFTER_LAST_COMMIT = """import sqlite3
+
+
+def apply_credit(store, event):
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    with sqlite3.connect(store._database, isolation_level=None) as connection:
+        connection.execute(
+            "INSERT INTO credit_ledger(event_id, account_id, amount_cents) VALUES (?, ?, ?)",
+            (event["event_id"], event["account_id"], 1),
+        )
+"""
+
 THREE_ARGUMENT = """def apply_credit(store, event, extra=None):
     store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
 """
@@ -114,6 +146,36 @@ def test_candidate_that_never_marks_still_duplicates_and_fails(
         0,
     )
     assert cli._exit_code(result.verdict) == 1
+
+
+@pytest.mark.parametrize(
+    ("name", "source", "detail"),
+    [
+        ("direct-sql", DIRECT_SQL_EFFECT, "mark_processed reported, but the database moved"),
+        ("drift", DRIFT_AFTER_LAST_COMMIT, "after its last reported commit"),
+    ],
+)
+def test_effects_committed_outside_the_trusted_store_are_an_integrity_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, source: str, detail: str
+) -> None:
+    """A handler that moves money through its own connection cannot earn a verdict.
+
+    Before this check, such a handler was PROVEN: the controller only kills at store commits, so
+    the real crash window (between the direct write and the marker) was never exercised.
+    """
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, name, source)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert result.integrity_status.value == "INVALID"
+    assert "outside the trusted store" in result.summary
+    assert detail in result.summary
+    candidate_attempts = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
+    assert len(candidate_attempts) == 5
+    assert all(a.execution_status is ExecutionStatus.INTEGRITY_ERROR for a in candidate_attempts)
+    assert cli._exit_code(result.verdict) == 2
 
 
 def test_replay_base_role_can_reproduce_but_never_prove_a_fix(
