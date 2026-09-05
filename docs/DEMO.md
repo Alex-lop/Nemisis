@@ -75,7 +75,8 @@ summary: The base replayed evt_1042 to a durable +$50 duplicate effect.
 
 ```text
 verdict: FIX_PROVEN_FOR_THIS_CAPSULE
-summary: Five fresh worlds ended at exactly +$25, one ledger effect, and one marker.
+summary: Five fresh worlds ended at exactly +$25, one ledger effect, and one marker. The commit sweep killed the corrected once after each of its 1 store commit (credit_and_mark) and every replay ended exactly once.
+sweep: corrected makes 1 store commit (credit_and_mark); killed after each: #1 -> $25.00 EXACTLY_ONCE -> EXACTLY_ONCE
 timeline: $25.00 durable -> SIGKILL -> fresh worker -> $25.00
 ```
 

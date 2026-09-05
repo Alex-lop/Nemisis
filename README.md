@@ -87,9 +87,15 @@ earlier engine ship as fixture refs, so the claim above is one flag away for any
 uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/mark-first
 ```
 
-Or write your own: copy any tree's `app/credits.py`, edit the handler, and pass the directory as
-`--candidate`. The handler may only touch the store; a write around it is an integrity failure, not
-a verdict.
+Or write your own in thirty seconds:
+
+```bash
+uv run nemisis export fixture:sqlite-credit-v1/buggy ./my-candidate
+$EDITOR ./my-candidate/app/credits.py
+uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate ./my-candidate
+```
+
+The handler may only touch the store; a write around it is an integrity failure, not a verdict.
 
 ## Let Nemotron write the patch
 

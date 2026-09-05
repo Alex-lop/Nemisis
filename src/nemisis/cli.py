@@ -120,6 +120,15 @@ def _parser() -> argparse.ArgumentParser:
         "--json", action="store_true", help="print the result document only"
     )
 
+    export = commands.add_parser(
+        "export",
+        help="copy a packaged fixture tree to a directory you can edit and pass as --candidate",
+    )
+    export.add_argument(
+        "ref", help="fixture:<scenario>/<variant>, e.g. fixture:sqlite-credit-v1/buggy"
+    )
+    export.add_argument("out", type=Path, help="new directory for the tree")
+
     doctor_command = commands.add_parser("doctor", help="check CrashCheck prerequisites")
     doctor_command.add_argument(
         "--mode",
@@ -473,6 +482,19 @@ def main() -> None:
             print(f"patch: {describe(patch)}")
             print(f"rationale: {patch.rationale}")
             print(f"next: nemisis check --base {args.base} --candidate {args.out} --mode local")
+            return
+
+        if args.command == "export":
+            from nemisis.crash_fixture import materialize_fixture
+
+            exported = materialize_fixture(args.ref, args.out)
+            print(f"exported: {exported.path}")
+            print(f"tree: {exported.tree_digest}")
+            print(f"edit: {exported.path / 'app' / 'credits.py'}")
+            print(
+                f"next: nemisis check --base fixture:{SCENARIO_ID}/buggy --candidate {args.out} "
+                "--mode local"
+            )
             return
 
         if args.command == "doctor":
