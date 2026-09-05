@@ -9,14 +9,18 @@ restarts it, replays the same event, and checks the database for a duplicate. Se
 
 ## See it in action
 
-Everything below is a real local run of the packaged `sqlite-credit-v1` fixture on this tree. The
-labels say `LOCAL` and `FIXTURE` because that is what it is: no provider run is claimed anywhere on
-this page.
+The recording, the terminal stills, and the reports below are real local runs of the packaged
+`sqlite-credit-v1` fixture on this tree. The viewer capture renders the committed hero receipt, which
+stays bound to its own earlier commit. Every surface says `LOCAL` and `FIXTURE` because that is what
+it is: no provider run is claimed anywhere on this page.
 
 ![Thirty-second terminal recording: the original buggy handler reproduces the double credit, the agent's green patch still reproduces it under the same kill and retry, and the atomic fix ends at exactly one credit in five fresh worlds](docs/assets/screenshots/crashcheck-demo.gif)
 
 One frozen crash, three revisions: the original bug reproduces, the agent's "fixed" patch still
-reproduces, and only the atomic fix survives the same kill and retry.
+reproduces, and only the atomic fix survives the same kill and retry. The "fixed" patch
+(`misleading-green`) keeps the original's check → credit → mark shape and differs from `buggy` only
+in how the code is written: a different tree with the same crash window, and green tests. That is
+exactly the kind of diff only an executed crash can judge.
 
 ![Terminal output of nemisis check: verdict PATCH_FAILED_STILL_REPRODUCES, timeline $25.00 durable -> SIGKILL -> fresh worker -> $50.00, exit code 1](docs/assets/screenshots/terminal-check-misleading-green.png)
 
@@ -30,21 +34,25 @@ verdict to the exact source tree and the exact engine bytes that ran.
 
 ![Terminal output of nemisis replay against the atomic revision: verdict FIX_PROVEN_FOR_THIS_CAPSULE, timeline ends at $25.00, exit code 0](docs/assets/screenshots/terminal-replay-atomic-proven.png)
 
-The same frozen capsule replayed against the atomic fix: five fresh worlds end at `$25.00`, one
-ledger row, one marker, exit `0`. The capsule is the regression test the next patch must beat.
+The same frozen capsule replayed against the atomic fix: five fresh worlds (independent database
+and worker instances) end at `$25.00`, with one ledger row and one processed marker, exit `0`. The
+capsule is the regression test the next patch must beat.
 
-![The committed evidence viewer mid-replay: beat 3 of 5, Worker killed, SIGKILL with process id and exit -9, with the LOCAL and FIXTURE badges in the top bar](docs/assets/screenshots/viewer-02-mid-replay.png)
+![The committed evidence viewer after its replay: FAIL PATCH_FAILED_STILL_REPRODUCES for the candidate beside PASS FIX_PROVEN_FOR_THIS_CAPSULE for the corrected revision, 15 of 15 proof worlds valid, with the LOCAL and FIXTURE badges in the top bar](docs/assets/screenshots/viewer-03-verdict-receipt.png)
 
-The committed one-minute viewer steps through the five recorded beats with the `LOCAL` / `FIXTURE`
-labels pinned to the top; it reads the committed receipt and executes nothing.
+The committed one-minute viewer after stepping through its five recorded steps: the failing
+candidate and the passing corrected revision side by side, with the `LOCAL` / `FIXTURE` labels pinned
+to the top. It reads a committed receipt from an earlier exact commit and executes nothing.
 
 ![Terminal output of uv run pytest -q: 312 passed](docs/assets/screenshots/terminal-pytest-green.png)
 
 ![Terminal output of nemisis doctor --mode live: local checks PASS, NEBIUS_API_KEY, ConTree profile, root image and the CrashCheck provider transport BLOCKED, exit code 2](docs/assets/screenshots/terminal-doctor-live-blocked.png)
 
-The whole suite is green, and `doctor --mode live` says exactly what a live run still needs. Nothing
-is labelled `LIVE` until those lines pass for real; [docs/LIVE_SETUP.md](docs/LIVE_SETUP.md) is the
-turnkey path from a Token Factory key to a genuine receipt.
+The whole suite is green, and `doctor --mode live` names exactly what is missing. Three of those
+lines are a credential, a profile, and an image you can supply. The last one is the honest boundary:
+CrashCheck's own live transport does not exist yet, so CrashCheck verdicts stay `LOCAL` even with
+every credential present. A Token Factory key unlocks the Nemotron contract-proposal receipt, and
+[docs/LIVE_SETUP.md](docs/LIVE_SETUP.md) is the turnkey path to producing that receipt for real.
 
 ### What it does, and what it never does
 
@@ -62,10 +70,8 @@ turnkey path from a Token Factory key to a genuine receipt.
 - **Not yet:** arbitrary repositories, databases, or languages. This alpha audits exactly one
   scenario (`sqlite-credit-v1`) and one two-argument `CreditStore` handler shape, on purpose.
 
-Nemisis CrashCheck turns a green-looking retry-safety patch into an executed counterexample: it
-kills a real worker after a durable side effect, starts a fresh worker, replays the identical event,
-and determines whether the exact patch stopped the duplicate effect. The verdict comes from durable
-state and process receipts, not model confidence.
+In one sentence: the verdict comes from durable state and process receipts, not from model
+confidence.
 
 CrashCheck is the narrow crash/retry product built on Nemisis's broader deterministic differential
 verification foundation. Both surfaces remain available; neither claims universal patch safety.
@@ -84,8 +90,9 @@ uv run nemisis check \
 ```
 
 The packaged SQLite case applies event `evt_1042`, which should grant one `$25` credit. The
-misleading-green revision passes its small existing suite and an ordinary sequential duplicate
-check, yet still reaches `$50` after a real `SIGKILL` and retry. The atomic revision ends at `$25`,
+misleading-green revision is the buggy handler rewritten into the same check → credit → mark shape;
+it passes its small existing suite and an ordinary sequential duplicate check, yet still reaches
+`$50` after a real `SIGKILL` and retry. The atomic revision ends at `$25`,
 one ledger effect, and one processed marker under the same capsule. The measured comparison is
 published by `uv run nemisis benchmark`; CrashCheck receipts themselves remain limited to the
 kill/restart/replay evidence.
@@ -210,8 +217,9 @@ uv run nemisis verify --fixture idempotency-retry --mode local
 
 It runs real subprocesses in separate temporary base and candidate worlds. The same trusted
 baseline tests, adversarial tests, runner definition, parser, and bundle bytes run in both worlds.
-`verify` is report-only: it prints the matrix and the artifact decision and always exits `0`; the
-CrashCheck exit table above does not apply to it.
+`verify` is report-only: whenever it produces a matrix it exits `0`, including for a `REJECTED`
+artifact decision, so the CrashCheck exit table above does not apply to it. A blocked `--mode live`
+run prints no matrix and exits `2`.
 
 | Claim | Relation | Base | Candidate | Verdict |
 | --- | --- | --- | --- | --- |

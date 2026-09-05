@@ -20,6 +20,9 @@ The 30-second recording of exactly that is
 
 A bug report says: "a timeout followed by a retry occasionally credits the same order twice."
 A coding agent patches `apply_credit`. Its test passes. A plain "call it twice" check passes too.
+The patch (`misleading-green`) keeps the original's check → credit → mark shape and differs from
+`buggy` only in how the code is written: a different tree, the same crash window, green tests. That
+is the case this tool exists for, because nothing short of executing the crash can tell it apart.
 
 CrashCheck runs the handler in a real worker process, waits until the `$25` credit is durably
 committed, sends `SIGKILL` to the whole process group, confirms the worker died, starts a fresh
@@ -32,8 +35,8 @@ independent read-only connection.
 | agent's "fixed" patch | green | `$25` | **`$50`** | [`terminal-check-misleading-green.png`](assets/screenshots/terminal-check-misleading-green.png), [`report-patch-failed.png`](assets/screenshots/report-patch-failed.png) |
 | atomic fix | green | `$25` | `$25` | [`terminal-replay-atomic-proven.png`](assets/screenshots/terminal-replay-atomic-proven.png), [`report-fix-proven.png`](assets/screenshots/report-fix-proven.png) |
 
-It does this in five fresh worlds per revision, in about two seconds, on a laptop, and exits `1`
-for the agent's patch and `0` for the real fix. Everything it observed is written to a manifest, a
+It does this in five fresh worlds per revision, in about two seconds, on a laptop. `check` exits
+`1` on the agent's patch; replaying the same capsule against the real fix exits `0`. Everything it observed is written to a manifest, a
 static HTML report, and a content-addressed repro capsule you can replay against the next patch.
 
 ## Where NVIDIA and Nebius come in
@@ -69,12 +72,20 @@ applied to one immutable test bundle bound by digest to both worlds, with per-cl
 
 The limit of every such tool is the one it shares with the test suite: it can only observe what a
 test exercises. No ordinary test kills the process between two statements, so a differential run
-of this fixture marks the crash-retry claim `UNRESOLVED` (base fails, candidate fails, nothing
-learned) and stops. CrashCheck starts there. It does not run the repository's tests at all. It
-drives the real handler to its durable checkpoint, kills it, replays, and reads durable state; the
-verdict is a database row count and a process exit code, and the crash is preserved as a capsule
-that any later patch must survive. That is the part that is new here, and it is deliberately
-narrow: one audited scenario, one handler shape, executed rather than inferred.
+of the packaged `idempotency-retry` fixture (`uv run nemisis verify --fixture idempotency-retry
+--mode local`; the matrix is in the README) marks its crash-retry claim `UNRESOLVED` (base fails,
+candidate fails, nothing learned) and stops. CrashCheck starts there. It does not run the
+repository's tests at all. It drives the real handler to its durable checkpoint, kills it, replays,
+and reads durable state; the verdict is a database row count and a process exit code, and the crash
+is preserved as a capsule that any later patch must survive.
+
+Killing a process at a durable checkpoint and inspecting what survived is not new either:
+crash-consistency and fault-injection testing (Jepsen, ALICE, CrashMonkey and their relatives) have
+done it to databases and file systems for years. What is specific here is the packaging: the kill is
+aimed at one patch's exact side effect, the base is checked candidate-blind first, the verdict is a
+per-patch accept/reject with exit codes a CI gate can use, and the crash is frozen into a
+content-addressed capsule that the next patch has to beat. It is deliberately narrow: one audited
+scenario, one handler shape, executed rather than inferred.
 
 ## What it is not, on purpose
 

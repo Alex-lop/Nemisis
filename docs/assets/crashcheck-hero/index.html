@@ -539,6 +539,7 @@ const finishReplay = () => {
   button.setAttribute("aria-expanded", "true");
   button.textContent = "Hide fixture evidence";
   button.disabled = false;
+  button.focus({ preventScroll: true });
   receipt.scrollIntoView({ block: "start" });
 };
 const stepThrough = (index) => {

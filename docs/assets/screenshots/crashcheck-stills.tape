@@ -24,6 +24,7 @@ Type `uv run nemisis doctor --mode live; echo "exit code $?"`
 Enter
 Sleep 4s
 Screenshot docs/assets/screenshots/terminal-doctor-live-blocked.png
+Sleep 1s
 Type "clear"
 Enter
 
@@ -31,6 +32,7 @@ Type `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fix
 Enter
 Sleep 8s
 Screenshot docs/assets/screenshots/terminal-check-misleading-green.png
+Sleep 1s
 Type "clear"
 Enter
 

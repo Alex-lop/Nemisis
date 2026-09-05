@@ -7,7 +7,7 @@ Output .nemisis/vhs-pytest-scratch.gif
 Set Shell "bash"
 Set FontSize 17
 Set Width 1400
-Set Height 760
+Set Height 260
 Set Padding 22
 Set Theme "Catppuccin Mocha"
 Set TypingSpeed 1ms

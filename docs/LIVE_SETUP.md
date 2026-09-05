@@ -9,7 +9,9 @@ Two rules that never bend:
 
 - Nothing is labelled `LIVE` unless a real Token Factory call produced it. Injected clients are
   `MOCKED`; the packaged evidence is `FIXTURE`. The labels are checked by code, not by hand.
-- Nothing ever falls back from live to local. A blocked live run exits `2` and writes no evidence.
+- Nothing ever falls back from live to local. A blocked live run exits `2` and records no
+  observations: `verify --mode live` writes nothing, and `check --mode live` writes only an
+  `EVIDENCE_INCOMPLETE` manifest and report whose observations are absent.
 
 ## What you need
 
@@ -109,11 +111,12 @@ exit `1`. What changes is provenance. The printed `report:` page now has a card 
 **Contract proposal · LIVE Nemotron receipt**, and the manifest carries the same receipt:
 
 ```bash
-uv run python -c "import json,glob; m=json.load(open(sorted(glob.glob('.nemisis/runs/local-*/manifest.json'))[-1])); print(m['contract_proposal']['model_call']['truth_label'])"
+uv run python -c "import json,glob; m=json.load(open(sorted(glob.glob('.nemisis/runs/local-*/manifest.json'))[-1])); print(((m.get('contract_proposal') or {}).get('model_call') or {}).get('truth_label', 'ABSENT'))"
 ```
 
 That prints `LIVE`. If it prints `MOCKED`, the run used an injected client and is not a live
-claim; if the key is missing there is no `contract_proposal` at all.
+claim. If it prints `ABSENT`, the run carried no proposal (the manifest's `contract_proposal` is
+`null`), which is what every `check` without `--scenario .nemisis/config.json` produces.
 
 ### A4. Record it
 
@@ -121,8 +124,10 @@ claim; if the key is missing there is no `contract_proposal` at all.
    from `.gitignore`). Do not commit `.env`.
 2. In `docs/STATUS.md`, replace the sentence that says `NEBIUS_API_KEY` is absent with the receipt
    digest from the `nemotron:` line and the commit SHA the command ran at.
-3. Flip the `Nemotron contract proposal` row in `docs/PROOF.md` from `MOCKED` / `BLOCKED` to
-   `LIVE`, quoting the same digest. Leave every other row alone.
+3. In `docs/PROOF.md`, flip the `Nemotron contract proposal` row from `MOCKED` / `BLOCKED` to
+   `LIVE`, quoting the same digest, and remove "Token Factory key" from the missing items in the
+   `Genuine current-tree live proof` row (it stays `BLOCKED` on the ConTree profile, the image, and
+   the CrashCheck transport). Leave every other row alone.
 
 Stage A is complete when those three things are true. It proves a genuine current-tree Nemotron
 call. It does not prove a Sandbox run; that is Stage B.

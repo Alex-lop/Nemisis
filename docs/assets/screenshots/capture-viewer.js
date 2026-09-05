@@ -49,16 +49,13 @@ const VIEWER = "http://127.0.0.1:8000/docs/assets/crashcheck-hero/";
   const status = await page.textContent("#replay-status");
   await page.screenshot({ path: path.join(OUT, "viewer-02-mid-replay.png"), fullPage: false });
 
-  // 3. Final: receipt revealed; capture the receipt viewport and a full-page render.
+  // 3. Final: receipt revealed; capture the receipt viewport.
   await page.waitForSelector("#receipt:not([hidden])", { timeout: 15000 });
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(OUT, "viewer-03-verdict-receipt.png"), fullPage: false });
-  await page.evaluate(() => document.querySelector("details").setAttribute("open", ""));
-  await page.evaluate(() => window.scrollTo(0, 0));
-  await page.waitForTimeout(200);
-  await page.screenshot({ path: path.join(OUT, "viewer-04-full-page.png"), fullPage: true });
 
-  // 4. Fail-closed state: same page served without its manifest binding must show no claim.
+  // 4. Fail-closed state: the capture deliberately withholds manifest.json (404) to show that the
+  //    page renders no claim without its binding. This is the one induced state in the set.
   await page.route("**/manifest.json", (route) => route.fulfill({ status: 404, body: "gone" }));
   await page.goto(VIEWER, { waitUntil: "networkidle" });
   await page.waitForFunction(() => document.title === "Nemisis CrashCheck — evidence unavailable");

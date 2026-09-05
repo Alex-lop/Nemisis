@@ -1,9 +1,18 @@
 # Screenshots and recording
 
-Every file here is a real local run of the packaged `sqlite-credit-v1` fixture on this tree, labelled
-`LOCAL` / `FIXTURE` wherever the surface shows labels. Nothing is staged, composited, or a provider
-run. `tests/test_readme_truth.py` fails if any image the README embeds is missing, empty, or oddly
-sized, and if any terminal capture has no tape that regenerates it.
+Three kinds of capture live here, and they are labelled differently on purpose:
+
+- The GIF, the terminal stills, and the two report renders are real local runs of the packaged
+  `sqlite-credit-v1` fixture on this tree (`LOCAL` / `FIXTURE`).
+- The `viewer-01` to `viewer-03` captures are headless-Chrome renders of the committed hero evidence,
+  which stays bound to its own earlier commit and engine digest (`LOCAL` / `FIXTURE`, from
+  `docs/assets/crashcheck-hero/`).
+- `viewer-05-fail-closed.png` is the one induced state: the capture script withholds `manifest.json`
+  (a 404) so the page's fail-closed path can be seen. It shows the absence of a claim, not evidence.
+
+Nothing is composited and nothing is a provider run. `tests/test_readme_truth.py` fails if any image
+the README embeds is missing, empty, or oddly sized, and if any terminal capture has no tape that
+regenerates it.
 
 | File | What it shows | Regenerate with |
 | --- | --- | --- |
@@ -15,7 +24,7 @@ sized, and if any terminal capture has no tape that regenerates it.
 | `viewer-01-initial.png` | evidence viewer on load: verdict first, FAIL / PASS controls, truth-label bar | `capture-viewer.js` |
 | `viewer-02-mid-replay.png` | beat 3 of 5 active during the stepped replay | `capture-viewer.js` |
 | `viewer-03-verdict-receipt.png` | replay complete, receipt revealed | `capture-viewer.js` |
-| `viewer-05-fail-closed.png` | the same page with its manifest withheld: no claim rendered | `capture-viewer.js` |
+| `viewer-05-fail-closed.png` | the same page with its manifest deliberately withheld by the capture script: no claim rendered | `capture-viewer.js` |
 | `report-patch-failed.png` | generated HTML report for the failing candidate | `capture-viewer.js` |
 | `report-fix-proven.png` | generated HTML report for the proven atomic fix | `capture-viewer.js` |
 
