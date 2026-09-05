@@ -16,6 +16,12 @@ dependencies = [
   "pytest>=9.0.3,<10",
 ]
 
+[project.urls]
+Homepage = "https://github.com/Alex-lop/Nemisis"
+Repository = "https://github.com/Alex-lop/Nemisis"
+Issues = "https://github.com/Alex-lop/Nemisis/issues"
+Security = "https://github.com/Alex-lop/Nemisis/security/advisories/new"
+
 [project.scripts]
 nemisis = "nemisis.cli:main"
 

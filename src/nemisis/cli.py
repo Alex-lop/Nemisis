@@ -61,6 +61,18 @@ def _parser() -> argparse.ArgumentParser:
     )
     init.add_argument("--json", action="store_true")
 
+    propose = commands.add_parser(
+        "propose-patch",
+        help="ask Nemotron on Token Factory to write the fix; the result is an ordinary candidate",
+    )
+    propose.add_argument("--issue", type=Path, required=True, help="UTF-8 bug report file")
+    propose.add_argument("--base", required=True, help=f"exact base source: {ref_help}")
+    propose.add_argument(
+        "--out", type=Path, required=True, help="new directory for the candidate tree"
+    )
+    propose.add_argument("--scenario", default=SCENARIO_ID, choices=[SCENARIO_ID])
+    propose.add_argument("--json", action="store_true")
+
     crashcheck = commands.add_parser("check", help="run a crash/retry counterexample")
     crashcheck.add_argument("--base", required=True, help=f"exact base source: {ref_help}")
     crashcheck.add_argument(
@@ -107,6 +119,15 @@ def _parser() -> argparse.ArgumentParser:
     replay_command.add_argument(
         "--json", action="store_true", help="print the result document only"
     )
+
+    export = commands.add_parser(
+        "export",
+        help="copy a packaged fixture tree to a directory you can edit and pass as --candidate",
+    )
+    export.add_argument(
+        "ref", help="fixture:<scenario>/<variant>, e.g. fixture:sqlite-credit-v1/buggy"
+    )
+    export.add_argument("out", type=Path, help="new directory for the tree")
 
     doctor_command = commands.add_parser("doctor", help="check CrashCheck prerequisites")
     doctor_command.add_argument(
@@ -178,17 +199,46 @@ def _print_crash_result(
         )
         print(f"hypotheses: {len(result.hypothesis_receipts)} run -> {selection}")
     if minimization_receipts := getattr(result, "minimization_receipts", ()):
-        minimization = minimization_receipts[0]
-        if minimization.sole_fault_action_necessary_for_fixture:
-            confirmations = len(minimization.confirmations)
+        control = minimization_receipts[0]
+        if control.sole_fault_action_necessary_for_fixture:
+            confirmations = len(control.confirmations)
             print(
-                f"necessity: deleted {minimization.removed_fault.value}; empty schedule was "
-                f"EXACTLY_ONCE in {confirmations}/{confirmations} fresh base worlds; deletion "
-                "rejected; final fault actions 1/1 (fixture-only necessity proof)"
+                f"control: base delivered the event twice with no kill in {confirmations}/"
+                f"{confirmations} fresh worlds and ended exactly once; the duplicate needs the "
+                "crash"
             )
         else:
-            print("necessity: empty-schedule evidence incomplete; no necessity claim")
+            print(
+                "control: the no-kill base delivery did not complete, so the duplicate is not "
+                "attributed to the crash"
+            )
+    for sweep in getattr(result, "sweeps", ()):
+        operations = sweep.census.first_delivery_operations
+        points = ", ".join(
+            f"#{attempt.kill_after_commit} -> "
+            + (
+                money(attempt.final_snapshot.account_balance_cents)
+                if attempt.final_snapshot is not None
+                else "no final state"
+            )
+            + f" {attempt.observation.value}"
+            for attempt in sweep.attempts
+        )
+        print(
+            f"sweep: {sweep.role.value} makes {len(operations)} store commit"
+            f"{'s' if len(operations) != 1 else ''} ({', '.join(operations) or 'none observed'}); "
+            f"killed after each: {points or 'census incomplete'} -> {sweep.observation.value}"
+        )
     representative = next(
+        (
+            attempt
+            for sweep in getattr(result, "sweeps", ())
+            if sweep.observation.value != "EXACTLY_ONCE"
+            for attempt in sweep.attempts
+            if attempt.observation is sweep.observation and attempt.final_snapshot is not None
+        ),
+        None,
+    ) or next(
         (
             attempt
             for attempt in result.attempts
@@ -207,11 +257,22 @@ def _print_crash_result(
                 if representative.kill_signal == 9
                 else f"signal {representative.kill_signal}"
             )
+            kill_point = (
+                f" (after commit {representative.kill_after_commit})"
+                if getattr(representative, "kill_after_commit", None) is not None
+                else ""
+            )
             print(
                 "timeline: "
-                f"{money(checkpoint.account_balance_cents)} durable -> {signal_name} -> "
-                f"fresh worker -> {money(final.account_balance_cents)}"
+                f"{money(checkpoint.account_balance_cents)} durable{kill_point} -> "
+                f"{signal_name} -> fresh worker -> {money(final.account_balance_cents)}"
             )
+    author = getattr(result, "candidate_author", None)
+    if author is not None:
+        print(
+            f"author: {author.model_call.model_id} ({author.model_call.truth_label.value}) wrote "
+            f"{author.handler_path}; receipt {author.digest}"
+        )
     for binding in result.bindings:
         print(
             f"source: {binding.source_ref} -> {binding.resolved_source_identity} "
@@ -293,7 +354,11 @@ def _print_benchmark(result: BenchmarkResult, output: Path, *, as_json: bool) ->
 def _exit_code(verdict: CrashVerdict) -> int:
     if verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE:
         return 0
-    if verdict in {CrashVerdict.BUG_REPRODUCED, CrashVerdict.PATCH_FAILED_STILL_REPRODUCES}:
+    if verdict in {
+        CrashVerdict.BUG_REPRODUCED,
+        CrashVerdict.PATCH_FAILED_STILL_REPRODUCES,
+        CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN,
+    }:
         return 1
     return 2
 
@@ -382,6 +447,56 @@ def main() -> None:
                 proposal=proposal,
                 proposal_path=proposal_path,
                 accepted_draft=args.accept_contract,
+            )
+            return
+
+        if args.command == "propose-patch":
+            from nemisis.agent_patch import PatchError, describe, propose_patch
+            from nemisis.nemotron import NemotronError
+
+            try:
+                patch = propose_patch(args.issue, args.base, args.out, args.scenario)
+            except (NemotronError, PatchError) as error:
+                _fail(
+                    f"NEMOTRON PATCH REJECTED: {error}. No candidate was written.",
+                    as_json=args.json,
+                    crashcheck=False,
+                )
+            if args.json:
+                print(
+                    canonical_json(
+                        {
+                            "candidate": str(args.out),
+                            "patch_proposal": patch.model_dump(mode="json"),
+                        }
+                    ).decode()
+                )
+                return
+            from nemisis.agent_patch import receipt_path
+
+            receipt = patch.model_call
+            print(f"candidate: {args.out}")
+            print(f"receipt: {receipt_path(patch.candidate_tree_digest)}")
+            print(
+                f"nemotron: {receipt.model_id} · {receipt.endpoint_region} · "
+                f"{receipt.truth_label.value} · schema valid · {receipt.latency_ms} ms · "
+                f"receipt {patch.digest}"
+            )
+            print(f"patch: {describe(patch)}")
+            print(f"rationale: {patch.rationale}")
+            print(f"next: nemisis check --base {args.base} --candidate {args.out} --mode local")
+            return
+
+        if args.command == "export":
+            from nemisis.crash_fixture import materialize_fixture
+
+            exported = materialize_fixture(args.ref, args.out)
+            print(f"exported: {exported.path}")
+            print(f"tree: {exported.tree_digest}")
+            print(f"edit: {exported.path / 'app' / 'credits.py'}")
+            print(
+                f"next: nemisis check --base fixture:{SCENARIO_ID}/buggy --candidate {args.out} "
+                "--mode local"
             )
             return
 

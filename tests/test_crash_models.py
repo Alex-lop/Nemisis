@@ -10,6 +10,7 @@ from nemisis.crash_models import (
     REQUIRED_CONFIRMATIONS,
     AnchorBinding,
     AttemptReceipt,
+    CommitSweepReceipt,
     CrashCheckResult,
     CrashObservation,
     CrashVerdict,
@@ -126,7 +127,10 @@ def _attempt_values(
 ) -> dict[str, object]:
     duplicate = observation is CrashObservation.DUPLICATE_EFFECT
     checkpoint = _snapshot(marker=0) if duplicate else _snapshot()
-    final = _snapshot(effects=2) if duplicate else _snapshot()
+    final = {
+        CrashObservation.DUPLICATE_EFFECT: _snapshot(effects=2),
+        CrashObservation.INVARIANT_FAILED: _snapshot(effects=3),
+    }.get(observation, _snapshot())
     return {
         "receipt_id": f"{role.value}-attempt-{index}",
         "role": role,
@@ -141,6 +145,7 @@ def _attempt_values(
         "post_execution_tree_digest": binding.tree_digest,
         "environment_digest": capsule.environment_digest,
         "event_digest": capsule.event_digest,
+        "amount_cents": capsule.amount_cents,
         "initial_database_digest": capsule.initial_database_digest,
         "initial_database_file_digest": HASHES[7],
         "database_id": f"database-{role.value}-{index}",
@@ -247,7 +252,12 @@ def _hypothesis_values(receipt: HypothesisReceipt) -> dict[str, object]:
 
 
 def _no_fault_receipt(
-    capsule: ReproCapsule, binding: AnchorBinding, index: int
+    capsule: ReproCapsule,
+    binding: AnchorBinding,
+    index: int,
+    *,
+    role: WorldRole = WorldRole.BASE,
+    operations: tuple[str, ...] = ("credit", "mark_processed"),
 ) -> NoFaultReplayReceipt:
     workers = (
         _worker(
@@ -265,6 +275,7 @@ def _no_fault_receipt(
     )
     return NoFaultReplayReceipt.with_digest(
         receipt_id=f"minimization-{index}",
+        role=role,
         execution_status=ExecutionStatus.COMPLETED,
         integrity_status=IntegrityStatus.VALID,
         observation=CrashObservation.EXACTLY_ONCE,
@@ -275,6 +286,7 @@ def _no_fault_receipt(
         post_execution_tree_digest=binding.tree_digest,
         environment_digest=capsule.environment_digest,
         event_digest=capsule.event_digest,
+        amount_cents=capsule.amount_cents,
         initial_database_digest=capsule.initial_database_digest,
         initial_database_file_digest=HASHES[7],
         database_id=f"min-database-{index}",
@@ -282,9 +294,43 @@ def _no_fault_receipt(
         started_at=NOW,
         ended_at=NOW + timedelta(seconds=3),
         spawns=workers,
+        first_delivery_operations=operations,
+        first_delivery_commit_count=len(operations),
         initial_snapshot=_snapshot(effects=0, marker=0),
         first_delivery_snapshot=_snapshot(),
         final_snapshot=_snapshot(),
+    )
+
+
+def _sweep(
+    capsule: ReproCapsule,
+    binding: AnchorBinding,
+    *,
+    role: WorldRole = WorldRole.CANDIDATE,
+    observation: CrashObservation = CrashObservation.EXACTLY_ONCE,
+) -> CommitSweepReceipt:
+    """One-commit census plus one kill point; identities live in the 900 range."""
+    census = _no_fault_receipt(
+        capsule,
+        binding,
+        900 + (1 if role is WorldRole.CANDIDATE else 2),
+        role=role,
+        operations=("credit_and_mark",),
+    )
+    values = _attempt_values(capsule, binding, role=role, observation=observation, index=950)
+    values["kill_after_commit"] = 1
+    if observation is CrashObservation.INVARIANT_FAILED:
+        values["final_snapshot"] = _snapshot(effects=0, marker=1)
+        values["checkpoint_snapshot"] = _snapshot(effects=0, marker=1)
+        values["post_kill_snapshot"] = _snapshot(effects=0, marker=1)
+    attempt = AttemptReceipt.with_digest(**values)
+    return CommitSweepReceipt.with_digest(
+        role=role,
+        capsule_digest=capsule.digest,
+        binding_digest=binding.digest,
+        census=census,
+        attempts=(attempt,),
+        observation=observation,
     )
 
 
@@ -344,6 +390,13 @@ def _result_values(
         "hypothesis_receipts": (),
         "bindings": (binding,),
         "attempts": _confirmations(capsule, binding, attempt),
+        "sweeps": (
+            (_sweep(capsule, binding, role=attempt.role),)
+            if attempt.role is not WorldRole.BASE
+            and attempt.observation is CrashObservation.EXACTLY_ONCE
+            and attempt.transport is TruthLabel.LOCAL
+            else ()
+        ),
         "started_at": NOW,
         "ended_at": NOW + timedelta(seconds=4),
         "summary": "exact patch defeated the capsule",
@@ -418,6 +471,106 @@ def test_completed_attempt_requires_exact_kill_replay_evidence(field: str, value
         AttemptReceipt.with_digest(**values)
 
 
+def test_proven_fix_requires_a_commit_sweep_that_ends_exactly_once() -> None:
+    capsule = _capsule()
+    binding = _binding(capsule)
+    attempt = AttemptReceipt.with_digest(**_attempt_values(capsule, binding))
+    values = _result_values(capsule, binding, attempt)
+    assert CrashCheckResult.with_digest(**values).sweeps[0].observation is (
+        CrashObservation.EXACTLY_ONCE
+    )
+
+    values["sweeps"] = ()
+    with pytest.raises(ValidationError, match="role-specific attempt observations"):
+        CrashCheckResult.with_digest(**values)
+
+    values["sweeps"] = (_sweep(capsule, binding, observation=CrashObservation.INVARIANT_FAILED),)
+    with pytest.raises(ValidationError, match="role-specific attempt observations"):
+        CrashCheckResult.with_digest(**values)
+    values["verdict"] = CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
+    assert CrashCheckResult.with_digest(**values).verdict is (
+        CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
+    )
+
+
+def test_sweep_worlds_are_pinned_to_the_run_and_count_toward_its_axes() -> None:
+    """Reviewer findings: sweep worlds were not bound to the run's tree, contract, event, or
+    environment digests, and a sweep world's integrity failure did not reach the result's axes."""
+    capsule = _capsule()
+    binding = _binding(capsule)
+    attempt = AttemptReceipt.with_digest(**_attempt_values(capsule, binding))
+    values = _result_values(capsule, binding, attempt)
+    sweep = cast(tuple[CommitSweepReceipt], values["sweeps"])[0]
+
+    census_values = {
+        name: getattr(sweep.census, name)
+        for name in NoFaultReplayReceipt.model_fields
+        if name != "digest"
+    }
+    census_values["environment_digest"] = HASHES[8]
+    unpinned = CommitSweepReceipt.with_digest(
+        **{
+            **{n: getattr(sweep, n) for n in CommitSweepReceipt.model_fields if n != "digest"},
+            "census": NoFaultReplayReceipt.with_digest(**census_values),
+        }
+    )
+    values["sweeps"] = (unpinned,)
+    with pytest.raises(ValidationError, match="not bound to this run"):
+        CrashCheckResult.with_digest(**values)
+
+    census_values = {
+        name: getattr(sweep.census, name)
+        for name in NoFaultReplayReceipt.model_fields
+        if name != "digest"
+    }
+    census_values.update(
+        execution_status=ExecutionStatus.INTEGRITY_ERROR,
+        integrity_status=IntegrityStatus.INVALID,
+        observation=CrashObservation.NOT_OBSERVED,
+        failure_detail="rows outside this event changed",
+        first_delivery_operations=(),
+    )
+    broken_census = NoFaultReplayReceipt.with_digest(**census_values)
+    broken_sweep = CommitSweepReceipt.with_digest(
+        **{
+            **{n: getattr(sweep, n) for n in CommitSweepReceipt.model_fields if n != "digest"},
+            "census": broken_census,
+            "attempts": (),
+            "observation": CrashObservation.NOT_OBSERVED,
+        }
+    )
+    values.update(sweeps=(broken_sweep,), verdict=CrashVerdict.EVIDENCE_INCOMPLETE)
+    with pytest.raises(ValidationError, match="contradicts its attempts"):
+        CrashCheckResult.with_digest(**values)
+    values.update(
+        integrity_status=IntegrityStatus.INVALID, execution_status=ExecutionStatus.INTEGRITY_ERROR
+    )
+    assert CrashCheckResult.with_digest(**values).integrity_status is IntegrityStatus.INVALID
+
+
+def test_commit_sweep_kill_points_must_match_the_census() -> None:
+    capsule = _capsule()
+    binding = _binding(capsule)
+    sweep = _sweep(capsule, binding)
+    values = {
+        name: getattr(sweep, name) for name in CommitSweepReceipt.model_fields if name != "digest"
+    }
+
+    values["attempts"] = ()
+    with pytest.raises(ValidationError, match="once after each commit"):
+        CommitSweepReceipt.with_digest(**values)
+
+    values["attempts"] = sweep.attempts
+    values["observation"] = CrashObservation.DUPLICATE_EFFECT
+    with pytest.raises(ValidationError, match="sweep observation contradicts"):
+        CommitSweepReceipt.with_digest(**values)
+
+    values["observation"] = sweep.observation
+    values["role"] = WorldRole.BASE
+    with pytest.raises(ValidationError, match="not the base"):
+        CommitSweepReceipt.with_digest(**values)
+
+
 def test_completed_result_cannot_contain_an_incomplete_attempt() -> None:
     capsule = _capsule()
     binding = _binding(capsule)
@@ -432,6 +585,61 @@ def test_completed_result_cannot_contain_an_incomplete_attempt() -> None:
 
     with pytest.raises(ValidationError, match="result execution status contradicts"):
         CrashCheckResult.with_digest(**_result_values(capsule, binding, incomplete))
+
+
+def test_duplicate_observation_accepts_a_missing_marker() -> None:
+    """Two credits are a duplicate even when the handler never wrote its marker."""
+    capsule = _capsule()
+    values = _attempt_values(
+        capsule, _binding(capsule), observation=CrashObservation.DUPLICATE_EFFECT
+    )
+    values["final_snapshot"] = _snapshot(effects=2, marker=0)
+    receipt = AttemptReceipt.with_digest(**values)
+    assert receipt.observation is CrashObservation.DUPLICATE_EFFECT
+
+    values["final_snapshot"] = _snapshot(effects=3, marker=0)
+    with pytest.raises(ValidationError, match="observation contradicts its final state"):
+        AttemptReceipt.with_digest(**values)
+
+
+def test_invariant_broken_verdict_requires_unanimous_invariant_failures() -> None:
+    capsule = _capsule()
+    base = _binding(capsule, source_ref="fixture:base", tree_digest=HASHES[4])
+    candidate = _binding(capsule, source_ref="fixture:candidate", tree_digest=HASHES[5])
+    base_attempt = AttemptReceipt.with_digest(
+        **_attempt_values(
+            capsule, base, role=WorldRole.BASE, observation=CrashObservation.DUPLICATE_EFFECT
+        )
+    )
+
+    def broken(index: int) -> AttemptReceipt:
+        values = _attempt_values(capsule, candidate, role=WorldRole.CANDIDATE, index=index)
+        values.update(
+            observation=CrashObservation.INVARIANT_FAILED, final_snapshot=_snapshot(effects=3)
+        )
+        return AttemptReceipt.with_digest(**values)
+
+    values = _result_values(capsule, candidate, broken(1))
+    values.update(
+        verdict=CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN,
+        bindings=(base, candidate),
+        attempts=(
+            *_confirmations(capsule, base, base_attempt),
+            *(broken(index) for index in range(1, REQUIRED_CONFIRMATIONS + 1)),
+        ),
+        hypothesis_receipts=_hypothesis_receipts(capsule),
+        minimization_receipts=_minimization_receipts(capsule, base),
+    )
+    result = CrashCheckResult.with_digest(**values)
+    assert result.verdict is CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
+
+    for wrong in (
+        CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE,
+        CrashVerdict.PATCH_FAILED_STILL_REPRODUCES,
+    ):
+        values["verdict"] = wrong
+        with pytest.raises(ValidationError, match="role-specific attempt observations"):
+            CrashCheckResult.with_digest(**values)
 
 
 def test_completed_attempt_binds_tree_and_observation_to_snapshots() -> None:
@@ -451,14 +659,19 @@ def test_completed_attempt_binds_tree_and_observation_to_snapshots() -> None:
     with pytest.raises(ValidationError, match="post-execution tree"):
         AttemptReceipt.with_digest(**wrong_tree)
 
-    wrong_exact = _attempt_values(capsule, binding)
-    wrong_exact["checkpoint_snapshot"] = _snapshot(marker=0)
-    wrong_exact["post_kill_snapshot"] = wrong_exact["checkpoint_snapshot"]
-    with pytest.raises(ValidationError, match="exactly-once observation"):
-        AttemptReceipt.with_digest(**wrong_exact)
+    # The checkpoint is whatever the handler had committed when killed; a commit-sweep kill
+    # after a marker-only commit is a legitimate (0, 0, 0, 1) checkpoint.
+    marker_only = _attempt_values(capsule, binding, observation=CrashObservation.INVARIANT_FAILED)
+    marker_only["checkpoint_snapshot"] = _snapshot(effects=0, marker=1)
+    marker_only["post_kill_snapshot"] = marker_only["checkpoint_snapshot"]
+    marker_only["final_snapshot"] = _snapshot(effects=0, marker=1)
+    assert AttemptReceipt.with_digest(**marker_only).observation is (
+        CrashObservation.INVARIANT_FAILED
+    )
+
     wrong_exact_final = _attempt_values(capsule, binding)
     wrong_exact_final["final_snapshot"] = _snapshot(effects=2)
-    with pytest.raises(ValidationError, match="exactly-once observation"):
+    with pytest.raises(ValidationError, match="observation contradicts its final state"):
         AttemptReceipt.with_digest(**wrong_exact_final)
 
     wrong_duplicate = _attempt_values(
@@ -467,17 +680,12 @@ def test_completed_attempt_binds_tree_and_observation_to_snapshots() -> None:
         observation=CrashObservation.DUPLICATE_EFFECT,
     )
     wrong_duplicate["final_snapshot"] = _snapshot()
-    with pytest.raises(ValidationError, match="duplicate observation"):
+    with pytest.raises(ValidationError, match="observation contradicts its final state"):
         AttemptReceipt.with_digest(**wrong_duplicate)
-    wrong_duplicate_checkpoint = _attempt_values(
-        capsule,
-        binding,
-        observation=CrashObservation.DUPLICATE_EFFECT,
-    )
-    wrong_duplicate_checkpoint["checkpoint_snapshot"] = _snapshot()
-    wrong_duplicate_checkpoint["post_kill_snapshot"] = _snapshot()
-    with pytest.raises(ValidationError, match="duplicate observation"):
-        AttemptReceipt.with_digest(**wrong_duplicate_checkpoint)
+    wrong_amount = _attempt_values(capsule, binding)
+    wrong_amount["amount_cents"] = 1_000
+    with pytest.raises(ValidationError, match="observation contradicts its final state"):
+        AttemptReceipt.with_digest(**wrong_amount)
 
     changed_after_kill = _attempt_values(capsule, binding)
     changed_after_kill["post_kill_snapshot"] = _snapshot(effects=2)
@@ -1002,6 +1210,7 @@ def test_incomplete_live_result_can_omit_hypothesis_receipts() -> None:
             binding,
             AttemptReceipt.with_digest(**_attempt_values(capsule, binding)),
         ),
+        sweeps=(_sweep(capsule, binding),),
     )
     assert CrashCheckResult.with_digest(**values).hypothesis_receipts == ()
 

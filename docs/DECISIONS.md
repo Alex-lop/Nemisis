@@ -53,6 +53,20 @@ The bounded Nemotron contract adapter may select only audited catalog IDs and in
 `init --nemotron` puts it on the CrashCheck CLI path as provenance for a draft; see the decision
 below. No live generation is claimed until a genuine receipt exists.
 
+## Nemotron plays the coding agent, never the judge
+
+The thesis is that AI-written retry patches look green and still lose money. The honest,
+load-bearing job for NVIDIA's model is therefore to write the patch. `nemisis propose-patch`
+gives Nemotron the bug report, the base module, and the storage API, and nothing else: no kill
+points, no catalog, no verdict rules. Its module is accepted only after deterministic AST checks
+(one synchronous `(store, event)` handler, `typing` imports only, no private attributes, no
+dangerous builtins) and is then an ordinary candidate tree. The authorship receipt is provenance in
+the manifest and report; the verdict comes from executing the tree. This keeps the authority model
+intact: the model proposes the thing under test, deterministic code decides what happened to it.
+
+Without a `NEBIUS_API_KEY` the command exits `2` and writes nothing. Injected clients yield a
+`MOCKED` receipt, which the report labels as such. No `LIVE` authorship receipt exists in this tree.
+
 ## Nemotron proposes at init, never at check
 
 The model's one CrashCheck role is to turn the issue and the exact base handler into a typed
@@ -106,6 +120,32 @@ a repair in this slice.
 Choose Option A for this sprint: keep `sqlite-credit-v1` as the single supported CrashCheck slice.
 A second adapter would not close the missing live transport, exact sponsor receipt, public hosting,
 or demo-video gates, and would add a new trust surface before a second consumer is justified.
+
+## Depth before width: the commit sweep instead of a second scenario (2026-09-05)
+
+The overnight hardening had the choice again and chose depth. Red-teaming the checker with thirty
+adversarial handlers found two false passes inside the one supported scenario; fixing them (kill
+after every store commit of a claimed fix; attribute every durable change to a reported store
+commit) makes the core claim true, which a second scenario would not have done. A judge who can
+write a handler in thirty seconds (`nemisis export`) and watch it fail for the right reason is
+harder to dismiss than one shown two look-alike scenarios.
+
+A second scenario is still the right next seam. It is not a plugin today. The hardcoded points are:
+
+- `sqlite_credit.py`: the catalog constants (`_SCENARIO_ID`, `_ADAPTER_ID`, `_FAULT_ID`,
+  `_PROBE_ID`, `_PREDICATE_ID`, `_TARGET`), `_SCHEMA`, `_seed_database`, `_probe`, `_event`
+  validation, `_wait_for_checkpoint`'s effect condition, `_STORE_DELTAS`, and `CreditStore`;
+- `crash_models.py`: `CreditSnapshot`'s four fields, `classify_final`, the capsule's
+  `event_id`/`account_id`/`amount_cents`, and `amount_cents` on the receipts;
+- `crashcheck.py`: `_seal_capsule`, `_validate_capsule_contract`, the `repros/double-credit/`
+  path, the money and `evt_1042` wording in summaries, and `_regression_asset`;
+- `report.py` and `cli.py`: `money()` and credit labels; the viewer reads `account_balance_cents`.
+
+A real seam is a `Scenario` object supplying ids, schema, seed, store class, event shape, probe,
+allowed deltas, checkpoint predicate, `classify_final`, and display labels, with a generic
+four-field snapshot whose field names do not lie about their contents. Budget half a day with the
+gate, plus one hero and benchmark regeneration. Do not ship it as a renamed copy of the credit
+fixture; the second scenario must have its own seed, effect direction, and predicate.
 
 ## Official live endpoints and narrow trust
 

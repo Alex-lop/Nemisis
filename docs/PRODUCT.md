@@ -38,14 +38,19 @@ The packaged fixture command is the audited shortcut because its contract is alr
    With `init --nemotron`, Nemotron proposes the catalog binding and expected single effect from
    the issue and base handler only; fixed rules accept or refuse the proposal before any draft.
 2. Before candidate materialization, run two fixed base hypotheses, select the canonical
-   reproducer, then delete its sole fault action in two fresh worlds. Proceed only when both
-   no-fault replays finish exactly once, proving this one-action schedule necessary for the
-   counterexample.
+   reproducer, then run the no-crash control: deliver the same event twice with no kill in two
+   fresh base worlds. Proceed only when both end exactly once, which shows the base's duplicate
+   needs the crash and is not a handler that is simply wrong.
 3. In every proof world, observe the durable `$25` effect, send process-group `SIGKILL`, confirm
    exit `-9`, start a fresh worker, and replay the byte-identical event.
-4. Require five fresh base and candidate worlds, plus five corrected worlds when supplied. Fixed
-   rules emit the verdict from independently probed durable state.
-5. For the complete path, publish capsule, contract, event, hunt, single-action necessity receipt,
+4. Require five fresh base and candidate worlds, plus five corrected worlds when supplied. A
+   claimed fix whose five boundary worlds end exactly once is then swept: a census delivery with no
+   kill records every store commit the handler makes, and one more fresh world kills the worker
+   right after each of those commits and replays. The base's boundary proves the patch beat the
+   crash the base had; the sweep proves it did not introduce a new one (a handler that marks first
+   and credits second loses the credit when killed between the two). Fixed rules emit the verdict
+   from independently probed durable state.
+5. For the complete path, publish capsule, contract, event, hunt, no-crash control receipt,
    metadata, regression, manifest, and report. `replay` evaluates the unchanged capsule against
    another exact tree.
 
@@ -54,7 +59,8 @@ The packaged fixture command is the audited shortcut because its contract is alr
 | Verdict | Exit | Exact meaning |
 | --- | ---: | --- |
 | `BUG_REPRODUCED` | 1 | The exact base reproduced the capsule's duplicate effect. |
-| `PATCH_FAILED_STILL_REPRODUCES` | 1 | The exact candidate reproduced the same duplicate effect. |
+| `PATCH_FAILED_STILL_REPRODUCES` | 1 | The exact candidate reproduced the same duplicate effect (two credits, with or without the marker). |
+| `PATCH_FAILED_INVARIANT_BROKEN` | 1 | Every candidate world completed, but the durable state was neither exactly-once nor the capsule's duplicate: a lost credit, a triple credit, or another broken invariant. |
 | `FIX_PROVEN_FOR_THIS_CAPSULE` | 0 | The exact candidate completed exactly once in every required world for this capsule only. |
 | `EVIDENCE_INCOMPLETE` | 2 | Required execution, mapping, integrity, or provenance evidence is missing or contradictory. |
 | `UNSUPPORTED_TARGET` | 2 | Deterministic preflight proves the scenario, catalog ID, adapter, or target shape is outside the alpha. |
@@ -66,7 +72,19 @@ An accepted catalog target whose exact-tree anchor has zero, multiple, or invali
 
 ## Model and isolation roles
 
-`nemisis init --nemotron` is CrashCheck's Nemotron role: bounded base-only context (issue text and
+Nemotron has two jobs, and neither touches a verdict, a probe, a SQL statement, or an assertion.
+
+`nemisis propose-patch` is the load-bearing one: Nemotron plays the coding agent. It receives the
+bug report, the base handler module, and the storage API, and returns a complete replacement
+module. It sees nothing about how CrashCheck kills or judges. Deterministic rules accept the module
+only if it keeps the exact `(store, event)` signature, imports nothing but `typing`, and touches no
+private attribute or dangerous builtin; a rejected module writes nothing. An accepted module becomes
+an ordinary candidate tree, with a sanitized receipt written to the operator's `.nemisis/agent-patches/<tree digest>.json`, and `check`
+executes that tree exactly like a human's patch, carrying the receipt into the manifest and report
+as the candidate's author (`LIVE` for a real Token Factory call, `MOCKED` for an injected client).
+The model that wrote the patch is never the thing that judges it.
+
+`nemisis init --nemotron` is the smaller role: bounded base-only context (issue text and
 the exact base handler) becomes a typed catalog proposal plus one bounded scalar. That call may not
 emit commands, probes, SQL, assertions, or verdicts. Deterministic code accepts the proposal only
 when it selects the audited fault intent and the exact `amount_cents`; otherwise no contract is
@@ -90,7 +108,9 @@ directory/Git sources, and trusted owner checkouts.
 
 Unsupported: arbitrary languages, databases, side effects, handlers outside the fixed adapter
 shape, hostile local fork execution, generalized schedule or interleaving search, model-authored
-code, repair generation, PR comments, and a hosted control plane.
+trusted code (probes, kill points, assertions, harness), automatic repair loops, PR comments, and a
+hosted control plane. A model may author a candidate handler (`propose-patch`); that candidate is
+untrusted input and is judged like any other.
 
 ## Claim ledger
 
@@ -98,11 +118,11 @@ code, repair generation, PR comments, and a hosted control plane.
 | --- | --- | --- | --- |
 | Real durable checkpoint, process-group kill, fresh replay worker, identical event | `sqlite_credit.py`, `crashcheck.py` | `test_sqlite_credit.py`, `test_crashcheck.py` | `LOCAL` / `FIXTURE`; [successful workflow at exact `f05ae921cf3d866f69adf8415d6d7bd52071bf37`](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355) |
 | Candidate-blind two-hypothesis selection before candidate materialization | `crashcheck.py` | candidate-invariance and hunt tests | Same exact workflow above |
-| Sole crash action is necessary for this capsule | `crashcheck.py`, `crash_models.py` | deletion, freshness, and tamper tests | Two fresh no-fault confirmations; not a general minimizer |
+| The base's duplicate needs the crash (no-crash control) | `crashcheck.py`, `crash_models.py` | control, freshness, and tamper tests | Two fresh no-kill base deliveries end exactly once |
 | Five fresh worlds per claimed tree and scoped verdicts | `crash_models.py`, `crashcheck.py` | role and verdict model/integration tests | Same exact workflow above |
 | Portable capsule, manifest, report, regression, and replay | `_publish`, `report.py` | artifact relocation/export/replay tests | Same workflow includes installed-wheel replay |
 | Composite GitHub Action | `action.yml` | local Action job plus release tests | GitHub-hosted at the same exact SHA; expected candidate rejection is exit 1 |
-| Measured benchmark and one-minute viewer | `benchmark.py`, `docs/assets/crashcheck-hero/` | benchmark and static evidence-binding tests | `LOCAL` / `FIXTURE`; source `ddaf186aa81b8a7ebd442da1f2dfeee6878e7dce`, capsule `1025d9c6…` |
+| Measured benchmark and one-minute viewer | `benchmark.py`, `docs/assets/crashcheck-hero/` | benchmark and static evidence-binding tests | `LOCAL` / `FIXTURE`; source `305667621ef62b49523d35a65491dafbf1e779ef`, capsule `41a29044…` |
 | Candidate-blind Nemotron contract proposal at `init` | `proposal.py`, `crash_models.py`, `cli.py`, `crashcheck.py`, `report.py` | `test_proposal.py`: candidate blindness, fail-closed rejection, sidecar binding into manifest/report | `MOCKED` in tests; `LIVE` requires `NEBIUS_API_KEY`; no current-tree live receipt yet |
 | ConTree adapter and CrashCheck live transport | `contree.py`, `live.py` | injected-client contract tests | `MOCKED`; CrashCheck Sandbox transport `BLOCKED` |
 

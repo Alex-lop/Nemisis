@@ -4,9 +4,9 @@ Three kinds of capture live here, and they are labelled differently on purpose:
 
 - The GIF, the terminal stills, and the two report renders are real local runs of the packaged
   `sqlite-credit-v1` fixture on this tree (`LOCAL` / `FIXTURE`).
-- The `viewer-01` to `viewer-03` captures are headless-Chrome renders of the committed hero evidence,
-  which stays bound to its own earlier commit and engine digest (`LOCAL` / `FIXTURE`, from
-  `docs/assets/crashcheck-hero/`).
+- The `viewer-01` to `viewer-03` captures are headless-Chrome renders of the committed hero evidence
+  (`LOCAL` / `FIXTURE`, from `docs/assets/crashcheck-hero/`), regenerated on 2026-09-05 at the same
+  engine as every other capture here.
 - `viewer-05-fail-closed.png` is the one induced state: the capture script withholds `manifest.json`
   (a 404) so the page's fail-closed path can be seen. It shows the absence of a claim, not evidence.
 
@@ -18,7 +18,7 @@ regenerates it.
 | --- | --- | --- |
 | `crashcheck-demo.gif` | 30 s: buggy → `BUG_REPRODUCED`, agent's patch → `PATCH_FAILED_STILL_REPRODUCES`, atomic → `FIX_PROVEN_FOR_THIS_CAPSULE`, one capsule | `vhs crashcheck-demo.tape` |
 | `terminal-doctor-live-blocked.png` | `doctor --mode live` naming exactly what a live run still needs | `vhs crashcheck-stills.tape` |
-| `terminal-check-misleading-green.png` | `check` on the agent's patch: verdict, necessity, `$25 → SIGKILL → $50` timeline, exit `1` | `vhs crashcheck-stills.tape` |
+| `terminal-check-misleading-green.png` | `check` on the agent's patch: verdict, no-crash control, corrected-tree sweep, `$25 → SIGKILL → $50` timeline, exit `1` | `vhs crashcheck-stills.tape` |
 | `terminal-replay-atomic-proven.png` | the same capsule replayed against the atomic fix, exit `0` | `vhs crashcheck-stills.tape` |
 | `terminal-pytest-green.png` | the full suite, green | `vhs crashcheck-pytest.tape` (run last) |
 | `viewer-01-initial.png` | evidence viewer on load: verdict first, FAIL / PASS controls, truth-label bar | `capture-viewer.js` |

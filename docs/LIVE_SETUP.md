@@ -97,6 +97,32 @@ Two facts about the receipt: `.nemisis/proposal.json` contains the model ID, reg
 latency, and digests of the prompt, input, and response. It contains no key, no issue text, no
 handler source, and no raw model output. You can commit it.
 
+### A2b. Let Nemotron write the patch, then crash-test it
+
+This is the beat that makes the hackathon story literal: NVIDIA's model is the coding agent, and
+CrashCheck is the thing that checks its work.
+
+```bash
+uv run nemisis propose-patch --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
+  --base fixture:sqlite-credit-v1/buggy --out ./nemotron-candidate
+uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate ./nemotron-candidate \
+  --mode local
+```
+
+Success for the first command is exit `0` and five lines: `candidate:`, a `nemotron:` line whose
+label is `LIVE`, `patch:`, the model's `rationale:`, and the exact `next:` command. The model saw
+the bug report, the base module, and the store API; it saw nothing about kill points or verdicts.
+Its module was accepted only after deterministic checks (signature, imports, attribute access), and
+`.nemisis/agent-patches/<candidate tree digest>.json` in your checkout is the sanitized receipt (never inside the candidate tree, so a pull request cannot claim its own author).
+
+The second command's verdict is whatever the model earned. Either outcome is a good demo: a
+`FIX_PROVEN_FOR_THIS_CAPSULE` shows the checker blessing a real AI patch; a
+`PATCH_FAILED_*` shows exactly why the tool exists. The report gains a card titled
+**Candidate author · LIVE Nemotron receipt**, and the manifest's `result.candidate_author` carries
+the same receipt. Failures: `NEMOTRON PATCH REJECTED: NEBIUS_API_KEY is required ...` (exit `2`, no
+tree written), or `NEMOTRON PATCH REJECTED: model module import is not allowed: sqlite3` and the
+like, when the model stepped outside the store API. Nothing is written on rejection.
+
 ### A3. Carry the receipt into a real CrashCheck run
 
 ```bash

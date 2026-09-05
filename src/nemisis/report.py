@@ -6,7 +6,14 @@ import json
 from html import escape
 from pathlib import Path
 
-from nemisis.crash_models import ContractProposal, CrashCheckResult, CreditSnapshot, ReproCapsule
+from nemisis.crash_models import (
+    CommitSweepReceipt,
+    ContractProposal,
+    CrashCheckResult,
+    CreditSnapshot,
+    PatchProposal,
+    ReproCapsule,
+)
 from nemisis.models import ArtifactStatus, RunManifest
 
 
@@ -86,29 +93,41 @@ report.</caption>
             attempt.observation.value for attempt in minimization.confirmations
         )
         reduction_outcome = (
-            "deletion rejected; the sole fault action is necessary for this fixture witness"
+            "the base handler is correct without a crash, so the duplicate needs the kill"
             if minimization.sole_fault_action_necessary_for_fixture
-            else "empty-schedule evidence incomplete; no minimization claim"
+            else "the no-kill delivery did not complete, so the duplicate is not attributed to the "
+            "crash"
         )
         minimization_section = f"""<section class="card" aria-labelledby="minimization">
-<h2 id="minimization">Single-action deletion / necessity check</h2>
-<p>Tried deleting the capsule's sole <code>{escape(minimization.removed_fault.value)}</code>
-fault action in {len(minimization.confirmations)} fresh base worlds. The empty schedule observed
-<code>{escape(observations)}</code>; {escape(reduction_outcome)}.</p>
-<p>No general minimizer claim. Stable deletion trace
-<code>{escape(minimization.trace_digest)}</code></p></section>"""
+<h2 id="minimization">No-crash control</h2>
+<p>Delivered the event twice with no kill in {len(minimization.confirmations)} fresh base worlds
+and observed <code>{escape(observations)}</code>: {escape(reduction_outcome)}. This separates a
+crash/retry bug from a handler that is simply wrong.</p>
+<p>Control receipt <code>{escape(minimization.trace_digest)}</code></p></section>"""
     else:
         minimization_section = ""
-    proposal_section = _proposal_section(proposal)
+    proposal_section = _proposal_section(proposal) + _author_section(
+        getattr(result, "candidate_author", None)
+    )
+    sweep_section = "".join(_sweep_section(sweep) for sweep in getattr(result, "sweeps", ()))
     representative = next(
         (attempt for attempt in result.attempts if attempt.execution_status.value != "COMPLETED"),
         next(
             (
                 attempt
-                for attempt in result.attempts
-                if attempt.role.value in {"candidate", "corrected"}
+                for sweep in getattr(result, "sweeps", ())
+                if sweep.observation.value != "EXACTLY_ONCE"
+                for attempt in sweep.attempts
+                if attempt.observation is sweep.observation
             ),
-            result.attempts[0],
+            next(
+                (
+                    attempt
+                    for attempt in result.attempts
+                    if attempt.role.value in {"candidate", "corrected"}
+                ),
+                result.attempts[0],
+            ),
         ),
     )
     checkpoint = representative.checkpoint_snapshot
@@ -256,6 +275,7 @@ body {{ padding: .75rem; }} .comparison {{ grid-template-columns: 1fr; }}
 <li>{replay_story}</li>
 <li>{final_story}</li>
 </ol>{failure}</section>
+{sweep_section}
 {hunt_section}
 {minimization_section}
 <section class="card" aria-labelledby="source-bindings">
@@ -281,6 +301,60 @@ source-tree binding(s).</caption>
 </body>
 </html>"""
     path.write_text(document, encoding="utf-8")
+
+
+def _sweep_section(sweep: CommitSweepReceipt) -> str:
+    operations = sweep.census.first_delivery_operations
+    attempts = sweep.attempts
+    role = escape(sweep.role.value)
+    observation = escape(sweep.observation.value)
+    rows = "".join(
+        "<tr>"
+        f'<th scope="row">after commit {attempt.kill_after_commit}</th>'
+        f"<td><code>{escape(operations[attempt.kill_after_commit - 1])}</code></td>"
+        f"<td>{escape(_snapshot_text(attempt.checkpoint_snapshot))}</td>"
+        f"<td>{escape(_snapshot_text(attempt.final_snapshot))}</td>"
+        f"<td>{escape(attempt.observation.value)}</td>"
+        "</tr>"
+        for attempt in attempts
+        if attempt.kill_after_commit is not None and attempt.kill_after_commit <= len(operations)
+    )
+    tone = "pass" if observation == "EXACTLY_ONCE" else "fail"
+    return f"""<section class="card" aria-labelledby="sweep-{role}">
+<h2 id="sweep-{role}">Commit sweep · {role} · <span class="verdict-{tone}">{observation}</span></h2>
+<p>A census delivery with no kill observed {len(operations)} store commit(s):
+<code>{escape(", ".join(operations)) or "none"}</code>. CrashCheck then killed the worker once after
+each commit and replayed. The capsule boundary proves the patch beat the base's crash; the sweep
+proves it did not trade it for a new one.</p>
+<div class="table-wrap" role="region" aria-label="Commit sweep receipts" tabindex="0"><table>
+<caption>One fresh world per kill point.</caption>
+<thead><tr><th scope="col">Kill point</th><th scope="col">Operation</th>
+<th scope="col">Checkpoint</th><th scope="col">Final</th><th scope="col">Observation</th></tr>
+</thead><tbody>{rows}</tbody></table></div></section>"""
+
+
+def _author_section(author: PatchProposal | None) -> str:
+    if author is None:
+        return ""
+    receipt = author.model_call
+    label = escape(receipt.truth_label.value)
+    return f"""<section class="card" aria-labelledby="candidate-author">
+<h2 id="candidate-author">Candidate author · {label} Nemotron receipt</h2>
+<p>The candidate's <code>{escape(author.handler_path)}</code> was written by \
+<code>{escape(receipt.model_id)}</code> on Token Factory \
+(<code>{escape(receipt.endpoint_region)}</code>) from the bug report and the base module. \
+The model saw nothing about how CrashCheck kills or judges; its module was accepted only after \
+deterministic checks on signature, imports, and attribute access. The verdict above comes from \
+executing that tree, not from the model.</p>
+<blockquote>{escape(author.rationale)}</blockquote>
+<dl class="identity" aria-label="Author receipt">
+<div><dt>Truth label</dt><dd><code>{label}</code></dd></div>
+<div><dt>Module digest</dt><dd><code>{escape(author.module_digest)}</code></dd></div>
+<div><dt>Candidate tree</dt><dd><code>{escape(author.candidate_tree_digest)}</code></dd></div>
+<div><dt>Prompt digest</dt><dd><code>{escape(receipt.prompt_template_digest)}</code></dd></div>
+<div><dt>Response digest</dt><dd><code>{escape(receipt.response_digest or "none")}</code></dd></div>
+<div><dt>Receipt digest</dt><dd><code>{escape(author.digest)}</code></dd></div>
+</dl></section>"""
 
 
 def _proposal_section(proposal: ContractProposal | None) -> str:
@@ -354,6 +428,7 @@ def _verdict_title(verdict: str) -> str:
     return {
         "BUG_REPRODUCED": "Crash/retry bug reproduced",
         "PATCH_FAILED_STILL_REPRODUCES": "Patch still duplicates the effect",
+        "PATCH_FAILED_INVARIANT_BROKEN": "Patch breaks the invariant under a crash",
         "FIX_PROVEN_FOR_THIS_CAPSULE": "Fix proven for this capsule only",
         "EVIDENCE_INCOMPLETE": "Evidence incomplete",
         "UNSUPPORTED_TARGET": "Target unsupported",

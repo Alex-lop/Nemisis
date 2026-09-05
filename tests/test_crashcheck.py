@@ -118,6 +118,19 @@ def test_three_tree_hero_runs_fifteen_fresh_worlds(
         and attempt.spawns[1].exit_code == 0
         for attempt in result.attempts
     )
+    # Only claimed fixes whose boundary worlds pass are swept; the duplicating candidate is not.
+    assert [sweep.role for sweep in result.sweeps] == [WorldRole.CORRECTED]
+    corrected_sweep = result.sweeps[0]
+    assert corrected_sweep.census.first_delivery_operations == ("credit_and_mark",)
+    assert corrected_sweep.census.replay_operations == ()
+    assert corrected_sweep.census.first_delivery_commit_count == 1
+    assert corrected_sweep.attempts[0].first_worker_operations == ("credit_and_mark",)
+    assert [a.kill_after_commit for a in corrected_sweep.attempts] == [1]
+    assert corrected_sweep.observation is CrashObservation.EXACTLY_ONCE
+    sweep_ids = {corrected_sweep.census.database_id} | {
+        a.database_id for a in corrected_sweep.attempts
+    }
+    assert not sweep_ids & {attempt.database_id for attempt in result.attempts}
 
 
 def test_hero_artifacts_and_digests_are_exact(
@@ -240,6 +253,8 @@ def test_candidate_input_cannot_change_base_only_hunt_or_capsule(
 
     assert misleading.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
     assert atomic.verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE
+    assert [sweep.role for sweep in atomic.sweeps] == [WorldRole.CANDIDATE]
+    assert "every replay ended exactly once" in atomic.summary
     assert misleading.capsule_digest == atomic.capsule_digest
     assert (
         _artifact(first_root, misleading, "capsule").read_bytes()

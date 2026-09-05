@@ -1,7 +1,7 @@
 # CrashCheck benchmark
 
-Status: measured `LOCAL` / `FIXTURE` evidence generated from clean source commit
-`ddaf186aa81b8a7ebd442da1f2dfeee6878e7dce`. The result is
+Status: measured `LOCAL` / `FIXTURE` evidence generated on 2026-09-05 from clean source commit
+`305667621ef62b49523d35a65491dafbf1e779ef`. The result is
 [`benchmarks/results/crashcheck-v1.json`](../benchmarks/results/crashcheck-v1.json).
 
 This benchmark compares ordinary green checks with the real process-kill counterexample for the
@@ -25,9 +25,9 @@ fresh confirmation worlds are required for each base, candidate, and corrected r
 
 | Variant | Existing test | Sequential duplicate | CrashCheck | Valid worlds | CrashCheck wall |
 | --- | --- | --- | --- | ---: | ---: |
-| `buggy` | PASS (1/1, 154.515 ms) | PASS / exactly once (1.341 ms) | `DUPLICATE_EFFECT` | 5/5 | 464.276 ms |
-| `misleading-green` | PASS (1/1, 113.530 ms) | PASS / exactly once (0.611 ms) | `DUPLICATE_EFFECT` | 5/5 | 414.171 ms |
-| `atomic` | PASS (1/1, 112.197 ms) | PASS / exactly once (0.597 ms) | `EXACTLY_ONCE` | 5/5 | 345.884 ms |
+| `buggy` | PASS (1/1, 113.670 ms) | PASS / exactly once (1.192 ms) | `DUPLICATE_EFFECT` | 5/5 | 271.661 ms |
+| `misleading-green` | PASS (1/1, 98.296 ms) | PASS / exactly once (0.576 ms) | `DUPLICATE_EFFECT` | 5/5 | 265.878 ms |
+| `atomic` | PASS (1/1, 98.683 ms) | PASS / exactly once (0.545 ms) | `EXACTLY_ONCE` | 5/5 | 256.213 ms |
 
 The `buggy` and `misleading-green` rows are identical by design: both trees carry the same
 check-then-act guard (`if processed: return`, credit, mark) written two ways, so every ordinary check
@@ -37,27 +37,27 @@ every crash world ends at `$50`, two ledger effects, and one marker. Every corre
 `$25`, one effect, and one marker.
 
 The hypothesis hunt produced one reproducer from two valid worlds and selected
-`effect-commit-v1` by fixed catalog rank. One sole-fault-action deletion trial then observed
-`EXACTLY_ONCE` in 2/2 fresh base worlds, rejected deletion, and retained 1/1 fault actions. This is
-a fixture-scoped necessity proof, not a general minimizer.
+`effect-commit-v1` by fixed catalog rank. The no-crash control then delivered the event twice with
+no kill in 2/2 fresh base worlds and observed `EXACTLY_ONCE` both times, so the base's duplicate is
+attributed to the crash. (The JSON still names this the deletion trial.)
 
 Measured local timing:
 
-- time to first base witness: 294.779 ms;
-- two-world deletion proof: 327.369 ms;
-- complete CrashCheck portion: 1.935 s; and
-- total benchmark: 2.378 s.
+- time to first base witness: 259.309 ms;
+- two-world no-crash control: 238.623 ms;
+- complete CrashCheck portion (including the corrected tree's commit sweep): 1.809 s; and
+- total benchmark: 2.163 s.
 
 Timing is diagnostic only. It came from CPython 3.12.13, SQLite 3.53.1, Pytest 9.1.1, Darwin/arm64;
 host load can change it. No provider latency, concurrency limit, or cost was measured.
 
 ## Exact bindings
 
-- source commit: `ddaf186aa81b8a7ebd442da1f2dfeee6878e7dce`
-- engine code digest: `47d78405ca59dee877328e16face03b15af484e3d65811e8caf213f00d8ec912`
-- capsule digest: `1025d9c6e014394cf80629d180e7cb4fb1a77a4b7b26934980b5f5ea975069a8`
+- source commit: `305667621ef62b49523d35a65491dafbf1e779ef`
+- engine code digest: `a9b1227d5c32db9500232be0a161906a23128f7c95d5d9e06c82a26bc34897ad`
+- capsule digest: `41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c`
 - event digest: `4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293`
-- result digest: `11016ce964b88961c246c91eb1ae437cf0ff9e9547a794ad845776af52af864a`
+- result digest: `fe98afd23f5a5bf3b5cf72a52a42558f2fb6d32ef848392fbc7f6dd26b51f8ef`
 
 The evidence commit necessarily follows the clean measured source commit. The JSON retains that
 immediately preceding SHA rather than pretending the unexecuted evidence commit measured itself.

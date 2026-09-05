@@ -14,7 +14,11 @@ from nemisis.crash_fixture import (
     BUGGY_REF,
     EVENT_DIGEST,
     FIXTURE_REFS,
+    HERO_REFS,
+    LEFTOVER_CREDIT_REF,
+    MARK_FIRST_REF,
     MISLEADING_GREEN_REF,
+    NEVER_MARKS_REF,
     FixtureEvent,
     load_contract,
     load_event,
@@ -64,6 +68,11 @@ def test_audited_contract_issue_and_event_are_exactly_bound() -> None:
         (BUGGY_REF, 2500),
         (MISLEADING_GREEN_REF, 2500),
         (ATOMIC_REF, 2500),
+        # The zoo: mark-first is green under an ordinary double delivery, exactly like the hero's
+        # misleading patch; the other two are wrong even sequentially.
+        (MARK_FIRST_REF, 2500),
+        (LEFTOVER_CREDIT_REF, 5000),
+        (NEVER_MARKS_REF, 5000),
     ],
 )
 def test_materializes_exact_tree_and_preserves_expected_duplicate_behavior(
@@ -96,7 +105,8 @@ def test_rejects_unknown_refs_before_creating_a_destination(tmp_path: Path) -> N
     with pytest.raises(ValueError, match="unknown fixture ref"):
         materialize_fixture("fixture:sqlite-credit-v1/unknown", destination)
     assert not destination.exists()
-    assert FIXTURE_REFS == (BUGGY_REF, MISLEADING_GREEN_REF, ATOMIC_REF)
+    assert HERO_REFS == (BUGGY_REF, MISLEADING_GREEN_REF, ATOMIC_REF)
+    assert (*HERO_REFS, MARK_FIRST_REF, LEFTOVER_CREDIT_REF, NEVER_MARKS_REF) == FIXTURE_REFS
 
 
 def test_rejects_a_changed_packaged_contract(

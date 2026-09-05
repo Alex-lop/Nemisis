@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import importlib.util
 import inspect
 import json
@@ -13,6 +14,7 @@ import socket
 import sqlite3
 import subprocess
 import sys
+import threading
 import uuid
 from collections.abc import Callable, Mapping
 from contextlib import suppress
@@ -25,6 +27,7 @@ from typing import cast
 from urllib.parse import quote
 
 from nemisis.crash_models import (
+    MAX_SWEEP_COMMITS,
     AnchorBinding,
     AnchorResolutionStatus,
     AttemptReceipt,
@@ -40,6 +43,8 @@ from nemisis.crash_models import (
     TimelineState,
     WorkerSpawnReceipt,
     WorldRole,
+    classify_delivery,
+    classify_final,
 )
 from nemisis.hashing import canonical_json, sha256_bytes, sha256_json, sha256_tree
 from nemisis.models import TruthLabel
@@ -97,20 +102,56 @@ class AnchorResolutionError(ValueError):
         self.matched_paths = matched_paths
 
 
+class _Drain:
+    """Read one worker stream to EOF on a thread, hashing it, so the worker never blocks on a
+    full pipe. EOF arrives only when every holder of the write end has closed it, which is how
+    surviving descendants are detected."""
+
+    def __init__(self, stream: object) -> None:
+        self.digest = hashlib.sha256()
+        self._stream = stream
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def _run(self) -> None:
+        # Raw bytes only: a text wrapper could raise UnicodeDecodeError on one stray byte, end
+        # this thread early, and make a pipe still held by a child look closed.
+        read = getattr(self._stream, "read", None)
+        if read is None:
+            return
+        with suppress(OSError, ValueError):  # ValueError: stream closed by the controller
+            while chunk := read(65_536):
+                self.digest.update(chunk if isinstance(chunk, bytes) else chunk.encode())
+        with suppress(OSError, ValueError):
+            close = getattr(self._stream, "close", None)
+            if close is not None:
+                close()
+
+    def finished(self, timeout: float) -> bool:
+        self.thread.join(timeout)
+        return not self.thread.is_alive()
+
+
 @dataclass
 class _Spawn:
     index: int
     phase: str
-    process: subprocess.Popen[str]
+    process: subprocess.Popen[bytes]
     channel: socket.socket
     worker_nonce: str
     session_id: str
     started_at: datetime
     event_digest: str
     receive_buffer: bytearray = field(default_factory=bytearray)
+    operations: list[str] = field(default_factory=list)
     ended_at: datetime | None = None
     stdout_digest: str = field(default_factory=lambda: sha256_bytes(b""))
     stderr_digest: str = field(default_factory=lambda: sha256_bytes(b""))
+    drains: tuple[_Drain, _Drain] | None = None
+
+    def __post_init__(self) -> None:
+        if self.process.stdout is not None and self.process.stderr is not None:
+            self.drains = (_Drain(self.process.stdout), _Drain(self.process.stderr))
 
 
 def initial_database_digest(event: Mapping[str, object]) -> str:
@@ -198,7 +239,8 @@ def bind_anchor(
         raise AnchorResolutionError(
             AnchorResolutionStatus.ZERO_MATCHES,
             (),
-            "supported target has no top-level handler binding in the exact tree",
+            f"supported target has no top-level `def {symbol}` in the exact tree (an alias or "
+            "re-export is not a binding)",
         )
     if len(definitions) > 1:
         raise AnchorResolutionError(
@@ -251,8 +293,9 @@ def execute_attempt(
     execution_nonce: str,
     timeout_seconds: float = 10.0,
     transport: TruthLabel = TruthLabel.LOCAL,
+    kill_after_commit: int | None = None,
 ) -> AttemptReceipt:
-    """Kill one worker at its durable effect, then replay in a fresh worker."""
+    """Kill one worker at its durable effect (or after commit N), then replay in a fresh worker."""
     started_at = datetime.now(UTC)
     timeline = [TimelineEntry(state=TimelineState.PREFLIGHT, timestamp=started_at)]
     spawns: list[_Spawn] = []
@@ -298,7 +341,13 @@ def execute_attempt(
         timeline.append(_entry(TimelineState.FIRST_WORKER_STARTED, str(first.process.pid)))
         _expect_hello(first, capsule, execution_nonce, timeout_seconds)
         checkpoint = _wait_for_checkpoint(
-            first, database, event, capsule.fault_boundary, timeout_seconds
+            first,
+            database,
+            event,
+            capsule.fault_boundary,
+            timeout_seconds,
+            previous=pre,
+            kill_after_commit=kill_after_commit,
         )
         checkpoint_reached = True
         timeline.append(_entry(TimelineState.CHECKPOINT_REACHED, checkpoint.digest))
@@ -306,6 +355,7 @@ def execute_attempt(
         kill_signal = signal.SIGKILL
         timeline.append(_entry(TimelineState.WORKER_KILLED, str(first.process.returncode)))
         post_kill = _probe(database, event)
+        _require_others_untouched(database, event)
         if post_kill.digest != checkpoint.digest:
             raise _AttemptFailure(
                 ExecutionStatus.INTEGRITY_ERROR,
@@ -326,10 +376,17 @@ def execute_attempt(
         spawns.append(replay_worker)
         timeline.append(_entry(TimelineState.REPLAY_WORKER_STARTED, str(replay_worker.process.pid)))
         _expect_hello(replay_worker, capsule, execution_nonce, timeout_seconds)
-        _finish_replay(replay_worker, capsule, execution_nonce, timeout_seconds)
+        final = _finish_replay(
+            replay_worker,
+            capsule,
+            execution_nonce,
+            timeout_seconds,
+            database=database,
+            event=event,
+            previous=post_kill,
+        )
         replay_acknowledged = True
         timeline.append(_entry(TimelineState.EVENT_REPLAYED, capsule.event_digest))
-        final = _probe(database, event)
         timeline.append(_entry(TimelineState.FINAL_STATE_PROBED, final.digest))
         tree_after = sha256_tree(root, ignored_names=frozenset({"__pycache__"}))
         if tree_after != binding.tree_digest:
@@ -338,6 +395,7 @@ def execute_attempt(
                 "source tree changed during trusted execution",
                 integrity=IntegrityStatus.INVALID,
             )
+        _require_only_the_store_wrote(work_dir.resolve(), database)
         observation = _observation(final, capsule.amount_cents)
     except _AttemptFailure as error:
         status, integrity, failure_detail = error.status, error.integrity, error.detail
@@ -346,11 +404,9 @@ def execute_attempt(
         integrity = IntegrityStatus.INCOMPLETE
         failure_detail = f"{type(error).__name__}: {str(error)[:800]}"
 
-    cleanup_error = _cleanup(spawns)
-    if cleanup_error is not None:
-        status = ExecutionStatus.CLEANUP_ERROR
-        integrity = IntegrityStatus.INCOMPLETE
-        failure_detail = cleanup_error
+    status, integrity, failure_detail = _after_cleanup(
+        _cleanup(spawns), status, integrity, failure_detail
+    )
     ended_at = datetime.now(UTC)
     timeline.append(
         TimelineEntry(
@@ -376,6 +432,7 @@ def execute_attempt(
         post_execution_tree_digest=tree_after,
         environment_digest=capsule.environment_digest,
         event_digest=capsule.event_digest,
+        amount_cents=capsule.amount_cents,
         initial_database_digest=capsule.initial_database_digest,
         initial_database_file_digest=initial_file_digest,
         database_id=database_id,
@@ -389,6 +446,8 @@ def execute_attempt(
         post_kill_snapshot=post_kill,
         final_snapshot=final,
         checkpoint_reached=checkpoint_reached,
+        first_worker_operations=tuple(spawns[0].operations[:MAX_SWEEP_COMMITS]) if spawns else (),
+        kill_after_commit=kill_after_commit,
         kill_signal=int(kill_signal) if kill_signal is not None else None,
         replay_acknowledged=replay_acknowledged,
         failure_detail=failure_detail,
@@ -403,8 +462,9 @@ def execute_no_fault_replay(
     work_dir: Path,
     execution_nonce: str,
     timeout_seconds: float = 10.0,
+    role: WorldRole | str = WorldRole.BASE,
 ) -> NoFaultReplayReceipt:
-    """Delete the sole fault action, then deliver the event in two fresh workers."""
+    """Deliver the event twice in fresh workers with no kill, recording every store commit."""
     started_at = datetime.now(UTC)
     spawns: list[_Spawn] = []
     initial: CreditSnapshot | None = None
@@ -441,8 +501,15 @@ def execute_no_fault_replay(
         )
         spawns.append(first)
         _expect_hello(first, capsule, execution_nonce, timeout_seconds)
-        _finish_replay(first, capsule, execution_nonce, timeout_seconds)
-        first_delivery = _probe(database, event)
+        first_delivery = _finish_replay(
+            first,
+            capsule,
+            execution_nonce,
+            timeout_seconds,
+            database=database,
+            event=event,
+            previous=initial,
+        )
 
         replay_worker = _spawn_worker(
             capsule=capsule,
@@ -455,8 +522,15 @@ def execute_no_fault_replay(
         )
         spawns.append(replay_worker)
         _expect_hello(replay_worker, capsule, execution_nonce, timeout_seconds)
-        _finish_replay(replay_worker, capsule, execution_nonce, timeout_seconds)
-        final = _probe(database, event)
+        final = _finish_replay(
+            replay_worker,
+            capsule,
+            execution_nonce,
+            timeout_seconds,
+            database=database,
+            event=event,
+            previous=first_delivery,
+        )
         tree_after = sha256_tree(root, ignored_names=frozenset({"__pycache__"}))
         if tree_after != binding.tree_digest:
             raise _AttemptFailure(
@@ -464,7 +538,8 @@ def execute_no_fault_replay(
                 "source tree changed during no-fault replay",
                 integrity=IntegrityStatus.INVALID,
             )
-        observation = _observation(final, capsule.amount_cents)
+        _require_only_the_store_wrote(work_dir.resolve(), database)
+        observation = classify_delivery(first_delivery, final, capsule.amount_cents)
     except _AttemptFailure as error:
         status, integrity, failure_detail = error.status, error.integrity, error.detail
     except (OSError, sqlite3.Error, ValueError) as error:
@@ -472,13 +547,12 @@ def execute_no_fault_replay(
         integrity = IntegrityStatus.INCOMPLETE
         failure_detail = f"{type(error).__name__}: {str(error)[:800]}"
 
-    cleanup_error = _cleanup(spawns)
-    if cleanup_error is not None:
-        status = ExecutionStatus.CLEANUP_ERROR
-        integrity = IntegrityStatus.INCOMPLETE
-        failure_detail = cleanup_error
+    status, integrity, failure_detail = _after_cleanup(
+        _cleanup(spawns), status, integrity, failure_detail
+    )
     return NoFaultReplayReceipt.with_digest(
         receipt_id=f"no-fault-{uuid.uuid4().hex}",
+        role=WorldRole(role),
         execution_status=status,
         integrity_status=integrity,
         observation=observation,
@@ -489,6 +563,7 @@ def execute_no_fault_replay(
         post_execution_tree_digest=tree_after,
         environment_digest=capsule.environment_digest,
         event_digest=capsule.event_digest,
+        amount_cents=capsule.amount_cents,
         initial_database_digest=capsule.initial_database_digest,
         initial_database_file_digest=initial_file_digest,
         database_id=database_id,
@@ -496,11 +571,56 @@ def execute_no_fault_replay(
         started_at=started_at,
         ended_at=datetime.now(UTC),
         spawns=tuple(_spawn_receipt(item, capsule.event_digest) for item in spawns),
+        first_delivery_operations=(
+            tuple(spawns[0].operations[:MAX_SWEEP_COMMITS]) if spawns else ()
+        ),
+        first_delivery_commit_count=len(spawns[0].operations) if spawns else 0,
+        replay_operations=(
+            tuple(spawns[1].operations[:MAX_SWEEP_COMMITS]) if len(spawns) > 1 else ()
+        ),
+        replay_commit_count=len(spawns[1].operations) if len(spawns) > 1 else 0,
         initial_snapshot=initial,
         first_delivery_snapshot=first_delivery,
         final_snapshot=final,
         failure_detail=failure_detail,
     )
+
+
+def _require_only_the_store_wrote(work_dir: Path, database: Path) -> None:
+    """Refuse handlers that keep durable state beside the database.
+
+    Kill points are store commits. A dedup file or journal written in the worker's directory has
+    crash windows the sweep cannot reach, so such a handler cannot earn a verdict. Writes elsewhere
+    on the machine are outside what local mode can see and are a documented boundary.
+    """
+    expected = {database.name, f"{database.name}-wal", f"{database.name}-shm"}
+    extra = sorted(
+        path.relative_to(work_dir).as_posix()
+        for path in work_dir.rglob("*")
+        if path.name not in expected and not path.is_dir()
+    )
+    if extra:
+        shown = ", ".join(extra[:5]) + (", …" if len(extra) > 5 else "")
+        raise _AttemptFailure(
+            ExecutionStatus.UNSUPPORTED,
+            f"the handler wrote durable files outside the store ({shown}); kill points are store "
+            "commits, so crash windows around that state cannot be reached and no verdict is "
+            "issued",
+        )
+
+
+def _after_cleanup(
+    cleanup_error: str | None,
+    status: ExecutionStatus,
+    integrity: IntegrityStatus,
+    failure_detail: str | None,
+) -> tuple[ExecutionStatus, IntegrityStatus, str | None]:
+    """A cleanup problem fails a completed run; it never hides an earlier failure."""
+    if cleanup_error is None:
+        return status, integrity, failure_detail
+    if status is ExecutionStatus.COMPLETED:
+        return ExecutionStatus.CLEANUP_ERROR, IntegrityStatus.INCOMPLETE, cleanup_error
+    return status, integrity, f"{failure_detail}; cleanup: {cleanup_error}"[:1_000]
 
 
 def _preflight(
@@ -589,6 +709,47 @@ def _connect(path: Path) -> sqlite3.Connection:
     return connection
 
 
+def _probe_others(path: Path, event: Mapping[str, object]) -> str:
+    """Digest every row that is not this event's: they must never change during a run."""
+    normalized = _event(event)
+    uri = f"file:{quote(str(path.resolve()))}?mode=ro"
+    with sqlite3.connect(uri, uri=True, timeout=5) as connection:
+        connection.execute("PRAGMA query_only=ON")
+        others = {
+            "accounts": connection.execute(
+                "SELECT account_id, balance_cents FROM accounts WHERE account_id IS NOT ? "
+                "ORDER BY account_id",
+                (normalized["account_id"],),
+            ).fetchall(),
+            "credit_ledger": connection.execute(
+                "SELECT id, event_id, account_id, amount_cents FROM credit_ledger "
+                "WHERE event_id IS NOT ? ORDER BY id",
+                (normalized["event_id"],),
+            ).fetchall(),
+            "processed_events": connection.execute(
+                "SELECT event_id FROM processed_events WHERE event_id IS NOT ? ORDER BY event_id",
+                (normalized["event_id"],),
+            ).fetchall(),
+        }
+    return sha256_json({name: [list(row) for row in rows] for name, rows in others.items()})
+
+
+# The seed has exactly one account (this event's) and nothing else, so every other row set is
+# empty. Any later difference means something wrote around the trusted store.
+_SEEDED_OTHERS_DIGEST = sha256_json({"accounts": [], "credit_ledger": [], "processed_events": []})
+
+
+def _require_others_untouched(database: Path, event: Mapping[str, object]) -> None:
+    """Every row that is not this event's must still be exactly as seeded."""
+    if _probe_others(database, event) != _SEEDED_OTHERS_DIGEST:
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            "rows that belong to other accounts or events changed during the run; something "
+            "wrote around the trusted store",
+            integrity=IntegrityStatus.INVALID,
+        )
+
+
 def _probe(path: Path, event: Mapping[str, object]) -> CreditSnapshot:
     normalized = _event(event)
     uri = f"file:{quote(str(path.resolve()))}?mode=ro"
@@ -654,7 +815,7 @@ def _spawn_worker(
     try:
         process = subprocess.Popen(
             argv,
-            cwd=source_tree,
+            cwd=database.parent,
             env={
                 "PATH": os.environ.get("PATH", ""),
                 "PYTHONDONTWRITEBYTECODE": "1",
@@ -666,7 +827,6 @@ def _spawn_worker(
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
         )
     except OSError as error:
         parent.close()
@@ -721,6 +881,9 @@ def _wait_for_checkpoint(
     event: Mapping[str, object],
     fault_boundary: FaultBoundary,
     timeout_seconds: float,
+    *,
+    previous: CreditSnapshot,
+    kill_after_commit: int | None = None,
 ) -> CreditSnapshot:
     amount = _event(event)["amount_cents"]
     if not isinstance(amount, int):
@@ -730,7 +893,14 @@ def _wait_for_checkpoint(
         message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
         kind = message.get("type")
         if kind == "commit":
-            snapshot = _probe(database, event)
+            snapshot = _attributed_probe(database, event, previous, message, spawn=spawn)
+            spawn.operations.append(str(message.get("operation")))
+            previous = snapshot
+            if kill_after_commit is not None:
+                if len(spawn.operations) == kill_after_commit:
+                    return snapshot
+                _send(spawn.channel, {"type": "continue"})
+                continue
             if (
                 snapshot.account_balance_cents == amount
                 and snapshot.event_ledger_count == 1
@@ -743,10 +913,24 @@ def _wait_for_checkpoint(
                 return snapshot
             _send(spawn.channel, {"type": "continue"})
         elif kind in {"done", "error"}:
-            raise _AttemptFailure(
-                ExecutionStatus.CHECKPOINT_NOT_REACHED,
-                "worker ended before the durable credit checkpoint",
-            )
+            if kind == "done" and not spawn.operations:
+                detail = (
+                    "the handler finished without a single CreditStore commit; CrashCheck can "
+                    "only kill at store commits, so a handler that writes around the store "
+                    "cannot be crash-tested"
+                )
+            elif kind == "done":
+                detail = (
+                    "the handler finished without ever committing the credit "
+                    f"(commits seen: {', '.join(spawn.operations)}); check it credits at all "
+                    "before crash-testing it"
+                )
+            else:
+                detail = (
+                    f"the handler raised {message.get('error', 'an exception')} before the "
+                    "durable credit checkpoint"
+                )
+            raise _AttemptFailure(ExecutionStatus.CHECKPOINT_NOT_REACHED, detail)
         else:
             raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "unexpected worker message")
 
@@ -766,17 +950,31 @@ def _kill_and_wait(spawn: _Spawn, timeout_seconds: float) -> None:
 
 
 def _finish_replay(
-    spawn: _Spawn, capsule: ReproCapsule, execution_nonce: str, timeout_seconds: float
-) -> None:
+    spawn: _Spawn,
+    capsule: ReproCapsule,
+    execution_nonce: str,
+    timeout_seconds: float,
+    *,
+    database: Path,
+    event: Mapping[str, object],
+    previous: CreditSnapshot,
+) -> CreditSnapshot:
+    """Drive one worker to completion; every durable change must be a store commit it reported."""
     deadline = monotonic() + timeout_seconds
     while True:
         message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
         kind = message.get("type")
         if kind == "commit":
+            previous = _attributed_probe(database, event, previous, message, spawn=spawn)
+            spawn.operations.append(str(message.get("operation")))
             _send(spawn.channel, {"type": "continue"})
             continue
         if kind == "error":
-            raise _AttemptFailure(ExecutionStatus.REPLAY_ERROR, "replay worker reported an error")
+            raise _AttemptFailure(
+                ExecutionStatus.REPLAY_ERROR,
+                f"the handler raised {message.get('error', 'an exception')} during the "
+                f"{spawn.phase} delivery; a redelivery must return normally to be exactly once",
+            )
         expected = {
             "event_digest": capsule.event_digest,
             "execution_nonce": execution_nonce,
@@ -786,12 +984,78 @@ def _finish_replay(
             raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "replay completion was malformed")
         break
     try:
-        return_code = spawn.process.wait(timeout=max(0.001, deadline - monotonic()))
+        return_code = spawn.process.wait(timeout=max(1.0, deadline - monotonic()))
     except subprocess.TimeoutExpired as error:
-        raise _AttemptFailure(ExecutionStatus.TIMEOUT, "replay worker did not exit") from error
+        raise _AttemptFailure(
+            ExecutionStatus.TIMEOUT,
+            f"the {spawn.phase} delivery worker reported done but did not exit; a non-daemon "
+            "thread or child kept it alive",
+        ) from error
     _collect(spawn)
     if return_code != 0:
         raise _AttemptFailure(ExecutionStatus.REPLAY_ERROR, "replay worker returned nonzero")
+    final = _probe(database, event)
+    _require_others_untouched(database, event)
+    if final.digest != previous.digest:
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            "the database changed after the worker's last reported store commit; something wrote "
+            "around the trusted store (an exit hook, a thread, a child, or a direct connection)",
+            integrity=IntegrityStatus.INVALID,
+        )
+    return final
+
+
+# What each trusted store operation may change: (balance, ledger rows, ledger total, marker).
+_STORE_DELTAS: dict[str, Callable[[int], tuple[int, int, int, int]]] = {
+    "credit": lambda amount: (amount, 1, amount, 0),
+    "mark_processed": lambda amount: (0, 0, 0, 1),
+    "credit_and_mark": lambda amount: (amount, 1, amount, 1),
+}
+
+
+def _attributed_probe(
+    database: Path,
+    event: Mapping[str, object],
+    previous: CreditSnapshot,
+    message: Mapping[str, object],
+    *,
+    spawn: _Spawn | None = None,
+) -> CreditSnapshot:
+    """Probe after a reported commit and refuse any change the named operation cannot explain.
+
+    A handler that writes to the database through its own connection never pauses the
+    controller, so its effect would surface here as an unattributed delta. That is an integrity
+    failure, not a verdict: the kill point can no longer be trusted to sit where the money moved.
+    """
+    amount = _event(event)["amount_cents"]
+    operation = message.get("operation")
+    snapshot = _probe(database, event)
+    _require_others_untouched(database, event)
+    expected = _STORE_DELTAS.get(str(operation))
+    if not isinstance(amount, int) or expected is None:
+        raise _AttemptFailure(
+            ExecutionStatus.PROTOCOL_ERROR,
+            f"worker reported an unknown store operation {operation!r}",
+        )
+    observed = (
+        snapshot.account_balance_cents - previous.account_balance_cents,
+        snapshot.event_ledger_count - previous.event_ledger_count,
+        snapshot.event_ledger_total_cents - previous.event_ledger_total_cents,
+        snapshot.event_marker_count - previous.event_marker_count,
+    )
+    if observed != expected(amount):
+        wanted = expected(amount)
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            f"the durable change after {operation} was not the one {operation} makes: the probe "
+            f"saw balance {observed[0]:+d}, ledger rows {observed[1]:+d}, marker {observed[3]:+d} "
+            f"for this event, not balance {wanted[0]:+d}, ledger rows {wanted[1]:+d}, marker "
+            f"{wanted[3]:+d}; either something wrote around the trusted store or a store call "
+            "was made with values that are not this event's",
+            integrity=IntegrityStatus.INVALID,
+        )
+    return snapshot
 
 
 def _receive(
@@ -846,7 +1110,7 @@ def _cleanup(spawns: list[_Spawn]) -> str | None:
             # Deliberately unconditional: a /dev/null descendant can outlive a reaped leader in
             # the same group (tested). The window for PID reuse between reap and this call is
             # microseconds; containment wins that trade.
-            with suppress(ProcessLookupError):
+            with suppress(ProcessLookupError, PermissionError):
                 os.killpg(spawn.process.pid, signal.SIGKILL)
             if spawn.process.poll() is None:
                 spawn.process.wait(timeout=2)
@@ -862,26 +1126,40 @@ def _collect(spawn: _Spawn) -> None:
     if spawn.ended_at is not None:
         return
     descendants_survived = False
-    try:
-        stdout, stderr = spawn.process.communicate(timeout=1)
-    except subprocess.TimeoutExpired:
+    if spawn.drains is None:
+        raise _AttemptFailure(
+            ExecutionStatus.CLEANUP_ERROR, "worker output streams were not captured"
+        )
+    if not all(drain.finished(1) for drain in spawn.drains):
         descendants_survived = True
-        with suppress(ProcessLookupError):
+        with suppress(ProcessLookupError, PermissionError):
             os.killpg(spawn.process.pid, signal.SIGKILL)
-        try:
-            stdout, stderr = spawn.process.communicate(timeout=2)
-        except subprocess.TimeoutExpired as error:
+        if not all(drain.finished(2) for drain in spawn.drains):
+            spawn.ended_at = datetime.now(UTC)
+            for stream in (spawn.process.stdout, spawn.process.stderr):
+                with suppress(OSError):
+                    if stream is not None:
+                        stream.close()
             raise _AttemptFailure(
                 ExecutionStatus.CLEANUP_ERROR,
-                "worker process-group output pipes did not close after cleanup",
+                "a child process inherited the worker's stdout/stderr and outlived the kill; "
+                "detached helpers must not share the worker's pipes",
+            )
+    if spawn.process.poll() is None:
+        try:
+            spawn.process.wait(timeout=2)
+        except subprocess.TimeoutExpired as error:
+            raise _AttemptFailure(
+                ExecutionStatus.CLEANUP_ERROR, "worker did not exit after its output closed"
             ) from error
-    spawn.stdout_digest = sha256_bytes(stdout.encode())
-    spawn.stderr_digest = sha256_bytes(stderr.encode())
+    spawn.stdout_digest = spawn.drains[0].digest.hexdigest()
+    spawn.stderr_digest = spawn.drains[1].digest.hexdigest()
     spawn.ended_at = datetime.now(UTC)
     if descendants_survived:
         raise _AttemptFailure(
             ExecutionStatus.CLEANUP_ERROR,
-            "worker descendants survived their supervisor and were killed",
+            "worker descendants survived their supervisor and were killed; a fire-and-forget "
+            "child that shares the worker's stdout/stderr is not exactly-once evidence",
         )
 
 
@@ -906,21 +1184,14 @@ def _spawn_receipt(spawn: _Spawn, event_digest: str) -> WorkerSpawnReceipt:
 
 
 def _observation(snapshot: CreditSnapshot, amount: int) -> CrashObservation:
-    state = (
-        snapshot.account_balance_cents,
-        snapshot.event_ledger_count,
-        snapshot.event_ledger_total_cents,
-        snapshot.event_marker_count,
-    )
-    if state == (amount * 2, 2, amount * 2, 1):
-        return CrashObservation.DUPLICATE_EFFECT
-    if state == (amount, 1, amount, 1):
-        return CrashObservation.EXACTLY_ONCE
-    return CrashObservation.INVARIANT_FAILED
+    return classify_final(snapshot, amount)
 
 
 def _entry(state: TimelineState, detail: str = "") -> TimelineEntry:
     return TimelineEntry(state=state, timestamp=datetime.now(UTC), detail=detail)
+
+
+_UNSET: object = object()
 
 
 class CreditStore:
@@ -986,14 +1257,23 @@ class CreditStore:
 
     def _require(
         self,
-        account_id: str | None = None,
-        event_id: str | None = None,
-        amount_cents: int | None = None,
+        account_id: object = _UNSET,
+        event_id: object = _UNSET,
+        amount_cents: object = _UNSET,
     ) -> None:
+        """Every supplied value must be the event's exact value and exact type.
+
+        ``type(x) is str`` (not ``isinstance``, not ``==``) so a ``str`` subclass with a lying
+        ``__eq__``, an object with ``__conform__``, a ``bool``, or ``None`` cannot smuggle a
+        different row or a NULL into the trusted store's own SQL.
+        """
+        expected = self._event
         checks = (
-            account_id is None or account_id == self._event["account_id"],
-            event_id is None or event_id == self._event["event_id"],
-            amount_cents is None or amount_cents == self._event["amount_cents"],
+            account_id is _UNSET
+            or (type(account_id) is str and account_id == expected["account_id"]),
+            event_id is _UNSET or (type(event_id) is str and event_id == expected["event_id"]),
+            amount_cents is _UNSET
+            or (type(amount_cents) is int and amount_cents == expected["amount_cents"]),
         )
         if not all(checks):
             raise ValueError("handler attempted an event outside the accepted contract")

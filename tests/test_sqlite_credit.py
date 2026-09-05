@@ -28,9 +28,12 @@ from nemisis.hashing import canonical_json, sha256_bytes
 from nemisis.sqlite_credit import (
     AnchorResolutionError,
     _AttemptFailure,
+    _attributed_probe,
     _cleanup,
     _collect,
+    _probe,
     _receive,
+    _seed_database,
     _Spawn,
     _spawn_receipt,
     bind_anchor,
@@ -100,6 +103,67 @@ def test_anchor_resolution_counts_handler_definitions(tmp_path: Path) -> None:
         bind_anchor(contract, duplicate)
     assert multiple.value.status is AnchorResolutionStatus.MULTIPLE_MATCHES
     assert multiple.value.matched_paths == ("app/credits.py", "app/credits.py")
+
+
+def test_attributed_probe_accepts_only_the_delta_its_operation_explains(tmp_path: Path) -> None:
+    event = {"account_id": "acct_7", "amount_cents": 2500, "event_id": "evt_1042"}
+    database = tmp_path / "probe.sqlite3"
+    _seed_database(database, event)
+    seeded = _probe(database, event)
+
+    # Nothing changed, and mark_processed claims a marker: unattributed.
+    with pytest.raises(
+        _AttemptFailure, match="was not the one mark_processed makes"
+    ) as unattributed:
+        _attributed_probe(database, event, seeded, {"operation": "mark_processed"})
+    assert unattributed.value.status is ExecutionStatus.INTEGRITY_ERROR
+    assert unattributed.value.integrity is IntegrityStatus.INVALID
+
+    with pytest.raises(_AttemptFailure, match="unknown store operation") as unknown:
+        _attributed_probe(database, event, seeded, {"operation": "transfer"})
+    assert unknown.value.status is ExecutionStatus.PROTOCOL_ERROR
+
+    import sqlite3
+
+    with sqlite3.connect(database) as connection:
+        connection.execute("INSERT INTO processed_events(event_id) VALUES ('evt_1042')")
+        connection.commit()
+    marked = _attributed_probe(database, event, seeded, {"operation": "mark_processed"})
+    assert marked.event_marker_count == 1
+
+
+def test_store_requires_exact_types_and_values(tmp_path: Path) -> None:
+    from nemisis.sqlite_credit import CreditStore
+
+    event = {"account_id": "acct_7", "amount_cents": 2500, "event_id": "evt_1042"}
+    database = tmp_path / "store.sqlite3"
+    _seed_database(database, event)
+    controller, worker = socket.socketpair()
+    store = CreditStore(database, worker, event)
+
+    class Lying(str):
+        def __eq__(self, other: object) -> bool:
+            return True
+
+        def __hash__(self) -> int:
+            return 0
+
+    try:
+        for bad in (
+            lambda: store.mark_processed(None),  # type: ignore[arg-type]
+            lambda: store.processed(Lying("other")),
+            lambda: store.credit(Lying("shadow"), "evt_1042", 2500),
+            lambda: store.credit("acct_7", "evt_1042", True),
+            lambda: store.credit("acct_7", "evt_1042", 2500.0),  # type: ignore[arg-type]
+            lambda: store.credit_and_mark("acct_7", b"evt_1042", 2500),  # type: ignore[arg-type]
+        ):
+            with pytest.raises(ValueError, match="outside the accepted contract"):
+                bad()
+        assert store.processed("evt_1042") is False
+        assert _probe(database, event).event_marker_count == 0
+    finally:
+        controller.close()
+        worker.close()
 
 
 def test_receive_preserves_a_coalesced_second_frame() -> None:
@@ -185,7 +249,6 @@ def test_collect_kills_descendants_that_hold_worker_output_open(tmp_path: Path) 
         start_new_session=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
     )
     process.wait(timeout=5)
     controller, worker = socket.socketpair()
@@ -225,7 +288,6 @@ def test_cleanup_kills_a_devnull_descendant_after_its_leader_exits(tmp_path: Pat
         start_new_session=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
     )
     assert process.stdout is not None
     child_pid = int(process.stdout.readline())
@@ -270,7 +332,6 @@ def test_worker_output_is_hashed_but_not_persisted_in_its_receipt(tmp_path: Path
         start_new_session=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
     )
     process.wait(timeout=5)
     controller, worker = socket.socketpair()
