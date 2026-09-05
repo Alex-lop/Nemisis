@@ -188,6 +188,37 @@ def test_mark_then_credit_passes_the_boundary_and_fails_the_commit_sweep(
     assert "after commit 1" in report
 
 
+GUARDED_LEFTOVER_CREDIT = """def apply_credit(store, event):
+    event_id = event["event_id"]
+    if store.processed(event_id):
+        return
+    store.credit_and_mark(event["account_id"], event_id, event["amount_cents"])
+    store.credit(event["account_id"], event_id, event["amount_cents"])
+"""
+
+
+def test_guarded_leftover_credit_is_caught_by_the_census_and_blamed_on_no_crash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Red team, high severity at the baseline: the guard makes the boundary worlds pass (the kill
+    lands inside credit_and_mark and the replay returns early), yet every crash-free delivery
+    posts $50. The census sees it first, so the summary blames the handler, not a crash window."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "guarded-leftover", GUARDED_LEFTOVER_CREDIT)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
+    assert "with no crash at all" in result.summary
+    assert "$50.00 instead of $25.00" in result.summary
+    boundary = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
+    assert {a.observation for a in boundary} == {CrashObservation.EXACTLY_ONCE}
+    sweep = result.sweeps[0]
+    assert sweep.census.observation is CrashObservation.DUPLICATE_EFFECT
+    assert sweep.census.first_delivery_operations == ("credit_and_mark", "credit")
+    assert cli._exit_code(result.verdict) == 1
+
+
 def test_leftover_credit_after_the_atomic_call_is_a_duplicate_not_a_validation_error(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -226,6 +257,26 @@ def test_correct_handlers_with_noisy_side_channels_are_still_proven(
     assert result.verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE, result.summary
     assert cli._exit_code(result.verdict) == 0
     assert not list(candidate.rglob("audit.log"))
+
+
+def test_worlds_that_disagree_are_named_not_averaged() -> None:
+    """Five worlds report unanimity or nothing; a split is spelled out, never voted on."""
+    from nemisis.crashcheck import _unsupported_observation_summary
+
+    result = check(BUGGY_REF, ATOMIC_REF, SCENARIO_ID, mode="local")
+    attempts = tuple(a for a in result.attempts if a.role is WorldRole.CANDIDATE)
+    split = (
+        *attempts[:3],
+        *(
+            a.model_copy(update={"observation": CrashObservation.DUPLICATE_EFFECT})
+            for a in attempts[3:]
+        ),
+    )
+
+    summary = _unsupported_observation_summary(CrashObservation.NOT_OBSERVED, split)
+
+    assert "worlds disagreed (2 DUPLICATE_EFFECT, 3 EXACTLY_ONCE)" in summary
+    assert "unanimity or nothing" in summary
 
 
 def test_candidate_that_never_marks_still_duplicates_and_fails(

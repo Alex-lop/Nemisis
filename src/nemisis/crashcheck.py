@@ -814,6 +814,17 @@ def _unsupported_observation_summary(
             f"{count} of {len(attempts)} {role} worlds did not complete: {detail}. "
             "No verdict is issued from incomplete or contradictory evidence."
         )
+    seen = sorted({attempt.observation for attempt in attempts}, key=lambda item: item.value)
+    if len(seen) > 1:
+        tally = ", ".join(
+            f"{sum(attempt.observation is item for attempt in attempts)} {item.value}"
+            for item in seen
+        )
+        return (
+            f"The {len(attempts)} {attempts[0].role.value} worlds disagreed ({tally}): the "
+            "handler is nondeterministic under the same kill, so no verdict is issued. CrashCheck "
+            "reports unanimity or nothing."
+        )
     return "Execution completed without one stable supported observation."
 
 
@@ -1244,6 +1255,18 @@ def _sweep_summary(sweep: CommitSweepReceipt, capsule: ReproCapsule) -> str:
             f"The commit sweep killed the {sweep.role.value} once after each of its {schedule} "
             f"({', '.join(operations)}) and every replay ended exactly once."
         )
+    census_final = sweep.census.final_snapshot
+    if (
+        sweep.census.execution_status is ExecutionStatus.COMPLETED
+        and sweep.census.observation is sweep.observation
+        and census_final is not None
+    ):
+        return (
+            f"Delivering {capsule.event_id} twice with no crash at all ended at "
+            f"{_describe_final(census_final, capsule)}. The handler is wrong before any kill; the "
+            f"{REQUIRED_CONFIRMATIONS} capsule-boundary worlds passed only because the kill "
+            "landed before the extra write."
+        )
     failing = next(
         (attempt for attempt in sweep.attempts if attempt.observation is sweep.observation), None
     )
@@ -1256,11 +1279,6 @@ def _sweep_summary(sweep: CommitSweepReceipt, capsule: ReproCapsule) -> str:
             f"Killed after store commit {index} of {len(operations)} ({operation}) and replayed: "
             f"{observed}. The {REQUIRED_CONFIRMATIONS} capsule-boundary worlds passed, so this "
             "is a crash window the base did not have."
-        )
-    if sweep.census.observation is CrashObservation.DUPLICATE_EFFECT:
-        return (
-            f"Delivering {capsule.event_id} twice with no crash at all credited the account twice: "
-            "the handler is not idempotent even sequentially."
         )
     detail = sweep.census.failure_detail or next(
         (attempt.failure_detail for attempt in sweep.attempts if attempt.failure_detail),
