@@ -240,7 +240,8 @@ body {{ padding: .75rem; }} .comparison {{ grid-template-columns: 1fr; }}
 <dl class="axes" aria-label="Independent result axes">
 <div class="card"><dt>Transport</dt><dd>{escape(result.transport.value)}</dd></div>
 <div class="card"><dt>Execution</dt><dd>{escape(result.execution_status.value)}</dd></div>
-<div class="card"><dt>Provenance</dt><dd>{escape(result.integrity_status.value)}</dd></div>
+<div class="card"><dt>Provenance</dt><dd>{escape(capsule.truth_label.value)}</dd></div>
+<div class="card"><dt>Integrity</dt><dd>{escape(result.integrity_status.value)}</dd></div>
 <div class="card"><dt>CrashCheck verdict</dt><dd>{escape(result.verdict.value)}</dd></div>
 </dl>
 {proposal_section}
