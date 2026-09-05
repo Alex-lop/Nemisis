@@ -52,6 +52,7 @@ from nemisis.crash_models import (
     TimelineEntry,
     TimelineState,
     WorldRole,
+    all_worlds,
     sweep_observation,
 )
 from nemisis.doctor import doctor
@@ -1533,25 +1534,27 @@ def _publish(
         artifacts["hunt"] = (repro_relative / "hunt.json").as_posix()
     if minimization_receipts:
         artifacts["minimization"] = (run_relative / "minimization.json").as_posix()
+    summary = summary[:1_000]
+    worlds = all_worlds(attempts, sweeps)
     if anchor_resolutions:
         execution = ExecutionStatus.SETUP_ERROR
         integrity = IntegrityStatus.INCOMPLETE
     else:
         execution = (
             ExecutionStatus.COMPLETED
-            if all(item.execution_status is ExecutionStatus.COMPLETED for item in attempts)
+            if all(item.execution_status is ExecutionStatus.COMPLETED for item in worlds)
             else next(
                 item.execution_status
-                for item in attempts
+                for item in worlds
                 if item.execution_status is not ExecutionStatus.COMPLETED
             )
         )
         integrity = (
             IntegrityStatus.VALID
-            if all(item.integrity_status is IntegrityStatus.VALID for item in attempts)
+            if all(item.integrity_status is IntegrityStatus.VALID for item in worlds)
             else (
                 IntegrityStatus.INVALID
-                if any(item.integrity_status is IntegrityStatus.INVALID for item in attempts)
+                if any(item.integrity_status is IntegrityStatus.INVALID for item in worlds)
                 else IntegrityStatus.INCOMPLETE
             )
         )

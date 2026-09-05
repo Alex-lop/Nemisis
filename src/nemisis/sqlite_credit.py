@@ -114,12 +114,14 @@ class _Drain:
         self.thread.start()
 
     def _run(self) -> None:
+        # Raw bytes only: a text wrapper could raise UnicodeDecodeError on one stray byte, end
+        # this thread early, and make a pipe still held by a child look closed.
         read = getattr(self._stream, "read", None)
         if read is None:
             return
-        with suppress(OSError, ValueError):
+        with suppress(OSError, ValueError):  # ValueError: stream closed by the controller
             while chunk := read(65_536):
-                self.digest.update(chunk.encode() if isinstance(chunk, str) else chunk)
+                self.digest.update(chunk if isinstance(chunk, bytes) else chunk.encode())
         with suppress(OSError, ValueError):
             close = getattr(self._stream, "close", None)
             if close is not None:
@@ -134,7 +136,7 @@ class _Drain:
 class _Spawn:
     index: int
     phase: str
-    process: subprocess.Popen[str]
+    process: subprocess.Popen[bytes]
     channel: socket.socket
     worker_nonce: str
     session_id: str
@@ -353,6 +355,7 @@ def execute_attempt(
         kill_signal = signal.SIGKILL
         timeline.append(_entry(TimelineState.WORKER_KILLED, str(first.process.returncode)))
         post_kill = _probe(database, event)
+        _require_others_untouched(database, event)
         if post_kill.digest != checkpoint.digest:
             raise _AttemptFailure(
                 ExecutionStatus.INTEGRITY_ERROR,
@@ -706,6 +709,47 @@ def _connect(path: Path) -> sqlite3.Connection:
     return connection
 
 
+def _probe_others(path: Path, event: Mapping[str, object]) -> str:
+    """Digest every row that is not this event's: they must never change during a run."""
+    normalized = _event(event)
+    uri = f"file:{quote(str(path.resolve()))}?mode=ro"
+    with sqlite3.connect(uri, uri=True, timeout=5) as connection:
+        connection.execute("PRAGMA query_only=ON")
+        others = {
+            "accounts": connection.execute(
+                "SELECT account_id, balance_cents FROM accounts WHERE account_id IS NOT ? "
+                "ORDER BY account_id",
+                (normalized["account_id"],),
+            ).fetchall(),
+            "credit_ledger": connection.execute(
+                "SELECT id, event_id, account_id, amount_cents FROM credit_ledger "
+                "WHERE event_id IS NOT ? ORDER BY id",
+                (normalized["event_id"],),
+            ).fetchall(),
+            "processed_events": connection.execute(
+                "SELECT event_id FROM processed_events WHERE event_id IS NOT ? ORDER BY event_id",
+                (normalized["event_id"],),
+            ).fetchall(),
+        }
+    return sha256_json({name: [list(row) for row in rows] for name, rows in others.items()})
+
+
+# The seed has exactly one account (this event's) and nothing else, so every other row set is
+# empty. Any later difference means something wrote around the trusted store.
+_SEEDED_OTHERS_DIGEST = sha256_json({"accounts": [], "credit_ledger": [], "processed_events": []})
+
+
+def _require_others_untouched(database: Path, event: Mapping[str, object]) -> None:
+    """Every row that is not this event's must still be exactly as seeded."""
+    if _probe_others(database, event) != _SEEDED_OTHERS_DIGEST:
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            "rows that belong to other accounts or events changed during the run; something "
+            "wrote around the trusted store",
+            integrity=IntegrityStatus.INVALID,
+        )
+
+
 def _probe(path: Path, event: Mapping[str, object]) -> CreditSnapshot:
     normalized = _event(event)
     uri = f"file:{quote(str(path.resolve()))}?mode=ro"
@@ -783,7 +827,6 @@ def _spawn_worker(
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
         )
     except OSError as error:
         parent.close()
@@ -941,13 +984,18 @@ def _finish_replay(
             raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "replay completion was malformed")
         break
     try:
-        return_code = spawn.process.wait(timeout=max(0.001, deadline - monotonic()))
+        return_code = spawn.process.wait(timeout=max(1.0, deadline - monotonic()))
     except subprocess.TimeoutExpired as error:
-        raise _AttemptFailure(ExecutionStatus.TIMEOUT, "replay worker did not exit") from error
+        raise _AttemptFailure(
+            ExecutionStatus.TIMEOUT,
+            f"the {spawn.phase} delivery worker reported done but did not exit; a non-daemon "
+            "thread or child kept it alive",
+        ) from error
     _collect(spawn)
     if return_code != 0:
         raise _AttemptFailure(ExecutionStatus.REPLAY_ERROR, "replay worker returned nonzero")
     final = _probe(database, event)
+    _require_others_untouched(database, event)
     if final.digest != previous.digest:
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
@@ -983,6 +1031,7 @@ def _attributed_probe(
     amount = _event(event)["amount_cents"]
     operation = message.get("operation")
     snapshot = _probe(database, event)
+    _require_others_untouched(database, event)
     expected = _STORE_DELTAS.get(str(operation))
     if not isinstance(amount, int) or expected is None:
         raise _AttemptFailure(
@@ -1086,6 +1135,11 @@ def _collect(spawn: _Spawn) -> None:
         with suppress(ProcessLookupError, PermissionError):
             os.killpg(spawn.process.pid, signal.SIGKILL)
         if not all(drain.finished(2) for drain in spawn.drains):
+            spawn.ended_at = datetime.now(UTC)
+            for stream in (spawn.process.stdout, spawn.process.stderr):
+                with suppress(OSError):
+                    if stream is not None:
+                        stream.close()
             raise _AttemptFailure(
                 ExecutionStatus.CLEANUP_ERROR,
                 "a child process inherited the worker's stdout/stderr and outlived the kill; "

@@ -420,6 +420,66 @@ def test_a_flood_of_credits_is_a_failed_patch_not_a_protocol_error(
     assert cli._exit_code(result.verdict) == 1
 
 
+SIDE_POCKET = """import glob
+import sqlite3
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    with sqlite3.connect(glob.glob("*.sqlite3")[0], isolation_level=None) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            "INSERT INTO accounts(account_id, balance_cents) VALUES ('acct_attacker', 1000000)"
+        )
+        connection.commit()
+"""
+
+INVALID_BYTE_THEN_CHILD = """import os
+import subprocess
+import sys
+
+
+def apply_credit(store, event):
+    os.write(1, b"\\xff")
+    os.write(2, b"\\xff")
+    subprocess.Popen([sys.executable, "-c", "import time; time.sleep(20)"], start_new_session=True)
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+
+def test_writes_to_other_accounts_or_events_are_an_integrity_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reviewer finding: attribution watched only this event's four numbers, so a handler could
+    fund another account through its own connection and stay PROVEN. Every row outside this event
+    must stay exactly as seeded."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "side-pocket", SIDE_POCKET)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert result.integrity_status.value == "INVALID"
+    assert "other accounts or events changed" in result.summary
+
+
+def test_an_invalid_byte_on_stdout_cannot_hide_a_child_that_holds_the_pipes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reviewer finding: the text-mode drain died on one undecodable byte and reported EOF, so a
+    detached child holding the worker's pipes went unnoticed. Drains are raw bytes now."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "invalid-byte", INVALID_BYTE_THEN_CHILD)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert "inherited the worker's stdout/stderr" in result.summary
+    assert result.execution_status is ExecutionStatus.CLEANUP_ERROR
+
+
 def test_worlds_that_disagree_are_named_not_averaged() -> None:
     """Five worlds report unanimity or nothing; a split is spelled out, never voted on."""
     from nemisis.crashcheck import _unsupported_observation_summary

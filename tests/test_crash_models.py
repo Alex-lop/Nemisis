@@ -493,6 +493,61 @@ def test_proven_fix_requires_a_commit_sweep_that_ends_exactly_once() -> None:
     )
 
 
+def test_sweep_worlds_are_pinned_to_the_run_and_count_toward_its_axes() -> None:
+    """Reviewer findings: sweep worlds were not bound to the run's tree, contract, event, or
+    environment digests, and a sweep world's integrity failure did not reach the result's axes."""
+    capsule = _capsule()
+    binding = _binding(capsule)
+    attempt = AttemptReceipt.with_digest(**_attempt_values(capsule, binding))
+    values = _result_values(capsule, binding, attempt)
+    sweep = cast(tuple[CommitSweepReceipt], values["sweeps"])[0]
+
+    census_values = {
+        name: getattr(sweep.census, name)
+        for name in NoFaultReplayReceipt.model_fields
+        if name != "digest"
+    }
+    census_values["environment_digest"] = HASHES[8]
+    unpinned = CommitSweepReceipt.with_digest(
+        **{
+            **{n: getattr(sweep, n) for n in CommitSweepReceipt.model_fields if n != "digest"},
+            "census": NoFaultReplayReceipt.with_digest(**census_values),
+        }
+    )
+    values["sweeps"] = (unpinned,)
+    with pytest.raises(ValidationError, match="not bound to this run"):
+        CrashCheckResult.with_digest(**values)
+
+    census_values = {
+        name: getattr(sweep.census, name)
+        for name in NoFaultReplayReceipt.model_fields
+        if name != "digest"
+    }
+    census_values.update(
+        execution_status=ExecutionStatus.INTEGRITY_ERROR,
+        integrity_status=IntegrityStatus.INVALID,
+        observation=CrashObservation.NOT_OBSERVED,
+        failure_detail="rows outside this event changed",
+        first_delivery_operations=(),
+    )
+    broken_census = NoFaultReplayReceipt.with_digest(**census_values)
+    broken_sweep = CommitSweepReceipt.with_digest(
+        **{
+            **{n: getattr(sweep, n) for n in CommitSweepReceipt.model_fields if n != "digest"},
+            "census": broken_census,
+            "attempts": (),
+            "observation": CrashObservation.NOT_OBSERVED,
+        }
+    )
+    values.update(sweeps=(broken_sweep,), verdict=CrashVerdict.EVIDENCE_INCOMPLETE)
+    with pytest.raises(ValidationError, match="contradicts its attempts"):
+        CrashCheckResult.with_digest(**values)
+    values.update(
+        integrity_status=IntegrityStatus.INVALID, execution_status=ExecutionStatus.INTEGRITY_ERROR
+    )
+    assert CrashCheckResult.with_digest(**values).integrity_status is IntegrityStatus.INVALID
+
+
 def test_commit_sweep_kill_points_must_match_the_census() -> None:
     capsule = _capsule()
     binding = _binding(capsule)

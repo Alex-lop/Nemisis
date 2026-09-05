@@ -616,12 +616,27 @@ def sweep_observation(
             for attempt in attempts
         )
     )
-    observations = {census.observation, *(attempt.observation for attempt in attempts)}
+    census_complete = (
+        census.execution_status is ExecutionStatus.COMPLETED
+        and census.integrity_status is IntegrityStatus.VALID
+    )
+    # A census that completed and found the handler wrong without a crash decides on its own; a
+    # kill point decides only when every sweep world completed with valid integrity.
+    if census_complete and census.observation in {
+        CrashObservation.DUPLICATE_EFFECT,
+        CrashObservation.INVARIANT_FAILED,
+    }:
+        return census.observation
+    if not completed:
+        return CrashObservation.NOT_OBSERVED
+    observations = {attempt.observation for attempt in attempts}
     if CrashObservation.DUPLICATE_EFFECT in observations:
         return CrashObservation.DUPLICATE_EFFECT
     if CrashObservation.INVARIANT_FAILED in observations:
         return CrashObservation.INVARIANT_FAILED
-    if completed and observations == {CrashObservation.EXACTLY_ONCE}:
+    if observations == {CrashObservation.EXACTLY_ONCE} and census.observation is (
+        CrashObservation.EXACTLY_ONCE
+    ):
         return CrashObservation.EXACTLY_ONCE
     return CrashObservation.NOT_OBSERVED
 
@@ -901,28 +916,22 @@ class CrashCheckResult(_DigestedModel):
                 binding_by_digest,
                 self.attempts,
             )
-        completed = all(
-            attempt.execution_status is ExecutionStatus.COMPLETED for attempt in self.attempts
-        )
+        worlds = all_worlds(self.attempts, self.sweeps)
+        completed = all(world.execution_status is ExecutionStatus.COMPLETED for world in worlds)
         execution_matches = (
             self.execution_status is ExecutionStatus.SETUP_ERROR
             if self.anchor_resolutions
             else (self.execution_status is ExecutionStatus.COMPLETED) is completed
-            and (
-                completed
-                or self.execution_status in {attempt.execution_status for attempt in self.attempts}
-            )
+            and (completed or self.execution_status in {w.execution_status for w in worlds})
         )
         if not execution_matches:
             raise ValueError("result execution status contradicts its attempts")
         expected_integrity = (
             IntegrityStatus.INVALID
-            if any(attempt.integrity_status is IntegrityStatus.INVALID for attempt in self.attempts)
+            if any(world.integrity_status is IntegrityStatus.INVALID for world in worlds)
             else (
                 IntegrityStatus.VALID
-                if all(
-                    attempt.integrity_status is IntegrityStatus.VALID for attempt in self.attempts
-                )
+                if all(world.integrity_status is IntegrityStatus.VALID for world in worlds)
                 else IntegrityStatus.INCOMPLETE
             )
         )
@@ -1147,6 +1156,17 @@ def _snapshot_state(snapshot: CreditSnapshot) -> tuple[int, int, int, int]:
     )
 
 
+def all_worlds(
+    attempts: tuple[AttemptReceipt, ...], sweeps: tuple[CommitSweepReceipt, ...]
+) -> list[AttemptReceipt | NoFaultReplayReceipt]:
+    """Every world that ran: boundary attempts, sweep censuses, and sweep kill points."""
+    worlds: list[AttemptReceipt | NoFaultReplayReceipt] = list(attempts)
+    for sweep in sweeps:
+        worlds.append(sweep.census)
+        worlds.extend(sweep.attempts)
+    return worlds
+
+
 def _validate_sweeps(result: CrashCheckResult) -> None:
     binding_by_digest = {binding.digest: binding for binding in result.bindings}
     roles = [sweep.role for sweep in result.sweeps]
@@ -1164,8 +1184,26 @@ def _validate_sweeps(result: CrashCheckResult) -> None:
             raise ValueError("commit sweep is not bound to its role's anchor binding")
         if sweep.capsule_digest != result.capsule_digest:
             raise ValueError("commit sweep uses a different capsule")
+        if sweep.census.parent_capsule_digest != result.capsule_digest:
+            raise ValueError("sweep census uses a different capsule")
         if any(attempt.transport is not result.transport for attempt in sweep.attempts):
             raise ValueError("sweep attempt transport differs from result transport")
+        binding = binding_by_digest[sweep.binding_digest]
+        reference = next(attempt for attempt in result.attempts if attempt.role is sweep.role)
+        for world in all_worlds((), (sweep,)):
+            if (
+                world.tree_digest != binding.tree_digest
+                or world.contract_digest != binding.contract_digest
+                or world.event_digest != reference.event_digest
+                or world.environment_digest != reference.environment_digest
+                or world.initial_database_digest != reference.initial_database_digest
+                or world.amount_cents != reference.amount_cents
+                or (
+                    world.execution_status is ExecutionStatus.COMPLETED
+                    and world.post_execution_tree_digest != binding.tree_digest
+                )
+            ):
+                raise ValueError("sweep world is not bound to this run's tree, contract, or event")
         sweep_identities = (
             {attempt.database_id for attempt in sweep.attempts} | {sweep.census.database_id},
             {attempt.execution_nonce for attempt in sweep.attempts}
@@ -1293,6 +1331,7 @@ __all__ = [
     "ReproCapsule",
     "RetryContract",
     "WorldRole",
+    "all_worlds",
     "classify_delivery",
     "classify_final",
     "effective_observation",

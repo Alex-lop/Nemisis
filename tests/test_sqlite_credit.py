@@ -249,7 +249,6 @@ def test_collect_kills_descendants_that_hold_worker_output_open(tmp_path: Path) 
         start_new_session=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
     )
     process.wait(timeout=5)
     controller, worker = socket.socketpair()
@@ -289,7 +288,6 @@ def test_cleanup_kills_a_devnull_descendant_after_its_leader_exits(tmp_path: Pat
         start_new_session=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
     )
     assert process.stdout is not None
     child_pid = int(process.stdout.readline())
@@ -334,7 +332,6 @@ def test_worker_output_is_hashed_but_not_persisted_in_its_receipt(tmp_path: Path
         start_new_session=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
     )
     process.wait(timeout=5)
     controller, worker = socket.socketpair()
