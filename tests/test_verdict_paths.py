@@ -13,7 +13,10 @@ import nemisis.crashcheck as crashcheck_module
 from nemisis.crash_fixture import (
     ATOMIC_REF,
     BUGGY_REF,
+    LEFTOVER_CREDIT_REF,
+    MARK_FIRST_REF,
     MISLEADING_GREEN_REF,
+    NEVER_MARKS_REF,
     SCENARIO_ID,
     load_issue,
 )
@@ -257,6 +260,35 @@ def test_correct_handlers_with_noisy_side_channels_are_still_proven(
     assert result.verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE, result.summary
     assert cli._exit_code(result.verdict) == 0
     assert not list(candidate.rglob("audit.log"))
+
+
+@pytest.mark.parametrize(
+    ("ref", "verdict", "fragment"),
+    [
+        (
+            MARK_FIRST_REF,
+            CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN,
+            "commit 1 of 2 (mark_processed)",
+        ),
+        (LEFTOVER_CREDIT_REF, CrashVerdict.PATCH_FAILED_STILL_REPRODUCES, "with no crash at all"),
+        (NEVER_MARKS_REF, CrashVerdict.PATCH_FAILED_STILL_REPRODUCES, "+$50 duplicate"),
+    ],
+)
+def test_packaged_zoo_variants_get_the_verdict_they_earned(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    ref: str,
+    verdict: CrashVerdict,
+    fragment: str,
+) -> None:
+    """Each packaged zoo tree fooled or nearly fooled an earlier engine; each is one flag away."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+
+    result = check(BUGGY_REF, ref, SCENARIO_ID, mode="local")
+
+    assert result.verdict is verdict, result.summary
+    assert fragment in result.summary, result.summary
+    assert cli._exit_code(result.verdict) == 1
 
 
 def test_worlds_that_disagree_are_named_not_averaged() -> None:
