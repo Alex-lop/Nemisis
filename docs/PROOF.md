@@ -3,7 +3,7 @@
 This ledger separates observed behavior from transport and product claims. The committed evidence
 was executed from clean source `ddaf186aa81b8a7ebd442da1f2dfeee6878e7dce` and published by
 `3d66ccd4499fae5f1d6fbe5beee4b097d3ce3949`. Later commits changed engine bytes (the current engine
-code digest is `0bdc49a902ebf43d8af292c3ce204df735e8c1505a92c8bbd883ce16db27a76d`); the committed hero stays
+code digest is `4832df8eae3c6001cc07eaf86c737845326d6e35f5a5ac0fc8e47d17907a9aed`); the committed hero stays
 bound to its own exact source and engine and is not relabelled. A fresh `check` at the current
 commit prints its own capsule and engine digests.
 

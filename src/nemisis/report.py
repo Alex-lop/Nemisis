@@ -200,7 +200,8 @@ grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); }}
 .identity dt,.axes dt {{ color: #b7c3d1; }}
 .identity dd {{ margin: .25rem 0 0; }}
 .card {{ margin: 1rem 0; padding: 1rem; background: #121923; border: 1px solid #2a3747; }}
-.axes {{ margin: 1rem 0; }} .axes dd {{ margin: .35rem 0 0; font-size: 1.3rem; }}
+.axes {{ margin: 1rem 0; }} .axes div {{ min-width: 0; }}
+.axes dd {{ margin: .35rem 0 0; font-size: 1.3rem; overflow-wrap: anywhere; }}
 .timeline {{ display: grid; gap: .75rem; padding-left: 1.8rem; }}
 .timeline li {{ padding: .8rem; border-left: 3px solid var(--accent); }}
 .table-wrap {{ overflow-x: auto; }}

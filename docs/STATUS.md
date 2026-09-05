@@ -16,7 +16,7 @@ Committed hero evidence (unchanged, bound to its own exact source and engine):
 
 Current tree:
 
-- engine code digest: `0bdc49a902ebf43d8af292c3ce204df735e8c1505a92c8bbd883ce16db27a76d`
+- engine code digest: `4832df8eae3c6001cc07eaf86c737845326d6e35f5a5ac0fc8e47d17907a9aed`
   (changed by the contract-proposal and review commits; `tests/test_docs_identity.py` pins this value, so it cannot rot; a fresh `check` prints a new capsule digest bound to
   this engine, and the committed hero is not relabelled)
 - interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence
@@ -69,9 +69,10 @@ Visual evidence now exists and is committed under `docs/assets/screenshots/`: a 
 terminal recording (`crashcheck-demo.gif`: buggy reproduces, the agent's patch still reproduces, the
 atomic fix is proven, all under one capsule), terminal stills of `check`, the atomic `replay`,
 `doctor --mode live`, and the green test suite, and headless-Chrome screenshots of the evidence viewer
-(initial, mid-replay, final receipt, fail-closed) and of the generated fail/pass reports. Every image
-is a real local run of the packaged fixture on this tree and carries `LOCAL` / `FIXTURE` labels where
-the surface shows labels; `tests/test_readme_truth.py` fails if an embedded image is missing or
+(initial, mid-replay, final receipt, fail-closed) and of the generated fail/pass reports. The recording,
+stills, and reports are real local runs of the packaged fixture on this tree; the viewer captures
+render the committed hero receipt, bound to its own earlier commit; every surface carries `LOCAL` /
+`FIXTURE` labels where it shows labels; `tests/test_readme_truth.py` fails if an embedded image is missing or
 malformed. The viewer was redesigned on 2026-09-04 (stepped replay, pinned truth-label bar,
 PASS / FAIL colour language) and re-verified by the same tests. No public hosted URL is claimed and no
 provider run appears in any image.
