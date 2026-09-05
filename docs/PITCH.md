@@ -41,18 +41,33 @@ static HTML report, and a content-addressed repro capsule you can replay against
 
 ## Where NVIDIA and Nebius come in
 
-- **Nemotron on Token Factory drafts the contract, candidate-blind.** `nemisis init --nemotron`
-  sends the bug report and the base handler to `nvidia/nemotron-3-super-120b-a12b` with a strict
-  JSON schema over an audited catalog. The model proposes which fault intent applies and what the
-  expected single effect is. Deterministic code accepts the proposal only if it matches the audited
-  scenario exactly; otherwise nothing is drafted. The model never sees the candidate and never
-  emits the verdict. The sanitized receipt travels into the final report. The path is wired and
-  contract-tested; it is labelled `LIVE` only when a real Token Factory call produced the receipt,
-  and the exact steps to produce one are in [LIVE_SETUP.md](LIVE_SETUP.md).
+- **Nemotron on Token Factory is the coding agent.** `nemisis propose-patch` gives
+  `nvidia/nemotron-3-super-120b-a12b` the bug report, the buggy module, and the store API, and
+  nothing about how CrashCheck kills or judges. Its module is accepted only after deterministic
+  checks on signature, imports, and attribute access, and is then crash-tested exactly like a
+  human's patch, with the model named as the candidate's author in the report. The model writes
+  the thing under test; it never touches the verdict. The path is wired and contract-tested; the
+  receipt is labelled `LIVE` only when a real Token Factory call produced it, and the exact steps
+  are in [LIVE_SETUP.md](LIVE_SETUP.md).
+- **Nemotron also drafts the contract, candidate-blind.** `nemisis init --nemotron` asks the same
+  model to select the audited catalog binding and the expected single effect from the bug report
+  and the base handler. Deterministic code accepts the proposal only if it matches the audited
+  scenario exactly; otherwise nothing is drafted.
 - **Token Factory Sandboxes are the isolation story.** Local mode is for a trusted checkout only;
   untrusted pull requests are refused by the GitHub Action until the kill/replay kernel runs inside
   a Sandbox. The differential verifier already has a ConTree path; CrashCheck's Sandbox transport
   is the next milestone and is honestly labelled `BLOCKED` until a real receipt exists.
+
+## Why a single kill point is not enough
+
+The checker was red-teamed against thirty adversarially written handlers. Three that fooled an
+earlier engine now ship as fixture refs. `mark-first` is the important one: it passes the unit
+test, passes call-it-twice, and passes the kill the original handler failed, because its marker is
+already durable when the kill lands. Killed one commit earlier, it marks the event done and never
+credits it. CrashCheck therefore sweeps: a claimed fix is killed once after every store commit it
+makes, and only a clean sweep earns `FIX_PROVEN_FOR_THIS_CAPSULE`. Every durable change must also
+be attributable to a store commit the worker reported; money moved around the store is an integrity
+failure, never a verdict.
 
 ## Why it is not "an LLM judging an LLM"
 
@@ -90,9 +105,10 @@ scenario, one handler shape, executed rather than inferred.
 ## What it is not, on purpose
 
 One scenario (`sqlite-credit-v1`), one handler shape, Python 3.12+, SQLite, POSIX `SIGKILL`. It
-is not a general fuzzer, not a formal verifier, not a repair generator, and a passing result means
-"this exact tree defeated this exact capsule," nothing broader. The narrowness is what makes the
-verdict trustworthy.
+is not a general fuzzer, not a formal verifier, and a passing result means "this exact tree
+defeated this exact capsule and every kill point of its own," nothing broader. Five worlds must
+agree or there is no verdict; a nondeterministic handler is reported as a split, never averaged.
+The narrowness is what makes the verdict trustworthy.
 
 ## The ask
 

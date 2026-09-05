@@ -37,8 +37,9 @@ printed path is relative (`.nemisis/…`) and no home directory appears on scree
 | 0:15 | `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/misleading-green --corrected fixture:sqlite-credit-v1/atomic --mode local` | about two seconds later, `verdict: PATCH_FAILED_STILL_REPRODUCES` and `timeline: $25.00 durable -> SIGKILL -> fresh worker -> $50.00`; exit `1` | "Worker starts. Twenty-five dollars hits disk. SIGKILL to the process group. Confirmed dead. Fresh worker, same event. Fifty dollars. Five fresh worlds, five times." | [`terminal-check-misleading-green.png`](assets/screenshots/terminal-check-misleading-green.png) |
 | 0:40 | `CAP=$(ls .nemisis/repros/double-credit/*/capsule.json)` then `uv run nemisis replay "$CAP" --source fixture:sqlite-credit-v1/buggy --role base --mode local` | `verdict: BUG_REPRODUCED`; exit `1` | "The crash is now a frozen capsule. Same capsule against the original handler: same guard, same crash window, same fifty dollars." | [`crashcheck-demo.gif`](assets/screenshots/crashcheck-demo.gif), first beat |
 | 0:55 | `uv run nemisis replay "$CAP" --source fixture:sqlite-credit-v1/atomic --role corrected --mode local` | `verdict: FIX_PROVEN_FOR_THIS_CAPSULE`, `timeline: $25.00 durable -> SIGKILL -> fresh worker -> $25.00`; exit `0` | "Same kill, same retry, against an atomic fix. Twenty-five dollars, one ledger row, one marker. Exit zero. This is the regression test that ships with the repro." | [`terminal-replay-atomic-proven.png`](assets/screenshots/terminal-replay-atomic-proven.png) |
-| 1:15 | `open .nemisis/runs/$(ls -t .nemisis/runs \| head -1)/report.html` (macOS) or paste the printed `report:` path into a browser | Green report: **Fix proven for this capsule only**, `$25.00 vs $25.00`, capsule and engine digests | "Everything you just saw is a receipt: process ids, exit code minus nine, two worker nonces, database snapshots, source tree digests. No model confidence anywhere. What is proven is narrow on purpose: this exact tree beat this exact capsule." | [`report-fix-proven.png`](assets/screenshots/report-fix-proven.png) and the failing twin [`report-patch-failed.png`](assets/screenshots/report-patch-failed.png) |
-| 1:30 | stop | | | |
+| 1:15 | `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/mark-first --mode local` | `verdict: PATCH_FAILED_INVARIANT_BROKEN`; `timeline: $0.00 durable (after commit 1) -> SIGKILL -> fresh worker -> $0.00`; exit `1` | "One more patch. This one passes the unit test, passes call-it-twice, and passes the same kill the original failed. So CrashCheck kills it once after every commit it makes. Killed after the marker, before the credit: zero dollars, marked done. The customer never gets paid. A checker that only killed in one place would have blessed this." | [`crashcheck-demo.gif`](assets/screenshots/crashcheck-demo.gif) |
+| 1:35 | `open .nemisis/runs/$(ls -t .nemisis/runs \| head -1)/report.html` (macOS) or paste the printed `report:` path into a browser | Report: verdict card, commit sweep table with the failing kill point, capsule and engine digests | "Everything you just saw is a receipt: process ids, exit code minus nine, two worker nonces, database snapshots, source tree digests. No model confidence anywhere. What is proven is narrow on purpose: this exact tree beat this exact capsule and every kill point of its own." | [`report-fix-proven.png`](assets/screenshots/report-fix-proven.png) and the failing twin [`report-patch-failed.png`](assets/screenshots/report-patch-failed.png) |
+| 1:50 | stop | | | |
 
 ## Expected output, verbatim
 
@@ -56,8 +57,12 @@ engine code digest: <64 hex digits, pinned in docs/STATUS.md>
 engine source commit: <the commit you ran at>
 hypotheses: 2 run -> selected effect-commit (effect-commit-v1)
 control: base delivered the event twice with no kill in 2/2 fresh worlds and ended exactly once; the duplicate needs the crash
+sweep: corrected makes 1 store commit (credit_and_mark); killed after each: #1 -> $25.00 EXACTLY_ONCE -> EXACTLY_ONCE
 timeline: $25.00 durable -> SIGKILL -> fresh worker -> $50.00
 ```
+
+The candidate is not swept because its boundary worlds already failed; only claimed fixes whose
+five boundary worlds pass are killed once after each of their store commits.
 
 `replay … --source fixture:sqlite-credit-v1/buggy --role base`:
 
@@ -79,8 +84,23 @@ the missing receipt, and the run is `EVIDENCE_INCOMPLETE` rather than a verdict.
 
 ## If you have a Token Factory key
 
-Insert one beat before `check`, at about 0:12, and pass `--scenario .nemisis/config.json` to the
-`check` command:
+The strongest beat: let NVIDIA's model write the patch, then crash-test it. Insert it at about
+0:12, before the packaged `check`:
+
+```bash
+uv run nemisis propose-patch --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
+  --base fixture:sqlite-credit-v1/buggy --out ./nemotron-candidate
+uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate ./nemotron-candidate --mode local
+```
+
+Point at the `nemotron: … · LIVE · …` line and say: "Nemotron on Nebius Token Factory read the bug
+report and the buggy module, nothing about how we kill or judge, and wrote this patch. Now we crash
+it." Whatever verdict comes back is the demo: a proven fix shows the checker blessing a real AI
+patch, a failing one shows exactly why the tool exists. Without a key the command exits `2` and
+writes nothing; say "fail closed" and continue with the packaged candidates.
+
+The smaller model beat is the contract proposal. Insert it before `check` and pass
+`--scenario .nemisis/config.json` to the `check` command:
 
 ```bash
 uv run nemisis init --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
