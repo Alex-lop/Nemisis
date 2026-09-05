@@ -102,6 +102,21 @@ At `effect-commit`, the buggy and misleading-green trees expose one effect with 
 `$50` after replay. The atomic tree reaches the same semantic effect boundary with its marker
 already durable and remains at `$25` with one effect and marker.
 
+Every reported commit is attributed: the controller probes at that instant and refuses a delta the
+named store operation cannot explain, and again after the worker's last message. Effects written
+around the store are an integrity failure, never a verdict.
+
+## Commit sweep
+
+A candidate or corrected tree whose five boundary worlds end exactly once earns a
+`CommitSweepReceipt` before any verdict. A census delivery with no kill records the handler's store
+commits in order (`first_delivery_operations`); one fresh world per commit then kills the worker
+immediately after that commit (`kill_after_commit`) and replays. `FIX_PROVEN_FOR_THIS_CAPSULE`
+requires the census and every kill point to end exactly once. A kill point that loses or duplicates
+the effect yields `PATCH_FAILED_INVARIANT_BROKEN` or `PATCH_FAILED_STILL_REPRODUCES` with a summary
+naming the commit and operation. The sweep is the answer to "you only kill in one place": the
+capsule reproduces the base's crash, the sweep covers every crash window the patch itself created.
+
 ## Provider boundary
 
 Token Factory inference defaults to the official global endpoint

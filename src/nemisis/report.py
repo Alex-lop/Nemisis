@@ -6,7 +6,13 @@ import json
 from html import escape
 from pathlib import Path
 
-from nemisis.crash_models import ContractProposal, CrashCheckResult, CreditSnapshot, ReproCapsule
+from nemisis.crash_models import (
+    CommitSweepReceipt,
+    ContractProposal,
+    CrashCheckResult,
+    CreditSnapshot,
+    ReproCapsule,
+)
 from nemisis.models import ArtifactStatus, RunManifest
 
 
@@ -100,6 +106,7 @@ fault action in {len(minimization.confirmations)} fresh base worlds. The empty s
     else:
         minimization_section = ""
     proposal_section = _proposal_section(proposal)
+    sweep_section = "".join(_sweep_section(sweep) for sweep in getattr(result, "sweeps", ()))
     representative = next(
         (attempt for attempt in result.attempts if attempt.execution_status.value != "COMPLETED"),
         next(
@@ -256,6 +263,7 @@ body {{ padding: .75rem; }} .comparison {{ grid-template-columns: 1fr; }}
 <li>{replay_story}</li>
 <li>{final_story}</li>
 </ol>{failure}</section>
+{sweep_section}
 {hunt_section}
 {minimization_section}
 <section class="card" aria-labelledby="source-bindings">
@@ -281,6 +289,36 @@ source-tree binding(s).</caption>
 </body>
 </html>"""
     path.write_text(document, encoding="utf-8")
+
+
+def _sweep_section(sweep: CommitSweepReceipt) -> str:
+    operations = sweep.census.first_delivery_operations
+    attempts = sweep.attempts
+    role = escape(sweep.role.value)
+    observation = escape(sweep.observation.value)
+    rows = "".join(
+        "<tr>"
+        f'<th scope="row">after commit {attempt.kill_after_commit}</th>'
+        f"<td><code>{escape(operations[attempt.kill_after_commit - 1])}</code></td>"
+        f"<td>{escape(_snapshot_text(attempt.checkpoint_snapshot))}</td>"
+        f"<td>{escape(_snapshot_text(attempt.final_snapshot))}</td>"
+        f"<td>{escape(attempt.observation.value)}</td>"
+        "</tr>"
+        for attempt in attempts
+        if attempt.kill_after_commit is not None and attempt.kill_after_commit <= len(operations)
+    )
+    tone = "pass" if observation == "EXACTLY_ONCE" else "fail"
+    return f"""<section class="card" aria-labelledby="sweep-{role}">
+<h2 id="sweep-{role}">Commit sweep · {role} · <span class="verdict-{tone}">{observation}</span></h2>
+<p>A census delivery with no kill observed {len(operations)} store commit(s):
+<code>{escape(", ".join(operations)) or "none"}</code>. CrashCheck then killed the worker once after
+each commit and replayed. The capsule boundary proves the patch beat the base's crash; the sweep
+proves it did not trade it for a new one.</p>
+<div class="table-wrap" role="region" aria-label="Commit sweep receipts" tabindex="0"><table>
+<caption>One fresh world per kill point.</caption>
+<thead><tr><th scope="col">Kill point</th><th scope="col">Operation</th>
+<th scope="col">Checkpoint</th><th scope="col">Final</th><th scope="col">Observation</th></tr>
+</thead><tbody>{rows}</tbody></table></div></section>"""
 
 
 def _proposal_section(proposal: ContractProposal | None) -> str:

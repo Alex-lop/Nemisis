@@ -34,10 +34,12 @@ from nemisis.crash_models import (
     AnchorBinding,
     AnchorResolutionReceipt,
     AttemptReceipt,
+    CommitSweepReceipt,
     ContractProposal,
     CrashCheckResult,
     CrashObservation,
     CrashVerdict,
+    CreditSnapshot,
     ExecutionStatus,
     FaultBoundary,
     HypothesisReceipt,
@@ -49,6 +51,7 @@ from nemisis.crash_models import (
     TimelineEntry,
     TimelineState,
     WorldRole,
+    sweep_observation,
 )
 from nemisis.doctor import doctor
 from nemisis.hashing import canonical_json, sha256_bytes, sha256_json, sha256_text, sha256_tree
@@ -384,6 +387,7 @@ def check(
         )
         bindings = [base_binding, candidate_binding]
         attempts = [*base_attempts, *candidate_attempts]
+        sweeps: list[CommitSweepReceipt] = []
         candidate_observation = _confirmed_observation(candidate_attempts, capsule)
         if candidate_observation is CrashObservation.NOT_OBSERVED:
             return publish(
@@ -398,6 +402,17 @@ def check(
                 hypothesis_receipts=hypothesis_receipts,
                 minimization_receipts=minimization_receipts,
             )
+        candidate_sweep: CommitSweepReceipt | None = None
+        if candidate_observation is CrashObservation.EXACTLY_ONCE:
+            candidate_sweep = _execute_sweep(
+                capsule,
+                candidate_binding,
+                candidate_source.path,
+                root / "candidate-sweep",
+                WorldRole.CANDIDATE,
+            )
+            sweeps.append(candidate_sweep)
+            candidate_observation = candidate_sweep.observation
         corrected_observation: CrashObservation | None = None
         if corrected is not None:
             corrected_source = _materialize_source(corrected, root / "source-corrected")
@@ -436,22 +451,24 @@ def check(
             bindings.append(corrected_binding)
             attempts.extend(corrected_attempts)
             corrected_observation = _confirmed_observation(corrected_attempts, capsule)
+            if corrected_observation is CrashObservation.EXACTLY_ONCE:
+                corrected_sweep = _execute_sweep(
+                    capsule,
+                    corrected_binding,
+                    corrected_source.path,
+                    root / "corrected-sweep",
+                    WorldRole.CORRECTED,
+                )
+                sweeps.append(corrected_sweep)
+                corrected_observation = corrected_sweep.observation
 
         if corrected is not None and corrected_observation is not CrashObservation.EXACTLY_ONCE:
             verdict = CrashVerdict.EVIDENCE_INCOMPLETE
             summary = "The known-good corrected control did not prove the capsule invariant."
-        elif candidate_observation is CrashObservation.DUPLICATE_EFFECT:
-            verdict = CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
-            summary = _summary(verdict)
-        elif candidate_observation is CrashObservation.INVARIANT_FAILED:
-            verdict = CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
-            summary = _invariant_summary(candidate_attempts, capsule)
-        elif candidate_observation is CrashObservation.EXACTLY_ONCE:
-            verdict = CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE
-            summary = _summary(verdict)
         else:
-            verdict = CrashVerdict.EVIDENCE_INCOMPLETE
-            summary = _unsupported_observation_summary(candidate_observation, candidate_attempts)
+            verdict, summary = _claimed_fix_verdict(
+                candidate_observation, candidate_attempts, candidate_sweep, capsule
+            )
         return publish(
             run_id,
             started_at,
@@ -463,6 +480,7 @@ def check(
             summary,
             hypothesis_receipts=hypothesis_receipts,
             minimization_receipts=minimization_receipts,
+            sweeps=tuple(sweeps),
         )
 
 
@@ -513,6 +531,8 @@ def replay(
             )
         binding = anchor
         attempts: tuple[AttemptReceipt, ...]
+        sweeps: tuple[CommitSweepReceipt, ...] = ()
+        sweep: CommitSweepReceipt | None = None
         if mode == "live":
             detail = _live_blocker()
             attempts = (_failed_attempt(sealed, binding, world_role, TruthLabel.LIVE, detail),)
@@ -526,31 +546,27 @@ def replay(
                 sealed, binding, materialized.path, root / "worlds", world_role
             )
             observation = _confirmed_observation(attempts, sealed)
-            if observation is CrashObservation.DUPLICATE_EFFECT:
-                verdict = (
-                    CrashVerdict.BUG_REPRODUCED
-                    if world_role is WorldRole.BASE
-                    else CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
-                )
-                detail = _summary(verdict)
-            elif observation is CrashObservation.EXACTLY_ONCE and world_role is WorldRole.BASE:
-                verdict = CrashVerdict.EVIDENCE_INCOMPLETE
-                detail = (
-                    "The base role completed exactly once, so it did not reproduce this capsule; "
-                    "replay a fix under --role candidate or --role corrected."
-                )
-            elif observation is CrashObservation.EXACTLY_ONCE:
-                verdict = CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE
-                detail = _summary(verdict)
-            elif (
-                observation is CrashObservation.INVARIANT_FAILED
-                and world_role is not WorldRole.BASE
-            ):
-                verdict = CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
-                detail = _invariant_summary(attempts, sealed)
+            if world_role is WorldRole.BASE:
+                if observation is CrashObservation.DUPLICATE_EFFECT:
+                    verdict = CrashVerdict.BUG_REPRODUCED
+                    detail = _summary(verdict)
+                elif observation is CrashObservation.EXACTLY_ONCE:
+                    verdict = CrashVerdict.EVIDENCE_INCOMPLETE
+                    detail = (
+                        "The base role completed exactly once, so it did not reproduce this "
+                        "capsule; replay a fix under --role candidate or --role corrected."
+                    )
+                else:
+                    verdict = CrashVerdict.EVIDENCE_INCOMPLETE
+                    detail = _unsupported_observation_summary(observation, attempts)
             else:
-                verdict = CrashVerdict.EVIDENCE_INCOMPLETE
-                detail = _unsupported_observation_summary(observation, attempts)
+                if observation is CrashObservation.EXACTLY_ONCE:
+                    sweep = _execute_sweep(
+                        sealed, binding, materialized.path, root / "sweep", world_role
+                    )
+                    sweeps = (sweep,)
+                    observation = sweep.observation
+                verdict, detail = _claimed_fix_verdict(observation, attempts, sweep, sealed)
         else:
             raise CrashCheckError("mode must be 'local' or 'live'")
         return _publish(
@@ -562,6 +578,7 @@ def replay(
             attempts,
             verdict,
             detail,
+            sweeps=sweeps,
         )
 
 
@@ -805,17 +822,8 @@ def _invariant_summary(attempts: tuple[AttemptReceipt, ...], capsule: ReproCapsu
     final = next((attempt.final_snapshot for attempt in attempts if attempt.final_snapshot), None)
     if final is None:
         return _unsupported_observation_summary(CrashObservation.INVARIANT_FAILED)
-    expected = money(capsule.amount_cents)
-    observed = money(final.account_balance_cents)
-    if final.event_ledger_count == 0 and final.event_marker_count == 1:
-        cause = f"{capsule.event_id} was marked processed but never credited, so the credit is lost"
-    elif final.event_ledger_count > 2:
-        cause = f"{capsule.event_id} was credited {final.event_ledger_count} times"
-    else:
-        cause = "the final state matches neither exactly-once nor the capsule's duplicate shape"
     return (
-        f"Every world completed with {observed} instead of {expected} "
-        f"({final.event_ledger_count} ledger rows, {final.event_marker_count} marker): {cause}. "
+        f"Every world completed with {_describe_final(final, capsule)}. "
         "The patch broke the invariant it was meant to protect."
     )
 
@@ -1109,6 +1117,171 @@ def _execute_confirmations(
         return tuple(future.result() for future in futures)
 
 
+def _execute_sweep(
+    capsule: ReproCapsule,
+    binding: AnchorBinding,
+    source: Path,
+    work_root: Path,
+    role: WorldRole,
+) -> CommitSweepReceipt:
+    """Count the handler's store commits without a kill, then kill once after each of them."""
+    work_root.mkdir(parents=True, exist_ok=False)
+    nonce = f"{role.value}-census-{uuid.uuid4().hex}"
+    try:
+        census = execute_no_fault_replay(
+            capsule=capsule,
+            binding=binding,
+            source_tree=source,
+            work_dir=work_root / "census",
+            execution_nonce=nonce,
+            role=role,
+        )
+    except Exception as error:  # Preserve a fail-closed census receipt.
+        census = _failed_census(capsule, binding, role, nonce, type(error).__name__)
+    attempts: tuple[AttemptReceipt, ...] = ()
+    if (
+        census.execution_status is ExecutionStatus.COMPLETED
+        and census.integrity_status is IntegrityStatus.VALID
+    ):
+
+        def one(index: int) -> AttemptReceipt:
+            attempt_nonce = f"{role.value}-sweep-{index}-{uuid.uuid4().hex}"
+            try:
+                return execute_attempt(
+                    capsule=capsule,
+                    binding=binding,
+                    source_tree=source,
+                    work_dir=work_root / f"kill-after-{index}",
+                    role=role,
+                    execution_nonce=attempt_nonce,
+                    kill_after_commit=index,
+                )
+            except Exception as error:  # Preserve a fail-closed sweep receipt.
+                return _failed_attempt(
+                    capsule,
+                    binding,
+                    role,
+                    TruthLabel.LOCAL,
+                    f"sweep orchestration failed ({type(error).__name__})",
+                    execution_nonce=attempt_nonce,
+                    kill_after_commit=index,
+                )
+
+        kill_points = range(1, len(census.first_delivery_operations) + 1)
+        with ThreadPoolExecutor(max_workers=max(1, len(kill_points))) as executor:
+            futures = [executor.submit(one, index) for index in kill_points]
+            attempts = tuple(future.result() for future in futures)
+    return CommitSweepReceipt.with_digest(
+        role=role,
+        capsule_digest=capsule.digest,
+        binding_digest=binding.digest,
+        census=census,
+        attempts=attempts,
+        observation=sweep_observation(census, attempts),
+    )
+
+
+def _failed_census(
+    capsule: ReproCapsule, binding: AnchorBinding, role: WorldRole, nonce: str, error: str
+) -> NoFaultReplayReceipt:
+    now = datetime.now(UTC)
+    return NoFaultReplayReceipt.with_digest(
+        receipt_id=f"no-fault-{uuid.uuid4().hex}",
+        role=role,
+        execution_status=ExecutionStatus.SETUP_ERROR,
+        integrity_status=IntegrityStatus.INCOMPLETE,
+        observation=CrashObservation.NOT_OBSERVED,
+        parent_capsule_digest=capsule.digest,
+        contract_digest=capsule.contract_digest,
+        binding_digest=binding.digest,
+        tree_digest=binding.tree_digest,
+        post_execution_tree_digest=binding.tree_digest,
+        environment_digest=capsule.environment_digest,
+        event_digest=capsule.event_digest,
+        initial_database_digest=capsule.initial_database_digest,
+        database_id=f"db-{uuid.uuid4().hex}",
+        execution_nonce=nonce,
+        started_at=now,
+        ended_at=now,
+        spawns=(),
+        failure_detail=f"census orchestration failed ({error})",
+    )
+
+
+def _claimed_fix_verdict(
+    observation: CrashObservation,
+    attempts: tuple[AttemptReceipt, ...],
+    sweep: CommitSweepReceipt | None,
+    capsule: ReproCapsule,
+) -> tuple[CrashVerdict, str]:
+    """Decide for a candidate or corrected role from its boundary worlds and its sweep."""
+    boundary = _confirmed_observation(attempts, capsule)
+    if observation is CrashObservation.DUPLICATE_EFFECT:
+        verdict = CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
+        if boundary is CrashObservation.DUPLICATE_EFFECT or sweep is None:
+            return verdict, _summary(verdict)
+        return verdict, _sweep_summary(sweep, capsule)
+    if observation is CrashObservation.INVARIANT_FAILED:
+        verdict = CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
+        if boundary is CrashObservation.INVARIANT_FAILED or sweep is None:
+            return verdict, _invariant_summary(attempts, capsule)
+        return verdict, _sweep_summary(sweep, capsule)
+    if observation is CrashObservation.EXACTLY_ONCE and sweep is not None:
+        verdict = CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE
+        return verdict, _summary(verdict) + " " + _sweep_summary(sweep, capsule)
+    if sweep is not None and boundary is CrashObservation.EXACTLY_ONCE:
+        return CrashVerdict.EVIDENCE_INCOMPLETE, _sweep_summary(sweep, capsule)
+    return CrashVerdict.EVIDENCE_INCOMPLETE, _unsupported_observation_summary(observation, attempts)
+
+
+def _sweep_summary(sweep: CommitSweepReceipt, capsule: ReproCapsule) -> str:
+    operations = sweep.census.first_delivery_operations
+    schedule = f"{len(operations)} store commit{'s' if len(operations) != 1 else ''}"
+    if sweep.observation is CrashObservation.EXACTLY_ONCE:
+        return (
+            f"The commit sweep killed the {sweep.role.value} once after each of its {schedule} "
+            f"({', '.join(operations)}) and every replay ended exactly once."
+        )
+    failing = next(
+        (attempt for attempt in sweep.attempts if attempt.observation is sweep.observation), None
+    )
+    if failing is not None and failing.kill_after_commit is not None:
+        index = failing.kill_after_commit
+        operation = operations[index - 1] if index <= len(operations) else "unknown"
+        final = failing.final_snapshot
+        observed = _describe_final(final, capsule) if final is not None else "no final state"
+        return (
+            f"Killed after store commit {index} of {len(operations)} ({operation}) and replayed: "
+            f"{observed}. The {REQUIRED_CONFIRMATIONS} capsule-boundary worlds passed, so this "
+            "is a crash window the base did not have."
+        )
+    if sweep.census.observation is CrashObservation.DUPLICATE_EFFECT:
+        return (
+            f"Delivering {capsule.event_id} twice with no crash at all credited the account twice: "
+            "the handler is not idempotent even sequentially."
+        )
+    detail = sweep.census.failure_detail or next(
+        (attempt.failure_detail for attempt in sweep.attempts if attempt.failure_detail),
+        "a sweep world did not complete",
+    )
+    return f"The commit sweep could not complete: {detail}. No verdict is issued."
+
+
+def _describe_final(final: CreditSnapshot, capsule: ReproCapsule) -> str:
+    money_now = money(final.account_balance_cents)
+    rows = f"{final.event_ledger_count} ledger row{'s' if final.event_ledger_count != 1 else ''}"
+    marker = f"{final.event_marker_count} marker"
+    if final.event_ledger_count == 0 and final.event_marker_count == 1:
+        cause = f"{capsule.event_id} was marked processed but never credited, so the credit is lost"
+    elif final.event_ledger_count == 2:
+        cause = f"{capsule.event_id} was credited twice"
+    elif final.event_ledger_count > 2:
+        cause = f"{capsule.event_id} was credited {final.event_ledger_count} times"
+    else:
+        cause = "the final state matches neither exactly-once nor the capsule's duplicate shape"
+    return f"{money_now} instead of {money(capsule.amount_cents)} ({rows}, {marker}): {cause}"
+
+
 def _confirmed_observation(
     attempts: tuple[AttemptReceipt, ...], capsule: ReproCapsule
 ) -> CrashObservation:
@@ -1152,6 +1325,7 @@ def _failed_attempt(
     detail: str,
     *,
     execution_nonce: str | None = None,
+    kill_after_commit: int | None = None,
 ) -> AttemptReceipt:
     started = datetime.now(UTC)
     ended = datetime.now(UTC)
@@ -1183,6 +1357,7 @@ def _failed_attempt(
         ),
         spawns=(),
         checkpoint_reached=False,
+        kill_after_commit=kill_after_commit,
         replay_acknowledged=False,
         failure_detail=detail[:1_000],
     )
@@ -1203,6 +1378,7 @@ def _publish(
     minimization_receipts: tuple[MinimizationReceipt, ...] = (),
     transport: TruthLabel | None = None,
     proposal: ContractProposal | None = None,
+    sweeps: tuple[CommitSweepReceipt, ...] = (),
 ) -> CrashCheckResult:
     if capsule.engine_code_digest != engine_code_digest():
         raise CrashCheckError("capsule engine digest differs from the installed engine")
@@ -1280,6 +1456,7 @@ def _publish(
         minimization_receipts=minimization_receipts,
         bindings=bindings,
         attempts=attempts,
+        sweeps=sweeps,
         started_at=started_at,
         ended_at=datetime.now(UTC),
         summary=summary,

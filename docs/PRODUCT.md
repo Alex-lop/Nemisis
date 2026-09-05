@@ -43,8 +43,13 @@ The packaged fixture command is the audited shortcut because its contract is alr
    counterexample.
 3. In every proof world, observe the durable `$25` effect, send process-group `SIGKILL`, confirm
    exit `-9`, start a fresh worker, and replay the byte-identical event.
-4. Require five fresh base and candidate worlds, plus five corrected worlds when supplied. Fixed
-   rules emit the verdict from independently probed durable state.
+4. Require five fresh base and candidate worlds, plus five corrected worlds when supplied. A
+   claimed fix whose five boundary worlds end exactly once is then swept: a census delivery with no
+   kill records every store commit the handler makes, and one more fresh world kills the worker
+   right after each of those commits and replays. The base's boundary proves the patch beat the
+   crash the base had; the sweep proves it did not introduce a new one (a handler that marks first
+   and credits second loses the credit when killed between the two). Fixed rules emit the verdict
+   from independently probed durable state.
 5. For the complete path, publish capsule, contract, event, hunt, single-action necessity receipt,
    metadata, regression, manifest, and report. `replay` evaluates the unchanged capsule against
    another exact tree.

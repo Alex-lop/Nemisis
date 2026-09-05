@@ -25,6 +25,7 @@ from typing import cast
 from urllib.parse import quote
 
 from nemisis.crash_models import (
+    MAX_SWEEP_COMMITS,
     AnchorBinding,
     AnchorResolutionStatus,
     AttemptReceipt,
@@ -108,6 +109,7 @@ class _Spawn:
     started_at: datetime
     event_digest: str
     receive_buffer: bytearray = field(default_factory=bytearray)
+    operations: list[str] = field(default_factory=list)
     ended_at: datetime | None = None
     stdout_digest: str = field(default_factory=lambda: sha256_bytes(b""))
     stderr_digest: str = field(default_factory=lambda: sha256_bytes(b""))
@@ -251,8 +253,9 @@ def execute_attempt(
     execution_nonce: str,
     timeout_seconds: float = 10.0,
     transport: TruthLabel = TruthLabel.LOCAL,
+    kill_after_commit: int | None = None,
 ) -> AttemptReceipt:
-    """Kill one worker at its durable effect, then replay in a fresh worker."""
+    """Kill one worker at its durable effect (or after commit N), then replay in a fresh worker."""
     started_at = datetime.now(UTC)
     timeline = [TimelineEntry(state=TimelineState.PREFLIGHT, timestamp=started_at)]
     spawns: list[_Spawn] = []
@@ -298,7 +301,13 @@ def execute_attempt(
         timeline.append(_entry(TimelineState.FIRST_WORKER_STARTED, str(first.process.pid)))
         _expect_hello(first, capsule, execution_nonce, timeout_seconds)
         checkpoint = _wait_for_checkpoint(
-            first, database, event, capsule.fault_boundary, timeout_seconds, previous=pre
+            first,
+            database,
+            event,
+            capsule.fault_boundary,
+            timeout_seconds,
+            previous=pre,
+            kill_after_commit=kill_after_commit,
         )
         checkpoint_reached = True
         timeline.append(_entry(TimelineState.CHECKPOINT_REACHED, checkpoint.digest))
@@ -396,6 +405,7 @@ def execute_attempt(
         post_kill_snapshot=post_kill,
         final_snapshot=final,
         checkpoint_reached=checkpoint_reached,
+        kill_after_commit=kill_after_commit,
         kill_signal=int(kill_signal) if kill_signal is not None else None,
         replay_acknowledged=replay_acknowledged,
         failure_detail=failure_detail,
@@ -410,8 +420,9 @@ def execute_no_fault_replay(
     work_dir: Path,
     execution_nonce: str,
     timeout_seconds: float = 10.0,
+    role: WorldRole | str = WorldRole.BASE,
 ) -> NoFaultReplayReceipt:
-    """Delete the sole fault action, then deliver the event in two fresh workers."""
+    """Deliver the event twice in fresh workers with no kill, recording every store commit."""
     started_at = datetime.now(UTC)
     spawns: list[_Spawn] = []
     initial: CreditSnapshot | None = None
@@ -500,6 +511,7 @@ def execute_no_fault_replay(
         failure_detail = cleanup_error
     return NoFaultReplayReceipt.with_digest(
         receipt_id=f"no-fault-{uuid.uuid4().hex}",
+        role=WorldRole(role),
         execution_status=status,
         integrity_status=integrity,
         observation=observation,
@@ -517,6 +529,8 @@ def execute_no_fault_replay(
         started_at=started_at,
         ended_at=datetime.now(UTC),
         spawns=tuple(_spawn_receipt(item, capsule.event_digest) for item in spawns),
+        first_delivery_operations=tuple(spawns[0].operations) if spawns else (),
+        replay_operations=tuple(spawns[1].operations) if len(spawns) > 1 else (),
         initial_snapshot=initial,
         first_delivery_snapshot=first_delivery,
         final_snapshot=final,
@@ -744,6 +758,7 @@ def _wait_for_checkpoint(
     timeout_seconds: float,
     *,
     previous: CreditSnapshot,
+    kill_after_commit: int | None = None,
 ) -> CreditSnapshot:
     amount = _event(event)["amount_cents"]
     if not isinstance(amount, int):
@@ -753,8 +768,14 @@ def _wait_for_checkpoint(
         message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
         kind = message.get("type")
         if kind == "commit":
-            snapshot = _attributed_probe(database, event, previous, message)
+            snapshot = _attributed_probe(database, event, previous, message, spawn=spawn)
+            spawn.operations.append(str(message.get("operation")))
             previous = snapshot
+            if kill_after_commit is not None:
+                if len(spawn.operations) == kill_after_commit:
+                    return snapshot
+                _send(spawn.channel, {"type": "continue"})
+                continue
             if (
                 snapshot.account_balance_cents == amount
                 and snapshot.event_ledger_count == 1
@@ -805,7 +826,8 @@ def _finish_replay(
         message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
         kind = message.get("type")
         if kind == "commit":
-            previous = _attributed_probe(database, event, previous, message)
+            previous = _attributed_probe(database, event, previous, message, spawn=spawn)
+            spawn.operations.append(str(message.get("operation")))
             _send(spawn.channel, {"type": "continue"})
             continue
         if kind == "error":
@@ -848,6 +870,8 @@ def _attributed_probe(
     event: Mapping[str, object],
     previous: CreditSnapshot,
     message: Mapping[str, object],
+    *,
+    spawn: _Spawn | None = None,
 ) -> CreditSnapshot:
     """Probe after a reported commit and refuse any change the named operation cannot explain.
 
@@ -857,6 +881,11 @@ def _attributed_probe(
     """
     amount = _event(event)["amount_cents"]
     operation = message.get("operation")
+    if spawn is not None and len(spawn.operations) >= MAX_SWEEP_COMMITS:
+        raise _AttemptFailure(
+            ExecutionStatus.PROTOCOL_ERROR,
+            f"worker reported more than {MAX_SWEEP_COMMITS} store commits for one event",
+        )
     snapshot = _probe(database, event)
     expected = _STORE_DELTAS.get(str(operation))
     if not isinstance(amount, int) or expected is None:

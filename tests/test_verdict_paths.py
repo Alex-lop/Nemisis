@@ -48,6 +48,13 @@ def apply_credit(store, event):
     store.mark_processed(event["event_id"])
 '''
 
+MARK_THEN_CREDIT = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.mark_processed(event["event_id"])
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
 CREDIT_NEVER_MARKS = """def apply_credit(store, event):
     store.credit(event["account_id"], event["event_id"], event["amount_cents"])
 """
@@ -124,6 +131,38 @@ def test_over_crediting_candidate_is_a_failed_patch_not_missing_evidence(
     final = candidate_attempts[0].final_snapshot
     assert final is not None and final.account_balance_cents == 7_500
     assert cli._exit_code(result.verdict) == 1
+
+
+def test_mark_then_credit_passes_the_boundary_and_fails_the_commit_sweep(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The false negative that motivated the sweep: green at the base's kill point, and it loses
+    the credit when killed one commit earlier."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "mark-then-credit", MARK_THEN_CREDIT)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, corrected=ATOMIC_REF, mode="local")
+
+    assert result.verdict is CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
+    assert "commit 1 of 2 (mark_processed)" in result.summary
+    assert "$0.00 instead of $25.00" in result.summary
+    assert "never credited" in result.summary
+    boundary = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
+    assert {a.observation for a in boundary} == {CrashObservation.EXACTLY_ONCE}
+    sweeps = {sweep.role: sweep for sweep in result.sweeps}
+    candidate_sweep = sweeps[WorldRole.CANDIDATE]
+    assert candidate_sweep.census.first_delivery_operations == ("mark_processed", "credit")
+    assert [a.observation for a in candidate_sweep.attempts] == [
+        CrashObservation.INVARIANT_FAILED,
+        CrashObservation.EXACTLY_ONCE,
+    ]
+    assert [a.kill_after_commit for a in candidate_sweep.attempts] == [1, 2]
+    assert sweeps[WorldRole.CORRECTED].observation is CrashObservation.EXACTLY_ONCE
+    assert sweeps[WorldRole.CORRECTED].census.first_delivery_operations == ("credit_and_mark",)
+    assert cli._exit_code(result.verdict) == 1
+    report = (tmp_path / "artifacts" / result.artifacts["report"]).read_text(encoding="utf-8")
+    assert "Commit sweep · candidate" in report
+    assert "after commit 1" in report
 
 
 def test_candidate_that_never_marks_still_duplicates_and_fails(

@@ -188,6 +188,23 @@ def _print_crash_result(
             )
         else:
             print("necessity: empty-schedule evidence incomplete; no necessity claim")
+    for sweep in getattr(result, "sweeps", ()):
+        operations = sweep.census.first_delivery_operations
+        points = ", ".join(
+            f"#{attempt.kill_after_commit} -> "
+            + (
+                money(attempt.final_snapshot.account_balance_cents)
+                if attempt.final_snapshot is not None
+                else "no final state"
+            )
+            + f" {attempt.observation.value}"
+            for attempt in sweep.attempts
+        )
+        print(
+            f"sweep: {sweep.role.value} makes {len(operations)} store commit"
+            f"{'s' if len(operations) != 1 else ''} ({', '.join(operations) or 'none observed'}); "
+            f"killed after each: {points or 'census incomplete'} -> {sweep.observation.value}"
+        )
     representative = next(
         (
             attempt

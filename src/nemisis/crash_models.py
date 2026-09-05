@@ -13,6 +13,7 @@ from nemisis.models import ModelCallReceipt, SafeId, Sha256, StrictModel, TruthL
 from nemisis.safety import safe_relative_path
 
 REQUIRED_CONFIRMATIONS = 5
+MAX_SWEEP_COMMITS = 16
 
 
 class WorldRole(StrEnum):
@@ -322,6 +323,7 @@ class AttemptReceipt(_DigestedModel):
     post_kill_snapshot: CreditSnapshot | None = None
     final_snapshot: CreditSnapshot | None = None
     checkpoint_reached: bool
+    kill_after_commit: int | None = Field(default=None, ge=1, le=MAX_SWEEP_COMMITS)
     kill_signal: int | None = None
     replay_acknowledged: bool
     failure_detail: str | None = Field(default=None, max_length=1_000)
@@ -433,11 +435,16 @@ class AttemptReceipt(_DigestedModel):
 
 
 class NoFaultReplayReceipt(_DigestedModel):
-    """One fresh two-process replay with the capsule's fault action removed."""
+    """One fresh two-process delivery with no kill: the handler's commit schedule, observed.
 
-    schema_version: Literal["1"] = "1"
+    On the base it is the no-crash control (the duplicate needs the crash). On a candidate or
+    corrected tree it is the census that tells the commit sweep how many kill points exist and
+    which store operation each one is.
+    """
+
+    schema_version: Literal["2"] = "2"
     receipt_id: SafeId
-    role: Literal[WorldRole.BASE] = WorldRole.BASE
+    role: WorldRole = WorldRole.BASE
     transport: Literal[TruthLabel.LOCAL] = TruthLabel.LOCAL
     execution_status: ExecutionStatus
     integrity_status: IntegrityStatus
@@ -456,6 +463,8 @@ class NoFaultReplayReceipt(_DigestedModel):
     started_at: datetime
     ended_at: datetime
     spawns: tuple[WorkerSpawnReceipt, ...] = Field(max_length=2)
+    first_delivery_operations: tuple[SafeId, ...] = Field(default=(), max_length=MAX_SWEEP_COMMITS)
+    replay_operations: tuple[SafeId, ...] = Field(default=(), max_length=MAX_SWEEP_COMMITS)
     initial_snapshot: CreditSnapshot | None = None
     first_delivery_snapshot: CreditSnapshot | None = None
     final_snapshot: CreditSnapshot | None = None
@@ -514,9 +523,91 @@ class NoFaultReplayReceipt(_DigestedModel):
                 raise ValueError("no-fault duplicate observation contradicts final state")
             if self.observation is CrashObservation.NOT_OBSERVED:
                 raise ValueError("completed no-fault replay requires a conclusive observation")
+            if not self.first_delivery_operations:
+                raise ValueError("completed no-fault replay recorded no store commits")
         elif self.failure_detail is None:
             raise ValueError("incomplete no-fault replay requires a failure detail")
         return self
+
+
+class CommitSweepReceipt(_DigestedModel):
+    """Kill after every store commit the handler makes, not only at the base's boundary.
+
+    The capsule's boundary proves the patch beat the crash the base had. The sweep proves it did
+    not trade that crash for another one: a handler that marks first and credits second passes the
+    boundary and loses the credit when killed between the two. ``FIX_PROVEN_FOR_THIS_CAPSULE``
+    requires every kill point in the sweep to end exactly once.
+    """
+
+    schema_version: Literal["1"] = "1"
+    role: WorldRole
+    capsule_digest: Sha256
+    binding_digest: Sha256
+    census: NoFaultReplayReceipt
+    attempts: tuple[AttemptReceipt, ...] = Field(default=(), max_length=MAX_SWEEP_COMMITS)
+    observation: CrashObservation
+
+    @model_validator(mode="after")
+    def sweep_is_coherent(self) -> CommitSweepReceipt:
+        if self.role is WorldRole.BASE:
+            raise ValueError("the commit sweep applies to claimed fixes, not the base")
+        self.census._require_canonical_digest()
+        for attempt in self.attempts:
+            attempt._require_canonical_digest()
+        if self.census.role is not self.role or self.census.binding_digest != self.binding_digest:
+            raise ValueError("sweep census differs from the sweep role or binding")
+        if any(
+            attempt.role is not self.role
+            or attempt.binding_digest != self.binding_digest
+            or attempt.capsule_digest != self.capsule_digest
+            for attempt in self.attempts
+        ):
+            raise ValueError("sweep attempt differs from the sweep role, binding, or capsule")
+        census_complete = (
+            self.census.execution_status is ExecutionStatus.COMPLETED
+            and self.census.integrity_status is IntegrityStatus.VALID
+        )
+        expected_kill_points = (
+            tuple(range(1, len(self.census.first_delivery_operations) + 1))
+            if census_complete
+            else ()
+        )
+        if tuple(attempt.kill_after_commit for attempt in self.attempts) != expected_kill_points:
+            raise ValueError("sweep must kill once after each commit the census observed")
+        identities = (
+            [attempt.receipt_id for attempt in self.attempts] + [self.census.receipt_id],
+            [attempt.database_id for attempt in self.attempts] + [self.census.database_id],
+            [attempt.execution_nonce for attempt in self.attempts] + [self.census.execution_nonce],
+        )
+        if any(len(values) != len(set(values)) for values in identities):
+            raise ValueError("sweep worlds require fresh identities")
+        if self.observation is not sweep_observation(self.census, self.attempts):
+            raise ValueError("sweep observation contradicts its attempts")
+        return self
+
+
+def sweep_observation(
+    census: NoFaultReplayReceipt, attempts: tuple[AttemptReceipt, ...]
+) -> CrashObservation:
+    """Exactly once only if the census and every kill point say so; the worst failure otherwise."""
+    completed = (
+        census.execution_status is ExecutionStatus.COMPLETED
+        and census.integrity_status is IntegrityStatus.VALID
+        and bool(attempts)
+        and all(
+            attempt.execution_status is ExecutionStatus.COMPLETED
+            and attempt.integrity_status is IntegrityStatus.VALID
+            for attempt in attempts
+        )
+    )
+    observations = {census.observation, *(attempt.observation for attempt in attempts)}
+    if CrashObservation.DUPLICATE_EFFECT in observations:
+        return CrashObservation.DUPLICATE_EFFECT
+    if CrashObservation.INVARIANT_FAILED in observations:
+        return CrashObservation.INVARIANT_FAILED
+    if completed and observations == {CrashObservation.EXACTLY_ONCE}:
+        return CrashObservation.EXACTLY_ONCE
+    return CrashObservation.NOT_OBSERVED
 
 
 class MinimizationReceipt(_DigestedModel):
@@ -547,7 +638,8 @@ class MinimizationReceipt(_DigestedModel):
         for attempt in self.confirmations:
             attempt._require_canonical_digest()
         if any(
-            attempt.parent_capsule_digest != self.parent_capsule_digest
+            attempt.role is not WorldRole.BASE
+            or attempt.parent_capsule_digest != self.parent_capsule_digest
             or attempt.contract_digest != self.contract_digest
             or attempt.tree_digest != self.originating_base_tree_digest
             for attempt in self.confirmations
@@ -720,6 +812,7 @@ class CrashCheckResult(_DigestedModel):
     minimization_receipts: tuple[MinimizationReceipt, ...] = Field(default=(), max_length=1)
     bindings: tuple[AnchorBinding, ...] = Field(default=(), max_length=3)
     attempts: tuple[AttemptReceipt, ...] = Field(default=(), max_length=24)
+    sweeps: tuple[CommitSweepReceipt, ...] = Field(default=(), max_length=2)
     started_at: datetime
     ended_at: datetime
     summary: str = Field(min_length=1, max_length=1_000)
@@ -742,10 +835,14 @@ class CrashCheckResult(_DigestedModel):
             reduction._require_canonical_digest()
         for anchor_resolution in self.anchor_resolutions:
             anchor_resolution._require_canonical_digest()
+        for sweep in self.sweeps:
+            sweep._require_canonical_digest()
         for artifact_path in self.artifacts.values():
             safe_relative_path(artifact_path)
         _validate_anchor_resolution_context(self)
         if not self.attempts:
+            if self.sweeps:
+                raise ValueError("a commit sweep requires boundary attempts")
             return self
         binding_digests = [binding.digest for binding in self.bindings]
         if len(binding_digests) != len(set(binding_digests)):
@@ -773,6 +870,7 @@ class CrashCheckResult(_DigestedModel):
             raise ValueError("attempt roles and anchor bindings must have one exact mapping")
         if any(attempt.transport is not self.transport for attempt in self.attempts):
             raise ValueError("attempt transport differs from result transport")
+        _validate_sweeps(self)
         if self.hypothesis_receipts:
             _validate_hypothesis_receipt_links(
                 self.hypothesis_receipts, binding_by_digest, self.attempts
@@ -827,7 +925,7 @@ class CrashCheckResult(_DigestedModel):
                     )
             elif len(self.bindings) > 1:
                 raise ValueError("conclusive full check requires both crash-boundary hypotheses")
-            _validate_conclusive_verdict(self.verdict, self.attempts)
+            _validate_conclusive_verdict(self.verdict, self.attempts, self.sweeps)
         elif self.verdict is CrashVerdict.UNSUPPORTED_TARGET and (
             self.execution_status is not ExecutionStatus.UNSUPPORTED
             or any(
@@ -1030,8 +1128,56 @@ def _snapshot_state(snapshot: CreditSnapshot) -> tuple[int, int, int, int]:
     )
 
 
+def _validate_sweeps(result: CrashCheckResult) -> None:
+    binding_by_digest = {binding.digest: binding for binding in result.bindings}
+    roles = [sweep.role for sweep in result.sweeps]
+    if len(roles) != len(set(roles)):
+        raise ValueError("each role may carry at most one commit sweep")
+    boundary_identities = (
+        {attempt.database_id for attempt in result.attempts},
+        {attempt.execution_nonce for attempt in result.attempts},
+    )
+    for sweep in result.sweeps:
+        role_bindings = {
+            attempt.binding_digest for attempt in result.attempts if attempt.role is sweep.role
+        }
+        if role_bindings != {sweep.binding_digest} or sweep.binding_digest not in binding_by_digest:
+            raise ValueError("commit sweep is not bound to its role's anchor binding")
+        if sweep.capsule_digest != result.capsule_digest:
+            raise ValueError("commit sweep uses a different capsule")
+        if any(attempt.transport is not result.transport for attempt in sweep.attempts):
+            raise ValueError("sweep attempt transport differs from result transport")
+        sweep_identities = (
+            {attempt.database_id for attempt in sweep.attempts} | {sweep.census.database_id},
+            {attempt.execution_nonce for attempt in sweep.attempts}
+            | {sweep.census.execution_nonce},
+        )
+        if any(a & b for a, b in zip(sweep_identities, boundary_identities, strict=True)):
+            raise ValueError("sweep and boundary worlds must have disjoint identities")
+
+
+def effective_observation(
+    role: WorldRole,
+    attempts: tuple[AttemptReceipt, ...],
+    sweeps: tuple[CommitSweepReceipt, ...],
+) -> CrashObservation | None:
+    """The boundary worlds decide unless they are exactly once; then the sweep must agree."""
+    observations = {attempt.observation for attempt in attempts if attempt.role is role}
+    if len(observations) != 1:
+        return None
+    boundary = next(iter(observations))
+    if role is WorldRole.BASE or boundary is not CrashObservation.EXACTLY_ONCE:
+        return boundary
+    sweep = next((item for item in sweeps if item.role is role), None)
+    if sweep is None:
+        return CrashObservation.NOT_OBSERVED
+    return sweep.observation
+
+
 def _validate_conclusive_verdict(
-    verdict: CrashVerdict, attempts: tuple[AttemptReceipt, ...]
+    verdict: CrashVerdict,
+    attempts: tuple[AttemptReceipt, ...],
+    sweeps: tuple[CommitSweepReceipt, ...] = (),
 ) -> None:
     role_attempts = {
         role: tuple(attempt for attempt in attempts if attempt.role is role)
@@ -1053,7 +1199,7 @@ def _validate_conclusive_verdict(
             "conclusive verdict requires globally unique attempt and worker identities"
         )
     observations = {
-        role: {attempt.observation for attempt in attempts if attempt.role is role}
+        role: {effective_observation(role, attempts, sweeps)}
         for role in WorldRole
         if any(attempt.role is role for attempt in attempts)
     }
@@ -1109,7 +1255,9 @@ def _validate_conclusive_verdict(
 
 __all__ = [
     "CONCLUSIVE_VERDICTS",
+    "MAX_SWEEP_COMMITS",
     "AnchorBinding",
+    "CommitSweepReceipt",
     "AnchorResolutionReceipt",
     "AnchorResolutionStatus",
     "AttemptReceipt",
@@ -1125,4 +1273,6 @@ __all__ = [
     "ReproCapsule",
     "RetryContract",
     "WorldRole",
+    "effective_observation",
+    "sweep_observation",
 ]
