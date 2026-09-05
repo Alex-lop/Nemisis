@@ -1,14 +1,15 @@
 # Morning
 
 Branch `overnight/hardening`, pushed, `main` untouched. Gate green on every commit that is on the
-remote (ruff, mypy, 356 tests). Read `git log origin/main..overnight/hardening` top to bottom; each
+remote (ruff, mypy, 364 tests). Read `git log origin/main..overnight/hardening` top to bottom; each
 commit is one idea and says why. This file is the two-minute version.
 
 ## What is different
 
-1. **The checker was fooled, then fixed, twice.** I wrote candidates to beat it, then ran two
-   adversarial rounds (30 agents against the baseline, 25 against the hardened engine), each
-   finding verified by an independent agent before I acted on it. Real false passes found:
+1. **The checker was fooled, then fixed, three times over.** I wrote candidates to beat it, ran
+   two adversarial rounds (30 agents against the baseline, 25 against the hardened engine), and
+   had four hostile reviewers read the night's diff; every finding was verified by an independent
+   agent before I acted on it. Real false passes and holes found:
    - `mark_processed` then `credit` was PROVEN. Killed between the two, the retry sees the marker
      and never credits: $25 lost, exit 0.
    - The credit written through the handler's own `sqlite3` connection, then `store.mark_processed`,
@@ -19,11 +20,19 @@ commit is one idea and says why. This file is the two-minute version.
      `candidate-sweep-1`) behaved atomically only where the sweep was counting.
    - A dedup file written beside the database before the atomic call: a crash window no store
      commit can reach, blessed by the sweep.
+   - Attribution watched only this event's rows, so a handler could fund another account through
+     its own connection and stay PROVEN.
+   - A model-written module could reach `__import__` through `__builtins__[...]`, and the
+     authorship receipt lived inside the candidate tree where a PR author could hand-write "LIVE".
+   - One undecodable byte on stdout ended the text-mode output drain and hid a detached child
+     holding the worker's pipes.
    Fixes: every claimed fix is killed once after **each** store commit it makes (a census delivery
    counts them first, and that single delivery must itself be exactly once); every durable change
-   must match the store operation the worker reported; the store requires exact types and values;
-   worlds are named by opaque ids; files written beside the database forfeit the verdict with a
-   message that says why. Every one of these handlers now fails for the right reason.
+   must match the store operation the worker reported and every row outside the event must stay
+   as seeded; the store requires exact types and values; worlds are named by opaque ids; files
+   written beside the database forfeit the verdict; the AST check rejects every underscore name;
+   the authorship receipt lives with the operator, keyed by tree digest; drains read raw bytes.
+   Every one of these handlers now fails for the right reason.
 2. **Complete-but-wrong is a failed patch, not missing evidence.** `PATCH_FAILED_INVARIANT_BROKEN`
    (exit 1) for lost, tripled, or flooded money. Receipts validate through one shared final-state
    rule, so real duplicated-money evidence is never again rejected as "orchestration failed".
@@ -72,6 +81,9 @@ the right kill point, export-and-edit proven, `propose-patch` without a key exit
   benchmark (`scratchpad/regen.sh` was my script; the steps are in `docs/BENCHMARK.md`); rename the
   GitHub repo (old URL redirects). Half a day with the gate.
 - **GitHub description and 10 topics changed** via `gh repo edit`. Revert with the same command.
+- **The Nemotron authorship receipt is written to your `.nemisis/agent-patches/<tree digest>.json`**,
+  not into the candidate tree, and `check` attaches it only when the bound handler's module digest
+  matches. Anything a pull request carries about its own author is ignored.
 - **Files written beside the database now forfeit the verdict**, including an innocent audit log.
   The tool cannot tell a log from a dedup journal, so it says it cannot judge either. If you want
   logs allowed, the check is `_require_only_the_store_wrote` in `sqlite_credit.py`; I would not.
@@ -99,6 +111,9 @@ the right kill point, export-and-edit proven, `propose-patch` without a key exit
 
 - **Nothing is `LIVE`.** `docs/LIVE_SETUP.md` Stage A2b (`propose-patch`) is the exact fix and the
   best demo beat.
+- **The AST allowlist for model-written modules is a blocklist plus an underscore rule.** It held
+  against a hostile reviewer after the fix, but a sandbox (ConTree) is the real answer for running
+  model-written code, and the docs say so.
 - **In-process instrumentation has a floor.** A handler can always detect it is inside CrashCheck
   (the store object is in its hands) and behave; a detached child that writes after the final probe
   still passes. Both documented; ConTree is the answer.
