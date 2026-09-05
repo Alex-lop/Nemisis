@@ -108,7 +108,9 @@ directory/Git sources, and trusted owner checkouts.
 
 Unsupported: arbitrary languages, databases, side effects, handlers outside the fixed adapter
 shape, hostile local fork execution, generalized schedule or interleaving search, model-authored
-code, repair generation, PR comments, and a hosted control plane.
+trusted code (probes, kill points, assertions, harness), automatic repair loops, PR comments, and a
+hosted control plane. A model may author a candidate handler (`propose-patch`); that candidate is
+untrusted input and is judged like any other.
 
 ## Claim ledger
 
