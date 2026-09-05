@@ -65,10 +65,14 @@ def test_every_relative_link_in_readme_and_docs_resolves() -> None:
 
 def test_readme_embeds_real_visual_evidence() -> None:
     images = IMAGE.findall(README.read_text(encoding="utf-8"))
-    assert images, "the README front door must embed at least one screenshot"
+    assert any(not image.startswith("http") for image in images), (
+        "the README front door must embed at least one committed screenshot"
+    )
     committed = set(SCREENSHOTS.glob("*.png")) | set(SCREENSHOTS.glob("*.gif"))
     assert committed, "no captures are committed under docs/assets/screenshots"
     for target in images:
+        if target.startswith(("http://", "https://")):
+            continue  # status badges are not evidence; only committed captures are checked
         path = (ROOT / target).resolve()
         assert path.is_file(), f"README embeds a missing image: {target}"
         data = path.read_bytes()

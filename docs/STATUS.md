@@ -16,7 +16,7 @@ Committed hero evidence (unchanged, bound to its own exact source and engine):
 
 Current tree:
 
-- engine code digest: `5a58553f338fc092d212b2c5122464d19c40e6be4c77ad3cdc8f8f8c8bee6c0a`
+- engine code digest: `a9b1227d5c32db9500232be0a161906a23128f7c95d5d9e06c82a26bc34897ad`
   (changed by the contract-proposal and review commits; `tests/test_docs_identity.py` pins this value, so it cannot rot; a fresh `check` prints a new capsule digest bound to
   this engine, and the committed hero is not relabelled)
 - interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence

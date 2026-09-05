@@ -115,10 +115,19 @@ crash/retry bug from a handler that is simply wrong.</p>
         next(
             (
                 attempt
-                for attempt in result.attempts
-                if attempt.role.value in {"candidate", "corrected"}
+                for sweep in getattr(result, "sweeps", ())
+                if sweep.observation.value != "EXACTLY_ONCE"
+                for attempt in sweep.attempts
+                if attempt.observation is sweep.observation
             ),
-            result.attempts[0],
+            next(
+                (
+                    attempt
+                    for attempt in result.attempts
+                    if attempt.role.value in {"candidate", "corrected"}
+                ),
+                result.attempts[0],
+            ),
         ),
     )
     checkpoint = representative.checkpoint_snapshot

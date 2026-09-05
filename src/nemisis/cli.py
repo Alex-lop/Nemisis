@@ -223,6 +223,15 @@ def _print_crash_result(
     representative = next(
         (
             attempt
+            for sweep in getattr(result, "sweeps", ())
+            if sweep.observation.value != "EXACTLY_ONCE"
+            for attempt in sweep.attempts
+            if attempt.observation is sweep.observation and attempt.final_snapshot is not None
+        ),
+        None,
+    ) or next(
+        (
+            attempt
             for attempt in result.attempts
             if attempt.role.value in {"candidate", "corrected"}
             and attempt.checkpoint_snapshot is not None
@@ -239,10 +248,15 @@ def _print_crash_result(
                 if representative.kill_signal == 9
                 else f"signal {representative.kill_signal}"
             )
+            kill_point = (
+                f" (after commit {representative.kill_after_commit})"
+                if getattr(representative, "kill_after_commit", None) is not None
+                else ""
+            )
             print(
                 "timeline: "
-                f"{money(checkpoint.account_balance_cents)} durable -> {signal_name} -> "
-                f"fresh worker -> {money(final.account_balance_cents)}"
+                f"{money(checkpoint.account_balance_cents)} durable{kill_point} -> "
+                f"{signal_name} -> fresh worker -> {money(final.account_balance_cents)}"
             )
     author = getattr(result, "candidate_author", None)
     if author is not None:
