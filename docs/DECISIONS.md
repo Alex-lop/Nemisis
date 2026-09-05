@@ -121,6 +121,32 @@ Choose Option A for this sprint: keep `sqlite-credit-v1` as the single supported
 A second adapter would not close the missing live transport, exact sponsor receipt, public hosting,
 or demo-video gates, and would add a new trust surface before a second consumer is justified.
 
+## Depth before width: the commit sweep instead of a second scenario (2026-09-05)
+
+The overnight hardening had the choice again and chose depth. Red-teaming the checker with thirty
+adversarial handlers found two false passes inside the one supported scenario; fixing them (kill
+after every store commit of a claimed fix; attribute every durable change to a reported store
+commit) makes the core claim true, which a second scenario would not have done. A judge who can
+write a handler in thirty seconds (`nemisis export`) and watch it fail for the right reason is
+harder to dismiss than one shown two look-alike scenarios.
+
+A second scenario is still the right next seam. It is not a plugin today. The hardcoded points are:
+
+- `sqlite_credit.py`: the catalog constants (`_SCENARIO_ID`, `_ADAPTER_ID`, `_FAULT_ID`,
+  `_PROBE_ID`, `_PREDICATE_ID`, `_TARGET`), `_SCHEMA`, `_seed_database`, `_probe`, `_event`
+  validation, `_wait_for_checkpoint`'s effect condition, `_STORE_DELTAS`, and `CreditStore`;
+- `crash_models.py`: `CreditSnapshot`'s four fields, `classify_final`, the capsule's
+  `event_id`/`account_id`/`amount_cents`, and `amount_cents` on the receipts;
+- `crashcheck.py`: `_seal_capsule`, `_validate_capsule_contract`, the `repros/double-credit/`
+  path, the money and `evt_1042` wording in summaries, and `_regression_asset`;
+- `report.py` and `cli.py`: `money()` and credit labels; the viewer reads `account_balance_cents`.
+
+A real seam is a `Scenario` object supplying ids, schema, seed, store class, event shape, probe,
+allowed deltas, checkpoint predicate, `classify_final`, and display labels, with a generic
+four-field snapshot whose field names do not lie about their contents. Budget half a day with the
+gate, plus one hero and benchmark regeneration. Do not ship it as a renamed copy of the credit
+fixture; the second scenario must have its own seed, effect direction, and predicate.
+
 ## Official live endpoints and narrow trust
 
 Inference defaults to `https://api.tokenfactory.nebius.com/v1/` and
