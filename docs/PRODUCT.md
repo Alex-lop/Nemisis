@@ -79,7 +79,7 @@ bug report, the base handler module, and the storage API, and returns a complete
 module. It sees nothing about how CrashCheck kills or judges. Deterministic rules accept the module
 only if it keeps the exact `(store, event)` signature, imports nothing but `typing`, and touches no
 private attribute or dangerous builtin; a rejected module writes nothing. An accepted module becomes
-an ordinary candidate tree with a sanitized `.nemisis/agent-patch.json` receipt, and `check`
+an ordinary candidate tree, with a sanitized receipt written to the operator's `.nemisis/agent-patches/<tree digest>.json`, and `check`
 executes that tree exactly like a human's patch, carrying the receipt into the manifest and report
 as the candidate's author (`LIVE` for a real Token Factory call, `MOCKED` for an injected client).
 The model that wrote the patch is never the thing that judges it.

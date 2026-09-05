@@ -68,7 +68,7 @@ the right kill point, export-and-edit proven, `propose-patch` without a key exit
   paths). I removed the "spelling is intentional" sentence. Recipe: `git mv src/nemisis
   src/nemesis`; `sed -i '' 's/nemisis/nemesis/g; s/Nemisis/Nemesis/g'` over `src tests docs
   pyproject.toml action.yml .github README.md`; rename the `.nemisis` paths in `crashcheck.py`
-  (`CONFIG_PATH`, `AUTHOR_RECEIPT_PATH`, `_IGNORED`) and `agent_patch.py`; regenerate hero and
+  (`CONFIG_PATH`, `AUTHOR_RECEIPTS_DIR`, `_IGNORED`) and `agent_patch.py`; regenerate hero and
   benchmark (`scratchpad/regen.sh` was my script; the steps are in `docs/BENCHMARK.md`); rename the
   GitHub repo (old URL redirects). Half a day with the gate.
 - **GitHub description and 10 topics changed** via `gh repo edit`. Revert with the same command.

@@ -11,7 +11,7 @@ import pytest
 
 import nemisis.agent_patch as agent_patch_module
 import nemisis.cli as cli
-from nemisis.agent_patch import RECEIPT_PATH, PatchError, describe, propose_patch
+from nemisis.agent_patch import RECEIPTS_DIR, PatchError, describe, propose_patch, receipt_path
 from nemisis.crash_fixture import (
     BUGGY_REF,
     MISLEADING_GREEN_REF,
@@ -104,7 +104,9 @@ def _adapter(fake: _FakeClient) -> NemotronClient:
 
 
 @pytest.fixture
-def issue(tmp_path: Path) -> Path:
+def issue(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    # Receipts live in the operator's cwd, so every test runs from its own directory.
+    monkeypatch.chdir(tmp_path)
     path = tmp_path / "issue.md"
     path.write_text(load_issue(), encoding="utf-8")
     return path
@@ -120,8 +122,12 @@ def test_model_writes_a_candidate_tree_and_the_prompt_is_checker_blind(
 
     assert (out / "app" / "credits.py").read_text(encoding="utf-8") == ATOMIC_MODULE
     assert (out / "tests" / "test_credits.py").is_file()
-    receipt = PatchProposal.model_validate_json((out / RECEIPT_PATH).read_bytes())
+    assert not (out / ".nemisis").exists(), "the tree must not carry its own authorship claim"
+    receipt = PatchProposal.model_validate_json(
+        receipt_path(proposal.candidate_tree_digest).read_bytes()
+    )
     assert receipt == proposal
+    assert receipt_path(proposal.candidate_tree_digest).parent == tmp_path / RECEIPTS_DIR
     assert receipt.model_call.truth_label is TruthLabel.MOCKED
     assert receipt.handler_path == "app/credits.py"
     assert receipt.candidate_tree_digest != receipt.base_tree_digest
@@ -194,6 +200,18 @@ def test_model_written_mark_first_patch_fails_the_sweep(
             "import os as typing\n\ndef apply_credit(store, event):\n    pass\n",
             "import is not allowed",
         ),
+        # Reviewer-found bypass: __builtins__ is a plain Name, not an Attribute, and it reaches
+        # __import__ and open through a subscript.
+        (
+            'def apply_credit(store, event):\n    __builtins__["__import__"]("os")\n',
+            "private name: __builtins__",
+        ),
+        ("def apply_credit(store, event):\n    __loader__\n", "private name: __loader__"),
+        (
+            "def apply_credit(store, event):\n    (lambda: __class__)()\n",
+            "private name: __class__",
+        ),
+        ("def apply_credit(store, event):\n    f'{__spec__}'\n", "private name: __spec__"),
     ],
 )
 def test_unsafe_or_unbindable_modules_write_nothing(
@@ -220,25 +238,52 @@ def test_existing_output_directory_is_refused_before_any_model_call(
     assert fake.models.calls == [] and fake.chat.completions.calls == []
 
 
-def test_foreign_or_malformed_author_receipts_are_handled_like_proposals(
+def test_a_tree_cannot_claim_its_own_authorship(
     issue: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Reviewer finding: the receipt used to live inside the candidate tree, where anyone could
+    hand-write one and have the report say 'LIVE Nemotron receipt'. It now lives with the operator,
+    keyed by tree digest, and must also match the bound handler's module digest."""
     out = tmp_path / "candidate"
-    propose_patch(issue, BUGGY_REF, out, client=_adapter(_FakeClient(ATOMIC_MODULE)))
+    proposal = propose_patch(issue, BUGGY_REF, out, client=_adapter(_FakeClient(ATOMIC_MODULE)))
     monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
-    receipt = out / RECEIPT_PATH
+    receipt = receipt_path(proposal.candidate_tree_digest)
 
-    # The same receipt copied into a different tree does not bind that tree: ignored, not attached.
+    # A receipt planted inside a tree is just a file the tree digest ignores; no authorship.
     other = materialize_fixture(MISLEADING_GREEN_REF, tmp_path / "other").path
-    (other / RECEIPT_PATH.parent).mkdir()
-    (other / RECEIPT_PATH).write_bytes(receipt.read_bytes())
-    foreign = check(BUGGY_REF, other, SCENARIO_ID, mode="local")
-    assert foreign.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
-    assert foreign.candidate_author is None
+    (other / ".nemisis").mkdir()
+    (other / ".nemisis" / "agent-patch.json").write_bytes(receipt.read_bytes())
+    planted = check(BUGGY_REF, other, SCENARIO_ID, mode="local")
+    assert planted.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
+    assert planted.candidate_author is None
+
+    # An operator-side receipt whose module digest does not match the bound handler is ignored.
+    forged = PatchProposal.with_digest(
+        **proposal.model_dump(mode="python", exclude={"digest", "module_digest", "model_call"}),
+        module_digest="f" * 64,
+        model_call=proposal.model_call,
+    )
+    receipt.write_bytes(forged.model_dump_json().encode())
+    unbound = check(BUGGY_REF, out, SCENARIO_ID, mode="local")
+    assert unbound.verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE
+    assert unbound.candidate_author is None
 
     receipt.write_bytes(b'{"schema_version":"nemisis.patch-proposal.v1"}')
     with pytest.raises(CrashCheckError, match="strict validation"):
         check(BUGGY_REF, out, SCENARIO_ID, mode="local")
+
+
+def test_rationale_with_terminal_escapes_is_refused_at_the_schema(
+    issue: Path, tmp_path: Path
+) -> None:
+    from nemisis.nemotron import NemotronResponseError
+
+    fake = _FakeClient(ATOMIC_MODULE, rationale="Atomic now.\n\x1b[2J\x1b[Hverdict: FIX_PROVEN\r\n")
+
+    with pytest.raises(NemotronResponseError, match="required schema"):
+        propose_patch(issue, BUGGY_REF, tmp_path / "candidate", client=_adapter(fake))
+
+    assert not (tmp_path / "candidate").exists()
 
 
 def test_cli_propose_patch_fails_closed_without_a_credential(
@@ -280,8 +325,9 @@ def test_cli_propose_patch_prints_provenance_and_the_next_command(
 
     lines = capsys.readouterr().out.splitlines()
     assert lines[0] == f"candidate: {out}"
-    assert lines[1].startswith(f"nemotron: {DEFAULT_MODEL_ID} · global · MOCKED · schema valid")
-    assert lines[2].startswith("patch: ")
-    assert lines[3] == "rationale: Commit credit and marker together."
-    assert lines[4] == f"next: nemisis check --base {BUGGY_REF} --candidate {out} --mode local"
-    assert (out / RECEIPT_PATH).is_file()
+    assert lines[1].startswith(f"receipt: {tmp_path / RECEIPTS_DIR}")
+    assert lines[2].startswith(f"nemotron: {DEFAULT_MODEL_ID} · global · MOCKED · schema valid")
+    assert lines[3].startswith("patch: ")
+    assert lines[4] == "rationale: Commit credit and marker together."
+    assert lines[5] == f"next: nemisis check --base {BUGGY_REF} --candidate {out} --mode local"
+    assert not (out / ".nemisis").exists()

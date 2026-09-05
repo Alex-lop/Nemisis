@@ -14,7 +14,7 @@ from typing import Literal, Protocol, cast
 from urllib.parse import urlparse
 
 from openai import OpenAI
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, field_validator
 
 from nemisis.hashing import sha256_bytes, sha256_json, sha256_text
 from nemisis.models import (
@@ -159,6 +159,14 @@ class _ContractPayload(StrictModel):
 class _PatchPayload(StrictModel):
     module_source: str = Field(min_length=1, max_length=MAX_PATCH_MODULE_BYTES)
     rationale: str = Field(min_length=1, max_length=MAX_PATCH_RATIONALE_BYTES)
+
+    @field_validator("rationale")
+    @classmethod
+    def rationale_is_plain_text(cls, value: str) -> str:
+        # Printed to a terminal and rendered in a report: no escapes, no carriage returns.
+        if any(not (character.isprintable() or character in "\n\t") for character in value):
+            raise ValueError("rationale contains control characters")
+        return " ".join(value.split())
 
 
 class NemotronPatchGeneration(StrictModel):

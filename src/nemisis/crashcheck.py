@@ -118,7 +118,7 @@ def engine_code_digest() -> str:
     return sha256_json(hashes)
 
 
-AUTHOR_RECEIPT_PATH = Path(".nemisis/agent-patch.json")
+AUTHOR_RECEIPTS_DIR = Path(".nemisis/agent-patches")
 
 
 @dataclass(frozen=True)
@@ -128,7 +128,6 @@ class _Source:
     tree_digest: str
     resolved_identity: str
     config_bytes: bytes | None
-    author_bytes: bytes | None = None
 
 
 def initialize(issue: str | Path, target: str, base: str | Path, scenario_id: str) -> Path:
@@ -360,7 +359,6 @@ def check(
 
         # Candidate materialization deliberately begins only after the base witness is frozen.
         candidate_source = _materialize_source(candidate, root / "source-candidate")
-        publish = partial(publish, author=_load_author(candidate_source, contract))
         candidate_anchor = _bind_anchor(
             contract,
             candidate_source,
@@ -384,6 +382,9 @@ def check(
             )
         candidate_binding = candidate_anchor
         _require_distinct_binding(candidate_binding, (base_binding,), WorldRole.CANDIDATE)
+        publish = partial(
+            publish, author=_load_author(candidate_source, contract, candidate_binding)
+        )
         candidate_attempts = _execute_confirmations(
             capsule,
             candidate_binding,
@@ -673,20 +674,42 @@ def _proposal_for_check(
     return _load_proposal(Path(str(scenario)).with_name("proposal.json"), contract)
 
 
-def _load_author(source: _Source, contract: RetryContract) -> PatchProposal | None:
-    """Attach the Nemotron authorship receipt only when it binds this exact candidate tree."""
-    if source.author_bytes is None:
-        return None
-    if len(source.author_bytes) > MAX_CONFIG_BYTES:
-        raise CrashCheckError("candidate authorship receipt is oversized")
+def _load_author(
+    source: _Source, contract: RetryContract, binding: AnchorBinding
+) -> PatchProposal | None:
+    """Attach the operator's Nemotron authorship receipt for exactly this candidate tree.
+
+    The receipt is looked up in the operator's own ``.nemisis/agent-patches/`` by the candidate's
+    tree digest; nothing inside the candidate tree can claim authorship. It is attached only when it
+    binds the scenario, the contract's base tree, and the bound handler's exact module digest.
+    """
+    path = Path.cwd() / AUTHOR_RECEIPTS_DIR / f"{source.tree_digest}.json"
     try:
-        author = PatchProposal.model_validate_json(source.author_bytes)
+        status = path.lstat()
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise CrashCheckError("candidate authorship receipt could not be read") from error
+    if not stat.S_ISREG(status.st_mode) or status.st_size > MAX_CONFIG_BYTES:
+        raise CrashCheckError("candidate authorship receipt is not a bounded regular file")
+    try:
+        author = PatchProposal.model_validate_json(path.read_bytes())
+    except OSError as error:
+        raise CrashCheckError("candidate authorship receipt could not be read") from error
     except ValueError as error:
         raise CrashCheckError("candidate authorship receipt failed strict validation") from error
+    try:
+        module_digest = sha256_text(
+            (source.path / binding.handler_path).read_text(encoding="utf-8")
+        )
+    except (OSError, UnicodeError):
+        return None
     bound = (
         author.scenario_id == contract.scenario_id
         and author.candidate_tree_digest == source.tree_digest
         and author.base_tree_digest == contract.originating_base_tree_digest
+        and author.handler_path == binding.handler_path
+        and author.module_digest == module_digest
     )
     return author if bound else None
 
@@ -1649,10 +1672,9 @@ def _materialize_source(value: str | Path, destination: Path) -> _Source:
     if path_status is not None and stat.S_ISDIR(path_status.st_mode):
         source = path.resolve()
         config = _read_source_config(source)
-        author = _read_source_file(source, AUTHOR_RECEIPT_PATH)
         _copy_tree(source, destination)
         digest = sha256_tree(destination)
-        return _Source(str(path), destination.resolve(), digest, digest, config, author)
+        return _Source(str(path), destination.resolve(), digest, digest, config)
     try:
         repository = _git_repository()
         commit = (
@@ -1675,8 +1697,8 @@ def _materialize_source(value: str | Path, destination: Path) -> _Source:
     archive = _git(repository, "archive", "--format=tar", commit)
     if not archive or len(archive) > MAX_SOURCE_ARCHIVE_BYTES:
         raise CrashCheckError("resolved Git source archive is empty or oversized")
-    config, author = _extract_archive(archive, destination)
-    return _Source(ref, destination.resolve(), sha256_tree(destination), commit, config, author)
+    config = _extract_archive(archive, destination)
+    return _Source(ref, destination.resolve(), sha256_tree(destination), commit, config)
 
 
 def _read_source_config(source: Path) -> bytes | None:
@@ -1729,10 +1751,10 @@ def _copy_tree(source: Path, destination: Path) -> None:
         shutil.copyfile(path, output)
 
 
-def _extract_archive(content: bytes, destination: Path) -> tuple[bytes | None, bytes | None]:
+def _extract_archive(content: bytes, destination: Path) -> bytes | None:
     destination.mkdir(parents=True, exist_ok=False)
     sidecars: dict[str, bytes] = {}
-    sidecar_names = {CONFIG_PATH.as_posix(): "config", AUTHOR_RECEIPT_PATH.as_posix(): "author"}
+    sidecar_names = {CONFIG_PATH.as_posix(): "config"}
     file_count = 0
     try:
         with tarfile.open(fileobj=BytesIO(content), mode="r:") as archive:
@@ -1771,7 +1793,7 @@ def _extract_archive(content: bytes, destination: Path) -> tuple[bytes | None, b
                 output.write_bytes(extracted.read())
     except tarfile.TarError as error:
         raise CrashCheckError("Git source archive is malformed") from error
-    return sidecars.get("config"), sidecars.get("author")
+    return sidecars.get("config")
 
 
 def _warn_if_working_tree_is_dirty(repository: Path, ref: str, commit: str) -> None:

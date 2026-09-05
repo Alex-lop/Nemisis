@@ -44,8 +44,9 @@ The core records are:
   `ModelCallReceipt`. Provenance only; it is outside the capsule address.
 - `PatchProposal`: the receipt for a candidate tree whose handler Nemotron wrote (`propose-patch`):
   base and candidate tree digests, module digest, rationale, and the sanitized `ModelCallReceipt`.
-  It lives at `.nemisis/agent-patch.json` inside the candidate tree, is excluded from the tree
-  digest, and is attached to a `check` only when it binds that exact tree.
+  It lives in the operator's `.nemisis/agent-patches/<candidate tree digest>.json`, never inside
+  the candidate tree, and is attached to a `check` only when it binds that exact tree and the bound
+  handler's module digest.
 - `CommitSweepReceipt`: for a claimed fix, the census delivery's commit schedule plus one kill
   world per commit; `FIX_PROVEN_FOR_THIS_CAPSULE` requires all of them to end exactly once.
 - `AnchorBinding`: handler mapping plus supplied source ref, resolved source identity, and exact tree

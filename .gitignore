@@ -4,7 +4,7 @@
 .nemisis/*
 !.nemisis/config.json
 !.nemisis/proposal.json
-!.nemisis/agent-patch.json
+!.nemisis/agent-patches/
 .pytest_cache/
 .ruff_cache/
 .venv/

@@ -113,7 +113,7 @@ Success for the first command is exit `0` and five lines: `candidate:`, a `nemot
 label is `LIVE`, `patch:`, the model's `rationale:`, and the exact `next:` command. The model saw
 the bug report, the base module, and the store API; it saw nothing about kill points or verdicts.
 Its module was accepted only after deterministic checks (signature, imports, attribute access), and
-`./nemotron-candidate/.nemisis/agent-patch.json` is the sanitized receipt.
+`.nemisis/agent-patches/<candidate tree digest>.json` in your checkout is the sanitized receipt (never inside the candidate tree, so a pull request cannot claim its own author).
 
 The second command's verdict is whatever the model earned. Either outcome is a good demo: a
 `FIX_PROVEN_FOR_THIS_CAPSULE` shows the checker blessing a real AI patch; a

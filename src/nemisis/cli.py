@@ -472,8 +472,11 @@ def main() -> None:
                     ).decode()
                 )
                 return
+            from nemisis.agent_patch import receipt_path
+
             receipt = patch.model_call
             print(f"candidate: {args.out}")
+            print(f"receipt: {receipt_path(patch.candidate_tree_digest)}")
             print(
                 f"nemotron: {receipt.model_id} · {receipt.endpoint_region} · "
                 f"{receipt.truth_label.value} · schema valid · {receipt.latency_ms} ms · "

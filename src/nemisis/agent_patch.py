@@ -8,8 +8,11 @@ output is a candidate tree that ``check`` executes exactly like a human's patch.
 Deterministic rules decide whether the module may be written at all: one top-level handler with
 the exact ``(store, event)`` signature, imports from ``typing`` only, no private attributes, no
 dangerous builtins. A rejected module writes nothing. An accepted one becomes a candidate tree
-beside a sanitized receipt that ``check`` carries into the manifest and report as the candidate's
-author. The receipt never contains the credential or the raw model response.
+and the sanitized receipt is written to the operator's own ``.nemisis/agent-patches/`` keyed by
+the candidate tree digest, never inside the candidate tree: a tree that arrives in a pull request
+cannot carry its own claim of who wrote it. ``check`` attaches the receipt only when the operator
+holds one for exactly that tree and the receipt's module digest matches the bound handler. The
+receipt never contains the credential or the raw model response.
 """
 
 from __future__ import annotations
@@ -34,7 +37,7 @@ from nemisis.hashing import canonical_json, sha256_text, sha256_tree
 from nemisis.nemotron import NemotronClient, NemotronPatchGeneration
 from nemisis.sqlite_credit import AnchorResolutionError, bind_anchor
 
-RECEIPT_PATH = Path(".nemisis/agent-patch.json")
+RECEIPTS_DIR = Path(".nemisis/agent-patches")
 _ALLOWED_IMPORT_MODULES = frozenset({"typing", "__future__"})
 _DANGEROUS_NAMES = frozenset(
     {
@@ -127,11 +130,18 @@ def propose_patch(
                 rationale=generation.rationale,
                 model_call=generation.receipt,
             )
-            _write_exact(output / RECEIPT_PATH, canonical_json(proposal) + b"\n")
+            _write_exact(
+                receipt_path(candidate_tree_digest), canonical_json(proposal) + b"\n", replace=True
+            )
         except (CrashCheckError, ValueError, OSError) as error:
             cleanup_rejected(output)
             raise PatchError(f"candidate tree could not be written: {error}") from error
     return proposal
+
+
+def receipt_path(candidate_tree_digest: str) -> Path:
+    """Where the operator keeps the authorship receipt for one exact candidate tree."""
+    return Path.cwd() / RECEIPTS_DIR / f"{candidate_tree_digest}.json"
 
 
 def _store_api(module_source: str) -> str:
@@ -193,6 +203,10 @@ def _validate_module(source: str, symbol: str) -> None:
                 raise PatchError(f"model module import is not allowed: {node.module or '.'}")
         elif isinstance(node, ast.Name) and node.id in _DANGEROUS_NAMES:
             raise PatchError(f"model module uses a dangerous builtin: {node.id}")
+        elif isinstance(node, ast.Name) and node.id.startswith("_") and node.id != "_":
+            # __builtins__["__import__"], __loader__, __spec__, __class__: every route to the
+            # interpreter's internals starts with an underscore, so none are allowed by name.
+            raise PatchError(f"model module uses a private name: {node.id}")
         elif isinstance(node, ast.Attribute) and node.attr.startswith("_"):
             raise PatchError(f"model module reads a private attribute: {node.attr}")
         elif isinstance(node, ast.Global | ast.Nonlocal):
@@ -214,10 +228,11 @@ def cleanup_rejected(output: Path) -> None:
 
 
 __all__ = [
-    "RECEIPT_PATH",
+    "RECEIPTS_DIR",
     "PatchError",
     "Patcher",
     "cleanup_rejected",
     "describe",
     "propose_patch",
+    "receipt_path",
 ]
