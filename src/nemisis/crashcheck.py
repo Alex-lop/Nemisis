@@ -54,7 +54,7 @@ from nemisis.doctor import doctor
 from nemisis.hashing import canonical_json, sha256_bytes, sha256_json, sha256_text, sha256_tree
 from nemisis.local import source_commit
 from nemisis.models import TruthLabel
-from nemisis.report import write_crash_report
+from nemisis.report import money, write_crash_report
 from nemisis.safety import safe_destination, safe_relative_path
 from nemisis.sqlite_credit import (
     RUNNER_ID,
@@ -385,10 +385,7 @@ def check(
         bindings = [base_binding, candidate_binding]
         attempts = [*base_attempts, *candidate_attempts]
         candidate_observation = _confirmed_observation(candidate_attempts, capsule)
-        if candidate_observation not in {
-            CrashObservation.DUPLICATE_EFFECT,
-            CrashObservation.EXACTLY_ONCE,
-        }:
+        if candidate_observation is CrashObservation.NOT_OBSERVED:
             return publish(
                 run_id,
                 started_at,
@@ -445,10 +442,13 @@ def check(
             summary = "The known-good corrected control did not prove the capsule invariant."
         elif candidate_observation is CrashObservation.DUPLICATE_EFFECT:
             verdict = CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
-            summary = "The candidate replayed evt_1042 to a durable +$50 duplicate effect."
+            summary = _summary(verdict)
+        elif candidate_observation is CrashObservation.INVARIANT_FAILED:
+            verdict = CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
+            summary = _invariant_summary(candidate_attempts, capsule)
         elif candidate_observation is CrashObservation.EXACTLY_ONCE:
             verdict = CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE
-            summary = "Five fresh worlds ended at exactly +$25, one ledger effect, and one marker."
+            summary = _summary(verdict)
         else:
             verdict = CrashVerdict.EVIDENCE_INCOMPLETE
             summary = _unsupported_observation_summary(candidate_observation)
@@ -542,6 +542,12 @@ def replay(
             elif observation is CrashObservation.EXACTLY_ONCE:
                 verdict = CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE
                 detail = _summary(verdict)
+            elif (
+                observation is CrashObservation.INVARIANT_FAILED
+                and world_role is not WorldRole.BASE
+            ):
+                verdict = CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
+                detail = _invariant_summary(attempts, sealed)
             else:
                 verdict = CrashVerdict.EVIDENCE_INCOMPLETE
                 detail = _unsupported_observation_summary(observation)
@@ -780,6 +786,26 @@ def _unsupported_observation_summary(observation: CrashObservation) -> str:
             "the capsule's duplicate shape: the invariant failed, so nothing is proven."
         )
     return "Execution completed without one stable supported observation."
+
+
+def _invariant_summary(attempts: tuple[AttemptReceipt, ...], capsule: ReproCapsule) -> str:
+    """Name the durable state that was neither exactly-once nor the capsule's duplicate."""
+    final = next((attempt.final_snapshot for attempt in attempts if attempt.final_snapshot), None)
+    if final is None:
+        return _unsupported_observation_summary(CrashObservation.INVARIANT_FAILED)
+    expected = money(capsule.amount_cents)
+    observed = money(final.account_balance_cents)
+    if final.event_ledger_count == 0 and final.event_marker_count == 1:
+        cause = f"{capsule.event_id} was marked processed but never credited, so the credit is lost"
+    elif final.event_ledger_count > 2:
+        cause = f"{capsule.event_id} was credited {final.event_ledger_count} times"
+    else:
+        cause = "the final state matches neither exactly-once nor the capsule's duplicate shape"
+    return (
+        f"Every world completed with {observed} instead of {expected} "
+        f"({final.event_ledger_count} ledger rows, {final.event_marker_count} marker): {cause}. "
+        "The patch broke the invariant it was meant to protect."
+    )
 
 
 def _anchor_failure_summary(receipt: AnchorResolutionReceipt) -> str:
@@ -1725,6 +1751,10 @@ def _summary(verdict: CrashVerdict) -> str:
         ),
         CrashVerdict.PATCH_FAILED_STILL_REPRODUCES: (
             "The candidate replayed evt_1042 to a durable +$50 duplicate effect."
+        ),
+        CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN: (
+            "The candidate completed every world in a state that is neither exactly-once nor "
+            "the capsule's duplicate."
         ),
         CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE: (
             "Five fresh worlds ended at exactly +$25, one ledger effect, and one marker."

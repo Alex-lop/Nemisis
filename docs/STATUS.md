@@ -16,7 +16,7 @@ Committed hero evidence (unchanged, bound to its own exact source and engine):
 
 Current tree:
 
-- engine code digest: `4832df8eae3c6001cc07eaf86c737845326d6e35f5a5ac0fc8e47d17907a9aed`
+- engine code digest: `7df54c45ce280fa4af135d35cd338d4e6d8b10f5e67d69e5b303b9ec95937361`
   (changed by the contract-proposal and review commits; `tests/test_docs_identity.py` pins this value, so it cannot rot; a fresh `check` prints a new capsule digest bound to
   this engine, and the committed hero is not relabelled)
 - interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence
@@ -51,7 +51,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 312 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 316 tests, and package build: pass locally on
   Python 3.12.13 (the suite also passed on 3.13 during development);
 - exact engine CI for the committed hero: [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355);
 - exact measured-source CI: [successful run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096);

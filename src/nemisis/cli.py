@@ -293,7 +293,11 @@ def _print_benchmark(result: BenchmarkResult, output: Path, *, as_json: bool) ->
 def _exit_code(verdict: CrashVerdict) -> int:
     if verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE:
         return 0
-    if verdict in {CrashVerdict.BUG_REPRODUCED, CrashVerdict.PATCH_FAILED_STILL_REPRODUCES}:
+    if verdict in {
+        CrashVerdict.BUG_REPRODUCED,
+        CrashVerdict.PATCH_FAILED_STILL_REPRODUCES,
+        CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN,
+    }:
         return 1
     return 2
 

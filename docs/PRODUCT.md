@@ -54,7 +54,8 @@ The packaged fixture command is the audited shortcut because its contract is alr
 | Verdict | Exit | Exact meaning |
 | --- | ---: | --- |
 | `BUG_REPRODUCED` | 1 | The exact base reproduced the capsule's duplicate effect. |
-| `PATCH_FAILED_STILL_REPRODUCES` | 1 | The exact candidate reproduced the same duplicate effect. |
+| `PATCH_FAILED_STILL_REPRODUCES` | 1 | The exact candidate reproduced the same duplicate effect (two credits, with or without the marker). |
+| `PATCH_FAILED_INVARIANT_BROKEN` | 1 | Every candidate world completed, but the durable state was neither exactly-once nor the capsule's duplicate: a lost credit, a triple credit, or another broken invariant. |
 | `FIX_PROVEN_FOR_THIS_CAPSULE` | 0 | The exact candidate completed exactly once in every required world for this capsule only. |
 | `EVIDENCE_INCOMPLETE` | 2 | Required execution, mapping, integrity, or provenance evidence is missing or contradictory. |
 | `UNSUPPORTED_TARGET` | 2 | Deterministic preflight proves the scenario, catalog ID, adapter, or target shape is outside the alpha. |

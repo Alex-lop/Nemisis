@@ -44,7 +44,7 @@ The committed one-minute viewer after stepping through its five recorded steps: 
 candidate and the passing corrected revision side by side, with the `LOCAL` / `FIXTURE` labels pinned
 to the top. It reads a committed receipt from an earlier exact commit and executes nothing.
 
-![Terminal output of uv run pytest -q: 312 passed](docs/assets/screenshots/terminal-pytest-green.png)
+![Terminal output of uv run pytest -q: 312 passed at the commit the capture was taken; the suite has grown since](docs/assets/screenshots/terminal-pytest-green.png)
 
 ![Terminal output of nemisis doctor --mode live: local checks PASS, NEBIUS_API_KEY, ConTree profile, root image and the CrashCheck provider transport BLOCKED, exit code 2](docs/assets/screenshots/terminal-doctor-live-blocked.png)
 
@@ -200,7 +200,7 @@ CrashCheck commands support `--json`; progress stays on stderr. Their exit polic
 | Exit | Meaning |
 | ---: | --- |
 | `0` | `FIX_PROVEN_FOR_THIS_CAPSULE` |
-| `1` | `BUG_REPRODUCED` or `PATCH_FAILED_STILL_REPRODUCES` |
+| `1` | `BUG_REPRODUCED`, `PATCH_FAILED_STILL_REPRODUCES`, or `PATCH_FAILED_INVARIANT_BROKEN` |
 | `2` | `EVIDENCE_INCOMPLETE`, `UNSUPPORTED_TARGET`, invalid input, or infrastructure failure |
 
 Every run writes a manifest beneath `.nemisis/runs/<run-id>/`. Attempt-bearing runs add a report;

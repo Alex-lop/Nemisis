@@ -48,6 +48,10 @@ def apply_credit(store, event):
     store.mark_processed(event["event_id"])
 '''
 
+CREDIT_NEVER_MARKS = """def apply_credit(store, event):
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
 THREE_ARGUMENT = """def apply_credit(store, event, extra=None):
     store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
 """
@@ -70,7 +74,7 @@ def _draft_config(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return initialize(issue, TARGET, BUGGY_REF, SCENARIO_ID)
 
 
-def test_over_crediting_candidate_fails_the_invariant_and_proves_nothing(
+def test_over_crediting_candidate_is_a_failed_patch_not_missing_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
@@ -78,15 +82,38 @@ def test_over_crediting_candidate_fails_the_invariant_and_proves_nothing(
 
     result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
 
-    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
-    assert "invariant failed" in result.summary
+    assert result.verdict is CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
+    assert "$75.00 instead of $25.00" in result.summary
+    assert "credited 3 times" in result.summary
     candidate_attempts = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
     assert len(candidate_attempts) == 5
     assert {a.observation for a in candidate_attempts} == {CrashObservation.INVARIANT_FAILED}
     assert all(a.execution_status is ExecutionStatus.COMPLETED for a in candidate_attempts)
     final = candidate_attempts[0].final_snapshot
     assert final is not None and final.account_balance_cents == 7_500
-    assert cli._exit_code(result.verdict) == 2
+    assert cli._exit_code(result.verdict) == 1
+
+
+def test_candidate_that_never_marks_still_duplicates_and_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two credits are a duplicate whether or not the marker ever landed."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "never-marks", CREDIT_NEVER_MARKS)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
+    candidate_attempts = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
+    assert {a.observation for a in candidate_attempts} == {CrashObservation.DUPLICATE_EFFECT}
+    final = candidate_attempts[0].final_snapshot
+    assert final is not None
+    assert (final.account_balance_cents, final.event_ledger_count, final.event_marker_count) == (
+        5_000,
+        2,
+        0,
+    )
+    assert cli._exit_code(result.verdict) == 1
 
 
 def test_replay_base_role_can_reproduce_but_never_prove_a_fix(

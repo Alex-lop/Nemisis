@@ -66,6 +66,7 @@ def test_live_mode_lists_blockers_and_never_falls_back(
         (CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE, 0),
         (CrashVerdict.BUG_REPRODUCED, 1),
         (CrashVerdict.PATCH_FAILED_STILL_REPRODUCES, 1),
+        (CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN, 1),
         (CrashVerdict.EVIDENCE_INCOMPLETE, 2),
         (CrashVerdict.UNSUPPORTED_TARGET, 2),
     ],

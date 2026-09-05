@@ -3,7 +3,7 @@
 This ledger separates observed behavior from transport and product claims. The committed evidence
 was executed from clean source `ddaf186aa81b8a7ebd442da1f2dfeee6878e7dce` and published by
 `3d66ccd4499fae5f1d6fbe5beee4b097d3ce3949`. Later commits changed engine bytes (the current engine
-code digest is `4832df8eae3c6001cc07eaf86c737845326d6e35f5a5ac0fc8e47d17907a9aed`); the committed hero stays
+code digest is `7df54c45ce280fa4af135d35cd338d4e6d8b10f5e67d69e5b303b9ec95937361`); the committed hero stays
 bound to its own exact source and engine and is not relabelled. A fresh `check` at the current
 commit prints its own capsule and engine digests.
 
@@ -19,7 +19,7 @@ commit prints its own capsule and engine digests.
 | Installed-wheel replay and regression | `VERIFIED` | External temp install: base/candidate/corrected replay exits `1`/`1`/`0`; exported regression fails candidate and passes atomic. In-suite: base-role replay yields `BUG_REPRODUCED`, a fixed tree under `--role base` is `EVIDENCE_INCOMPLETE`, and an over-crediting candidate is `INVARIANT_FAILED`, never proven. |
 | Measured benchmark | `LOCAL` / `FIXTURE` | Result `11016ce964b88961c246c91eb1ae437cf0ff9e9547a794ad845776af52af864a`; strict schema/digest validation passes. |
 | Static one-minute viewer | `LOCAL` / `FIXTURE` | Verdict-first five-beat viewer with stepped replay and a pinned `LOCAL` / `FIXTURE` bar, exact receipt bindings, fail-closed runtime, and explicit “Replay fixture evidence” control. |
-| Project gates | `VERIFIED` | Locked sync, formatting, Ruff, mypy, 312 local tests, sdist, and wheel pass. |
+| Project gates | `VERIFIED` | Locked sync, formatting, Ruff, mypy, 316 local tests, sdist, and wheel pass. |
 | GitHub composite Action | `VERIFIED_WITH_BOUNDARY` | Exact-SHA CI executes `uses: ./`, expected candidate rejection, artifact validation, installed-wheel smoke, and corrected replay. The copyable workflow pins engine `f05ae921…`. Not exercised by CI: remote-action download, real upload transfer, and the action's Git-ref branch (resolving `base` to a commit SHA and reading the base-owned `.nemisis/config.json`), which every real pull request takes; that branch is covered only by the Python-level Git materialization tests. |
 | Nemotron contract proposal (`init --nemotron`) | `MOCKED` / `BLOCKED` | Wired into the CLI and into the check manifest and report; injected-client tests prove candidate blindness, fail-closed rejection, secret-free receipts, and sidecar binding. No `NEBIUS_API_KEY` here, so no current-tree `LIVE` receipt. |
 | Differential Nemotron + ConTree path | `IMPLEMENTED_NOT_CURRENTLY_OBSERVED` | Bounded adapter and guest-receipt tests exist, but no current-tree provider receipt exists. |

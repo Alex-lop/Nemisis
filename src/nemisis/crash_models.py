@@ -55,9 +55,20 @@ class CrashObservation(StrEnum):
 class CrashVerdict(StrEnum):
     BUG_REPRODUCED = "BUG_REPRODUCED"
     PATCH_FAILED_STILL_REPRODUCES = "PATCH_FAILED_STILL_REPRODUCES"
+    PATCH_FAILED_INVARIANT_BROKEN = "PATCH_FAILED_INVARIANT_BROKEN"
     FIX_PROVEN_FOR_THIS_CAPSULE = "FIX_PROVEN_FOR_THIS_CAPSULE"
     EVIDENCE_INCOMPLETE = "EVIDENCE_INCOMPLETE"
     UNSUPPORTED_TARGET = "UNSUPPORTED_TARGET"
+
+
+CONCLUSIVE_VERDICTS = frozenset(
+    {
+        CrashVerdict.BUG_REPRODUCED,
+        CrashVerdict.PATCH_FAILED_STILL_REPRODUCES,
+        CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN,
+        CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE,
+    }
+)
 
 
 class FaultBoundary(StrEnum):
@@ -384,16 +395,20 @@ class AttemptReceipt(_DigestedModel):
                     checkpoint.account_balance_cents,
                     0,
                 )
-                expected_final = (
-                    checkpoint.account_balance_cents * 2,
-                    2,
-                    checkpoint.account_balance_cents * 2,
-                    1,
-                )
-                if checkpoint.account_balance_cents <= 0 or (
-                    checkpoint_state,
-                    final_state,
-                ) != (expected_checkpoint, expected_final):
+                expected_finals = {
+                    (
+                        checkpoint.account_balance_cents * 2,
+                        2,
+                        checkpoint.account_balance_cents * 2,
+                        marker,
+                    )
+                    for marker in (0, 1)
+                }
+                if (
+                    checkpoint.account_balance_cents <= 0
+                    or checkpoint_state != expected_checkpoint
+                    or final_state not in expected_finals
+                ):
                     raise ValueError("duplicate observation contradicts checkpoint or final state")
             elif self.observation is CrashObservation.EXACTLY_ONCE:
                 expected = (
@@ -798,11 +813,7 @@ class CrashCheckResult(_DigestedModel):
             expected_integrity = IntegrityStatus.INCOMPLETE
         if self.integrity_status is not expected_integrity:
             raise ValueError("result integrity status contradicts its attempts")
-        if self.verdict in {
-            CrashVerdict.BUG_REPRODUCED,
-            CrashVerdict.PATCH_FAILED_STILL_REPRODUCES,
-            CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE,
-        }:
+        if self.verdict in CONCLUSIVE_VERDICTS:
             if not completed or expected_integrity is not IntegrityStatus.VALID:
                 raise ValueError("conclusive verdict requires completed valid attempts")
             if self.hypothesis_receipts:
@@ -1049,12 +1060,19 @@ def _validate_conclusive_verdict(
     roles = set(observations)
     duplicate = {CrashObservation.DUPLICATE_EFFECT}
     exactly_once = {CrashObservation.EXACTLY_ONCE}
+    invariant_failed = {CrashObservation.INVARIANT_FAILED}
     if verdict is CrashVerdict.BUG_REPRODUCED:
         coherent = roles == {WorldRole.BASE} and observations[WorldRole.BASE] == duplicate
-    elif verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES:
+    elif verdict in {
+        CrashVerdict.PATCH_FAILED_STILL_REPRODUCES,
+        CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN,
+    }:
+        failed = (
+            duplicate if verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES else invariant_failed
+        )
         coherent = (
             roles in ({WorldRole.CANDIDATE}, {WorldRole.CORRECTED})
-            and next(iter(observations.values())) == duplicate
+            and next(iter(observations.values())) == failed
         ) or (
             roles
             in (
@@ -1062,7 +1080,7 @@ def _validate_conclusive_verdict(
                 {WorldRole.BASE, WorldRole.CANDIDATE, WorldRole.CORRECTED},
             )
             and observations[WorldRole.BASE] == duplicate
-            and observations[WorldRole.CANDIDATE] == duplicate
+            and observations[WorldRole.CANDIDATE] == failed
             and (
                 WorldRole.CORRECTED not in roles
                 or observations[WorldRole.CORRECTED] == exactly_once
@@ -1090,6 +1108,7 @@ def _validate_conclusive_verdict(
 
 
 __all__ = [
+    "CONCLUSIVE_VERDICTS",
     "AnchorBinding",
     "AnchorResolutionReceipt",
     "AnchorResolutionStatus",

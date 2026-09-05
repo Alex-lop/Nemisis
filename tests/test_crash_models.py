@@ -434,6 +434,61 @@ def test_completed_result_cannot_contain_an_incomplete_attempt() -> None:
         CrashCheckResult.with_digest(**_result_values(capsule, binding, incomplete))
 
 
+def test_duplicate_observation_accepts_a_missing_marker() -> None:
+    """Two credits are a duplicate even when the handler never wrote its marker."""
+    capsule = _capsule()
+    values = _attempt_values(
+        capsule, _binding(capsule), observation=CrashObservation.DUPLICATE_EFFECT
+    )
+    values["final_snapshot"] = _snapshot(effects=2, marker=0)
+    receipt = AttemptReceipt.with_digest(**values)
+    assert receipt.observation is CrashObservation.DUPLICATE_EFFECT
+
+    values["final_snapshot"] = _snapshot(effects=3, marker=0)
+    with pytest.raises(ValidationError, match="duplicate observation"):
+        AttemptReceipt.with_digest(**values)
+
+
+def test_invariant_broken_verdict_requires_unanimous_invariant_failures() -> None:
+    capsule = _capsule()
+    base = _binding(capsule, source_ref="fixture:base", tree_digest=HASHES[4])
+    candidate = _binding(capsule, source_ref="fixture:candidate", tree_digest=HASHES[5])
+    base_attempt = AttemptReceipt.with_digest(
+        **_attempt_values(
+            capsule, base, role=WorldRole.BASE, observation=CrashObservation.DUPLICATE_EFFECT
+        )
+    )
+
+    def broken(index: int) -> AttemptReceipt:
+        values = _attempt_values(capsule, candidate, role=WorldRole.CANDIDATE, index=index)
+        values.update(
+            observation=CrashObservation.INVARIANT_FAILED, final_snapshot=_snapshot(effects=3)
+        )
+        return AttemptReceipt.with_digest(**values)
+
+    values = _result_values(capsule, candidate, broken(1))
+    values.update(
+        verdict=CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN,
+        bindings=(base, candidate),
+        attempts=(
+            *_confirmations(capsule, base, base_attempt),
+            *(broken(index) for index in range(1, REQUIRED_CONFIRMATIONS + 1)),
+        ),
+        hypothesis_receipts=_hypothesis_receipts(capsule),
+        minimization_receipts=_minimization_receipts(capsule, base),
+    )
+    result = CrashCheckResult.with_digest(**values)
+    assert result.verdict is CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
+
+    for wrong in (
+        CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE,
+        CrashVerdict.PATCH_FAILED_STILL_REPRODUCES,
+    ):
+        values["verdict"] = wrong
+        with pytest.raises(ValidationError, match="role-specific attempt observations"):
+            CrashCheckResult.with_digest(**values)
+
+
 def test_completed_attempt_binds_tree_and_observation_to_snapshots() -> None:
     capsule = _capsule()
     binding = _binding(capsule)

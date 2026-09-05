@@ -912,7 +912,7 @@ def _observation(snapshot: CreditSnapshot, amount: int) -> CrashObservation:
         snapshot.event_ledger_total_cents,
         snapshot.event_marker_count,
     )
-    if state == (amount * 2, 2, amount * 2, 1):
+    if state[:3] == (amount * 2, 2, amount * 2):
         return CrashObservation.DUPLICATE_EFFECT
     if state == (amount, 1, amount, 1):
         return CrashObservation.EXACTLY_ONCE

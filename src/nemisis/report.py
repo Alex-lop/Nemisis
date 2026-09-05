@@ -354,6 +354,7 @@ def _verdict_title(verdict: str) -> str:
     return {
         "BUG_REPRODUCED": "Crash/retry bug reproduced",
         "PATCH_FAILED_STILL_REPRODUCES": "Patch still duplicates the effect",
+        "PATCH_FAILED_INVARIANT_BROKEN": "Patch breaks the invariant under a crash",
         "FIX_PROVEN_FOR_THIS_CAPSULE": "Fix proven for this capsule only",
         "EVIDENCE_INCOMPLETE": "Evidence incomplete",
         "UNSUPPORTED_TARGET": "Target unsupported",
