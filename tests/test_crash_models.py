@@ -295,6 +295,7 @@ def _no_fault_receipt(
         ended_at=NOW + timedelta(seconds=3),
         spawns=workers,
         first_delivery_operations=operations,
+        first_delivery_commit_count=len(operations),
         initial_snapshot=_snapshot(effects=0, marker=0),
         first_delivery_snapshot=_snapshot(),
         final_snapshot=_snapshot(),

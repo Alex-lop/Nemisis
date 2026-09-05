@@ -13,7 +13,7 @@ from nemisis.models import ModelCallReceipt, SafeId, Sha256, StrictModel, TruthL
 from nemisis.safety import safe_relative_path
 
 REQUIRED_CONFIRMATIONS = 5
-MAX_SWEEP_COMMITS = 16
+MAX_SWEEP_COMMITS = 64
 
 
 class WorldRole(StrEnum):
@@ -367,6 +367,7 @@ class AttemptReceipt(_DigestedModel):
     post_kill_snapshot: CreditSnapshot | None = None
     final_snapshot: CreditSnapshot | None = None
     checkpoint_reached: bool
+    first_worker_operations: tuple[SafeId, ...] = Field(default=(), max_length=MAX_SWEEP_COMMITS)
     kill_after_commit: int | None = Field(default=None, ge=1, le=MAX_SWEEP_COMMITS)
     kill_signal: int | None = None
     replay_acknowledged: bool
@@ -472,7 +473,9 @@ class NoFaultReplayReceipt(_DigestedModel):
     ended_at: datetime
     spawns: tuple[WorkerSpawnReceipt, ...] = Field(max_length=2)
     first_delivery_operations: tuple[SafeId, ...] = Field(default=(), max_length=MAX_SWEEP_COMMITS)
+    first_delivery_commit_count: int = Field(default=0, ge=0)
     replay_operations: tuple[SafeId, ...] = Field(default=(), max_length=MAX_SWEEP_COMMITS)
+    replay_commit_count: int = Field(default=0, ge=0)
     initial_snapshot: CreditSnapshot | None = None
     first_delivery_snapshot: CreditSnapshot | None = None
     final_snapshot: CreditSnapshot | None = None
@@ -515,6 +518,8 @@ class NoFaultReplayReceipt(_DigestedModel):
                 raise ValueError("no-fault replay observation contradicts its final state")
             if not self.first_delivery_operations:
                 raise ValueError("completed no-fault replay recorded no store commits")
+            if self.first_delivery_commit_count < len(self.first_delivery_operations):
+                raise ValueError("no-fault replay commit count contradicts its recorded schedule")
         elif self.failure_detail is None:
             raise ValueError("incomplete no-fault replay requires a failure detail")
         return self

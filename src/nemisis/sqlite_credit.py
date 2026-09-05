@@ -441,6 +441,7 @@ def execute_attempt(
         post_kill_snapshot=post_kill,
         final_snapshot=final,
         checkpoint_reached=checkpoint_reached,
+        first_worker_operations=tuple(spawns[0].operations[:MAX_SWEEP_COMMITS]) if spawns else (),
         kill_after_commit=kill_after_commit,
         kill_signal=int(kill_signal) if kill_signal is not None else None,
         replay_acknowledged=replay_acknowledged,
@@ -564,8 +565,14 @@ def execute_no_fault_replay(
         started_at=started_at,
         ended_at=datetime.now(UTC),
         spawns=tuple(_spawn_receipt(item, capsule.event_digest) for item in spawns),
-        first_delivery_operations=tuple(spawns[0].operations) if spawns else (),
-        replay_operations=tuple(spawns[1].operations) if len(spawns) > 1 else (),
+        first_delivery_operations=(
+            tuple(spawns[0].operations[:MAX_SWEEP_COMMITS]) if spawns else ()
+        ),
+        first_delivery_commit_count=len(spawns[0].operations) if spawns else 0,
+        replay_operations=(
+            tuple(spawns[1].operations[:MAX_SWEEP_COMMITS]) if len(spawns) > 1 else ()
+        ),
+        replay_commit_count=len(spawns[1].operations) if len(spawns) > 1 else 0,
         initial_snapshot=initial,
         first_delivery_snapshot=first_delivery,
         final_snapshot=final,
@@ -850,7 +857,10 @@ def _wait_for_checkpoint(
                     "before crash-testing it"
                 )
             else:
-                detail = "the handler raised before the durable credit checkpoint"
+                detail = (
+                    f"the handler raised {message.get('error', 'an exception')} before the "
+                    "durable credit checkpoint"
+                )
             raise _AttemptFailure(ExecutionStatus.CHECKPOINT_NOT_REACHED, detail)
         else:
             raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "unexpected worker message")
@@ -891,7 +901,11 @@ def _finish_replay(
             _send(spawn.channel, {"type": "continue"})
             continue
         if kind == "error":
-            raise _AttemptFailure(ExecutionStatus.REPLAY_ERROR, "replay worker reported an error")
+            raise _AttemptFailure(
+                ExecutionStatus.REPLAY_ERROR,
+                f"the handler raised {message.get('error', 'an exception')} during the "
+                f"{spawn.phase} delivery; a redelivery must return normally to be exactly once",
+            )
         expected = {
             "event_digest": capsule.event_digest,
             "execution_nonce": execution_nonce,
@@ -942,11 +956,6 @@ def _attributed_probe(
     """
     amount = _event(event)["amount_cents"]
     operation = message.get("operation")
-    if spawn is not None and len(spawn.operations) >= MAX_SWEEP_COMMITS:
-        raise _AttemptFailure(
-            ExecutionStatus.PROTOCOL_ERROR,
-            f"worker reported more than {MAX_SWEEP_COMMITS} store commits for one event",
-        )
     snapshot = _probe(database, event)
     expected = _STORE_DELTAS.get(str(operation))
     if not isinstance(amount, int) or expected is None:

@@ -123,6 +123,8 @@ def test_three_tree_hero_runs_fifteen_fresh_worlds(
     corrected_sweep = result.sweeps[0]
     assert corrected_sweep.census.first_delivery_operations == ("credit_and_mark",)
     assert corrected_sweep.census.replay_operations == ()
+    assert corrected_sweep.census.first_delivery_commit_count == 1
+    assert corrected_sweep.attempts[0].first_worker_operations == ("credit_and_mark",)
     assert [a.kill_after_commit for a in corrected_sweep.attempts] == [1]
     assert corrected_sweep.observation is CrashObservation.EXACTLY_ONCE
     sweep_ids = {corrected_sweep.census.database_id} | {

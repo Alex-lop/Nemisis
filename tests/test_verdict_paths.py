@@ -310,6 +310,7 @@ def test_handler_that_never_credits_is_reported_with_its_no_crash_money(
     assert "without ever committing the credit" in result.summary
     assert "$0.00 instead of $25.00" in result.summary
     assert "never credited" in result.summary
+    assert "raised IntegrityError during the replay delivery" in result.summary
     assert "reported, not judged" in result.summary
     sweep = result.sweeps[0]
     assert sweep.role is WorldRole.CANDIDATE
@@ -319,6 +320,33 @@ def test_handler_that_never_credits_is_reported_with_its_no_crash_money(
     # The redelivery marks the event a second time and raises, so the census itself is incomplete.
     assert sweep.census.execution_status is ExecutionStatus.REPLAY_ERROR
     assert cli._exit_code(result.verdict) == 2
+
+
+CREDIT_FLOOD = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    for _ in range(20):
+        store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+
+def test_a_flood_of_credits_is_a_failed_patch_not_a_protocol_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Red team, round two: twenty credits used to trip a 16-commit protocol cap and become
+    EVIDENCE_INCOMPLETE. Money credited twenty times is an observation, so it is judged."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "flood", CREDIT_FLOOD)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
+    assert "credited 21 times" in result.summary
+    boundary = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
+    assert all(a.execution_status is ExecutionStatus.COMPLETED for a in boundary)
+    assert boundary[0].first_worker_operations[:1] == ("credit",)
+    assert cli._exit_code(result.verdict) == 1
 
 
 def test_worlds_that_disagree_are_named_not_averaged() -> None:

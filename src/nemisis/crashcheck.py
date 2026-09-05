@@ -273,7 +273,7 @@ def check(
             contract,
             base_binding,
             base_source.path,
-            root / "hypothesis-worlds",
+            root / uuid.uuid4().hex,
         )
         if not _hunt_is_conclusive(hypothesis_receipts):
             detail = "The two base-only crash-boundary hypotheses did not yield one witness."
@@ -297,7 +297,7 @@ def check(
             capsule,
             base_binding,
             base_source.path,
-            root / "minimization-worlds",
+            root / uuid.uuid4().hex,
         )
         minimization_receipts = (minimization_receipt,)
         if not minimization_receipt.sole_fault_action_necessary_for_fixture:
@@ -322,7 +322,7 @@ def check(
             )
 
         base_attempts = _execute_confirmations(
-            capsule, base_binding, base_source.path, root / "base-worlds", WorldRole.BASE
+            capsule, base_binding, base_source.path, root / uuid.uuid4().hex, WorldRole.BASE
         )
         if _confirmed_observation(base_attempts, capsule) is not CrashObservation.DUPLICATE_EFFECT:
             return publish(
@@ -388,7 +388,7 @@ def check(
             capsule,
             candidate_binding,
             candidate_source.path,
-            root / "candidate-worlds",
+            root / uuid.uuid4().hex,
             WorldRole.CANDIDATE,
         )
         bindings = [base_binding, candidate_binding]
@@ -404,7 +404,7 @@ def check(
                         capsule,
                         candidate_binding,
                         candidate_source.path,
-                        root / "candidate-sweep",
+                        root / uuid.uuid4().hex,
                         WorldRole.CANDIDATE,
                     )
                 )
@@ -427,7 +427,7 @@ def check(
                 capsule,
                 candidate_binding,
                 candidate_source.path,
-                root / "candidate-sweep",
+                root / uuid.uuid4().hex,
                 WorldRole.CANDIDATE,
             )
             sweeps.append(candidate_sweep)
@@ -464,7 +464,7 @@ def check(
                 capsule,
                 corrected_binding,
                 corrected_source.path,
-                root / "corrected-worlds",
+                root / uuid.uuid4().hex,
                 WorldRole.CORRECTED,
             )
             bindings.append(corrected_binding)
@@ -475,7 +475,7 @@ def check(
                     capsule,
                     corrected_binding,
                     corrected_source.path,
-                    root / "corrected-sweep",
+                    root / uuid.uuid4().hex,
                     WorldRole.CORRECTED,
                 )
                 sweeps.append(corrected_sweep)
@@ -562,7 +562,7 @@ def replay(
             verdict = CrashVerdict.EVIDENCE_INCOMPLETE
         elif mode == "local":
             attempts = _execute_confirmations(
-                sealed, binding, materialized.path, root / "worlds", world_role
+                sealed, binding, materialized.path, root / uuid.uuid4().hex, world_role
             )
             observation = _confirmed_observation(attempts, sealed)
             if world_role is WorldRole.BASE:
@@ -581,7 +581,7 @@ def replay(
             else:
                 if observation is CrashObservation.EXACTLY_ONCE:
                     sweep = _execute_sweep(
-                        sealed, binding, materialized.path, root / "sweep", world_role
+                        sealed, binding, materialized.path, root / uuid.uuid4().hex, world_role
                     )
                     sweeps = (sweep,)
                     observation = sweep.observation
@@ -929,13 +929,13 @@ def _hunt_hypotheses(
     ) -> tuple[tuple[int, str, FaultBoundary, int], ReproCapsule, AttemptReceipt]:
         rank, _hypothesis_id, boundary, _operation_count = spec
         provisional = _seal_capsule(contract, boundary)
-        nonce = f"hunt-{rank}-{uuid.uuid4().hex}"
+        nonce = uuid.uuid4().hex
         try:
             attempt = execute_attempt(
                 capsule=provisional,
                 binding=binding,
                 source_tree=source,
-                work_dir=work_root / f"hypothesis-{rank}",
+                work_dir=work_root / uuid.uuid4().hex,
                 role=WorldRole.BASE,
                 execution_nonce=nonce,
             )
@@ -1031,13 +1031,13 @@ def _minimize_witness(
     """Delete the sole fault action twice; continue only when both fixture worlds are exact-once."""
 
     def one(index: int) -> NoFaultReplayReceipt:
-        nonce = f"minimize-{index}-{uuid.uuid4().hex}"
+        nonce = uuid.uuid4().hex
         try:
             return execute_no_fault_replay(
                 capsule=parent,
                 binding=binding,
                 source_tree=source,
-                work_dir=work_root / f"world-{index}",
+                work_dir=work_root / uuid.uuid4().hex,
                 execution_nonce=nonce,
             )
         except Exception as error:  # Preserve fail-closed minimization evidence.
@@ -1141,13 +1141,13 @@ def _execute_confirmations(
     work_root.mkdir(parents=True, exist_ok=False)
 
     def one(index: int) -> AttemptReceipt:
-        nonce = f"{role.value}-{index}-{uuid.uuid4().hex}"
+        nonce = uuid.uuid4().hex
         try:
             return execute_attempt(
                 capsule=capsule,
                 binding=binding,
                 source_tree=source,
-                work_dir=work_root / f"world-{index}",
+                work_dir=work_root / uuid.uuid4().hex,
                 role=role,
                 execution_nonce=nonce,
             )
@@ -1175,13 +1175,13 @@ def _execute_sweep(
 ) -> CommitSweepReceipt:
     """Count the handler's store commits without a kill, then kill once after each of them."""
     work_root.mkdir(parents=True, exist_ok=False)
-    nonce = f"{role.value}-census-{uuid.uuid4().hex}"
+    nonce = uuid.uuid4().hex
     try:
         census = execute_no_fault_replay(
             capsule=capsule,
             binding=binding,
             source_tree=source,
-            work_dir=work_root / "census",
+            work_dir=work_root / uuid.uuid4().hex,
             execution_nonce=nonce,
             role=role,
         )
@@ -1194,13 +1194,13 @@ def _execute_sweep(
     ):
 
         def one(index: int) -> AttemptReceipt:
-            attempt_nonce = f"{role.value}-sweep-{index}-{uuid.uuid4().hex}"
+            attempt_nonce = uuid.uuid4().hex
             try:
                 return execute_attempt(
                     capsule=capsule,
                     binding=binding,
                     source_tree=source,
-                    work_dir=work_root / f"kill-after-{index}",
+                    work_dir=work_root / uuid.uuid4().hex,
                     role=role,
                     execution_nonce=attempt_nonce,
                     kill_after_commit=index,
@@ -1325,6 +1325,10 @@ def _sweep_summary(sweep: CommitSweepReceipt, capsule: ReproCapsule) -> str:
             f"({', '.join(operations)}) and every replay ended exactly once."
         )
     census_final = sweep.census.final_snapshot
+    if sweep.census.first_delivery_commit_count > len(operations):
+        schedule += (
+            f" (first {len(operations)} of {sweep.census.first_delivery_commit_count} recorded)"
+        )
     if (
         sweep.census.execution_status is ExecutionStatus.COMPLETED
         and sweep.census.observation is sweep.observation
@@ -1341,13 +1345,20 @@ def _sweep_summary(sweep: CommitSweepReceipt, capsule: ReproCapsule) -> str:
     )
     if failing is not None and failing.kill_after_commit is not None:
         index = failing.kill_after_commit
-        operation = operations[index - 1] if index <= len(operations) else "unknown"
+        own = failing.first_worker_operations
+        operation = own[index - 1] if index <= len(own) else "unknown"
+        drift = ""
+        if tuple(own[:index]) != tuple(operations[:index]):
+            drift = (
+                f" (this world's commits {', '.join(own) or 'none'} differ from the census's "
+                f"{', '.join(operations)}: the handler's schedule is not deterministic)"
+            )
         final = failing.final_snapshot
         observed = _describe_final(final, capsule) if final is not None else "no final state"
         return (
-            f"Killed after store commit {index} of {len(operations)} ({operation}) and replayed: "
-            f"{observed}. The {REQUIRED_CONFIRMATIONS} capsule-boundary worlds passed, so this "
-            "is a crash window the base did not have."
+            f"Killed after store commit {index} of {len(operations)} ({operation}){drift} and "
+            f"replayed: {observed}. The {REQUIRED_CONFIRMATIONS} capsule-boundary worlds passed, "
+            "so this is a crash window the base did not have."
         )
     detail = sweep.census.failure_detail or next(
         (attempt.failure_detail for attempt in sweep.attempts if attempt.failure_detail),
