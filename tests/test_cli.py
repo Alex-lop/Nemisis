@@ -171,9 +171,8 @@ def test_check_routes_arguments_artifacts_and_failure_exit(
     assert f"engine source commit: {'a' * 40}" in output.out
     assert "hypotheses: 2 run -> selected effect-commit (effect-commit-v1)" in output.out
     assert (
-        "necessity: deleted effect-commit; empty schedule was EXACTLY_ONCE in 2/2 fresh "
-        "base worlds; deletion rejected; final fault actions 1/1 (fixture-only necessity proof)"
-        in output.out
+        "control: base delivered the event twice with no kill in 2/2 fresh worlds and ended "
+        "exactly once; the duplicate needs the crash" in output.out
     )
     assert f"manifest: {tmp_path / 'runs/manifest.json'}" in output.out
     assert "CrashCheck check started (LOCAL)" in output.err
@@ -210,8 +209,8 @@ def test_crash_result_makes_no_minimization_claim_for_incomplete_evidence(
     cli._print_crash_result(result, as_json=False)
 
     output = capsys.readouterr().out
-    assert "necessity: empty-schedule evidence incomplete; no necessity claim" in output
-    assert "final fault actions" not in output
+    assert "control: the no-kill base delivery did not complete" in output
+    assert "needs the crash" not in output
 
 
 def test_json_error_preserves_the_unsupported_target_verdict(

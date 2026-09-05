@@ -190,16 +190,19 @@ def _print_crash_result(
         )
         print(f"hypotheses: {len(result.hypothesis_receipts)} run -> {selection}")
     if minimization_receipts := getattr(result, "minimization_receipts", ()):
-        minimization = minimization_receipts[0]
-        if minimization.sole_fault_action_necessary_for_fixture:
-            confirmations = len(minimization.confirmations)
+        control = minimization_receipts[0]
+        if control.sole_fault_action_necessary_for_fixture:
+            confirmations = len(control.confirmations)
             print(
-                f"necessity: deleted {minimization.removed_fault.value}; empty schedule was "
-                f"EXACTLY_ONCE in {confirmations}/{confirmations} fresh base worlds; deletion "
-                "rejected; final fault actions 1/1 (fixture-only necessity proof)"
+                f"control: base delivered the event twice with no kill in {confirmations}/"
+                f"{confirmations} fresh worlds and ended exactly once; the duplicate needs the "
+                "crash"
             )
         else:
-            print("necessity: empty-schedule evidence incomplete; no necessity claim")
+            print(
+                "control: the no-kill base delivery did not complete, so the duplicate is not "
+                "attributed to the crash"
+            )
     for sweep in getattr(result, "sweeps", ()):
         operations = sweep.census.first_delivery_operations
         points = ", ".join(

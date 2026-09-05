@@ -37,14 +37,14 @@ every crash world ends at `$50`, two ledger effects, and one marker. Every corre
 `$25`, one effect, and one marker.
 
 The hypothesis hunt produced one reproducer from two valid worlds and selected
-`effect-commit-v1` by fixed catalog rank. One sole-fault-action deletion trial then observed
-`EXACTLY_ONCE` in 2/2 fresh base worlds, rejected deletion, and retained 1/1 fault actions. This is
-a fixture-scoped necessity proof, not a general minimizer.
+`effect-commit-v1` by fixed catalog rank. The no-crash control then delivered the event twice with
+no kill in 2/2 fresh base worlds and observed `EXACTLY_ONCE` both times, so the base's duplicate is
+attributed to the crash. (The JSON still names this the deletion trial.)
 
 Measured local timing:
 
 - time to first base witness: 294.779 ms;
-- two-world deletion proof: 327.369 ms;
+- two-world no-crash control: 327.369 ms;
 - complete CrashCheck portion: 1.935 s; and
 - total benchmark: 2.378 s.
 

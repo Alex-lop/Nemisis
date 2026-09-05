@@ -304,7 +304,7 @@ summary { cursor: pointer; font-weight: 750; }
         <li><span>marker-commit-v1<code>2 trusted operations</code></span><span class="pass">NOT REPRODUCED</span></li>
       </ul>
       <small data-field="hunt">Loading measured hunt receipt…</small>
-      <p class="replay-note"><b>Single-action deletion / necessity check:</b> after selecting the one-action <code>effect-commit</code> witness, CrashCheck deleted that sole fault action. The empty schedule was <code>EXACTLY_ONCE</code> in two fresh base worlds, so deletion was rejected and the one fault action is necessary for this fixture's duplicate predicate. This receipt makes no general minimizer claim.</p>
+      <p class="replay-note"><b>No-crash control:</b> the base also delivered the same event twice with no kill, in two fresh worlds, and ended exactly once both times. The duplicate needs the crash: this is a crash/retry bug, not a handler that is simply wrong.</p>
     </div>
   </article>
 

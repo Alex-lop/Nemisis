@@ -41,8 +41,8 @@ def test_static_hero_surface_is_verdict_first_and_accessible() -> None:
     assert all(
         axis in page for axis in ("Transport", "Execution", "Provenance", "Integrity", "Verdict")
     )
-    assert "Single-action deletion / necessity check:" in page
-    assert "no general minimizer claim" in page
+    assert "No-crash control:" in page
+    assert "minimizer" not in page
     assert "minimization ratio" not in page
     assert 'field("provenance", capsule.truth_label)' in page
     assert 'field("integrity", result.integrity_status)' in page
@@ -132,8 +132,8 @@ def test_static_hero_receipt_is_exactly_bound() -> None:
     assert all(
         axis in page for axis in ("Transport", "Execution", "Provenance", "Integrity", "Verdict")
     )
-    assert "Single-action deletion / necessity check:" in page
-    assert "no general minimizer claim" in page
+    assert "No-crash control:" in page
+    assert "minimizer" not in page
     assert "minimization ratio" not in page
     assert 'field("provenance", capsule.truth_label)' in page
     assert 'field("integrity", result.integrity_status)' in page

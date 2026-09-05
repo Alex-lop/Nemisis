@@ -52,12 +52,13 @@ The core records are:
   digest.
 - `HypothesisReceipt`: one candidate-blind base attempt, its fixed crash boundary and canonical
   rank, exact contract/base/provisional-capsule bindings, observation, and selection decision.
-- `MinimizationReceipt`: one fixed deletion trial for the selected one-action schedule, including
-  two fresh empty-schedule base confirmations and the stable necessity decision.
+- `MinimizationReceipt`: the no-crash control. Two fresh base worlds deliver the event twice with
+  no kill; both must end exactly once for the capsule to claim a crash/retry bug. (The field names
+  still carry the older "deletion" vocabulary; the semantics are exactly this control.)
 - `AttemptReceipt`: transport, integrity, process-group kill, two worker spawns, nonces, IPC
   sessions, durable snapshots, logs, and optional provider identifiers.
 - `ReproCapsule`: stable contract, event, selected semantic fault boundary, predicates, environment,
-  trusted-engine code digest, and the single-action deletion trace; volatile PIDs, paths,
+  trusted-engine code digest, and the no-crash control digest; volatile PIDs, paths,
   timestamps, full hunt attempts, and per-tree anchors stay outside it.
 - `CrashCheckResult`: both hypothesis receipts, exact role bindings and confirmations, independent
   execution/integrity axes, scoped verdict, engine digest, and root-relative artifacts.
@@ -80,16 +81,17 @@ Each world produces a real `AttemptReceipt`, wrapped by a canonically ranked
 `HypothesisReceipt`. After filtering to completed, integrity-valid duplicate observations, the
 smallest fixed catalog rank wins; parallel completion order is irrelevant. In the packaged buggy base,
 `effect-commit-v1` reproduces and `marker-commit-v1` does not. Their stable projections are stored
-in `hunt.json`, not in the capsule trace. CrashCheck then deletes the selected schedule's sole fault
-action in two fresh base worlds. Both empty-schedule replays finish exactly once, so deletion is
-rejected and the capsule binds only that stable one-action necessity decision. Volatile hunt and
-deletion receipts remain outside the content address. Five new base worlds reconfirm the retained
-witness before the candidate is materialized.
+in `hunt.json`, not in the capsule trace. CrashCheck then runs the no-crash control: two fresh base
+worlds deliver the event twice with no kill. Both end exactly once, so the duplicate is attributed
+to the crash and the capsule binds that stable control decision. Volatile hunt and control receipts
+remain outside the content address. Five new base worlds reconfirm the witness before the candidate
+is materialized.
 
 The hunt receipts are discovery evidence, not confirmation runs. A conclusive verdict separately
 requires five fresh attempts for every claimed role, with globally unique database, execution,
-worker, and IPC identities. The three-tree hero therefore records two hunt attempts, two deletion
-confirmations, then five base, five candidate, and five corrected confirmations.
+worker, and IPC identities. The three-tree hero therefore records two hunt attempts, two no-crash
+control worlds, then five base, five candidate, and five corrected confirmations, plus a commit
+sweep (census and one kill world per commit) for the corrected tree.
 
 ## CrashCheck kernel
 

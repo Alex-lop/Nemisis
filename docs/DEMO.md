@@ -43,7 +43,7 @@ printed path is relative (`.nemisis/…`) and no home directory appears on scree
 ## Expected output, verbatim
 
 `check` (the `capsule digest`, run id, and tree digests are the values your run prints; the
-verdict, summary, hypotheses, necessity, and timeline lines are exact):
+verdict, summary, hypotheses, control, and timeline lines are exact):
 
 ```text
 NEMISIS CRASHCHECK — LOCAL
@@ -55,7 +55,7 @@ capsule digest: <64 hex digits>
 engine code digest: <64 hex digits, pinned in docs/STATUS.md>
 engine source commit: <the commit you ran at>
 hypotheses: 2 run -> selected effect-commit (effect-commit-v1)
-necessity: deleted effect-commit; empty schedule was EXACTLY_ONCE in 2/2 fresh base worlds; deletion rejected; final fault actions 1/1 (fixture-only necessity proof)
+control: base delivered the event twice with no kill in 2/2 fresh worlds and ended exactly once; the duplicate needs the crash
 timeline: $25.00 durable -> SIGKILL -> fresh worker -> $50.00
 ```
 

@@ -102,11 +102,10 @@ kill/restart/replay evidence.
 
 `PATCH_FAILED_STILL_REPRODUCES` and exit `1` are the expected result. Before reading the candidate,
 the run executes two fixed base-only hypotheses in parallel and selects the reproducing
-`effect-commit` boundary. CrashCheck deletes that sole fault action and runs the empty schedule in
-two fresh base worlds; both end exactly once, so deletion is rejected and this one-action schedule
-is necessary for the fixture witness. This is not a general minimizer. It then records five fresh
-proof worlds per supplied tree, exact source bindings, durable probes, confirmed worker exits, new
-worker nonces, and final snapshots.
+`effect-commit` boundary, then runs the no-crash control: two fresh base worlds deliver the event
+twice with no kill and end exactly once, so the duplicate needs the crash. It then records five
+fresh proof worlds per supplied tree, exact source bindings, durable probes, confirmed worker
+exits, new worker nonces, and final snapshots, and sweeps every store commit of each claimed fix.
 CrashCheck does not run the fixture's ordinary repository tests; the benchmark measures those
 separately as context for the counterexample.
 
@@ -204,7 +203,7 @@ CrashCheck commands support `--json`; progress stays on stderr. Their exit polic
 | `2` | `EVIDENCE_INCOMPLETE`, `UNSUPPORTED_TARGET`, invalid input, or infrastructure failure |
 
 Every run writes a manifest beneath `.nemisis/runs/<run-id>/`. Attempt-bearing runs add a report;
-the golden path also records the full single-action deletion receipt. A pre-execution mapping
+the golden path also records the full no-crash control receipt. A pre-execution mapping
 failure instead adds `anchor-resolution.json`. Immutable repro assets live under
 `.nemisis/repros/double-credit/<capsule-digest>/`; runs that completed with valid integrity add the
 executable integration/fault regression. Stored paths are artifact-root-relative, so the bundle can move without retaining a

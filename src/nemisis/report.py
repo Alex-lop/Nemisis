@@ -93,17 +93,17 @@ report.</caption>
             attempt.observation.value for attempt in minimization.confirmations
         )
         reduction_outcome = (
-            "deletion rejected; the sole fault action is necessary for this fixture witness"
+            "the base handler is correct without a crash, so the duplicate needs the kill"
             if minimization.sole_fault_action_necessary_for_fixture
-            else "empty-schedule evidence incomplete; no minimization claim"
+            else "the no-kill delivery did not complete, so the duplicate is not attributed to the "
+            "crash"
         )
         minimization_section = f"""<section class="card" aria-labelledby="minimization">
-<h2 id="minimization">Single-action deletion / necessity check</h2>
-<p>Tried deleting the capsule's sole <code>{escape(minimization.removed_fault.value)}</code>
-fault action in {len(minimization.confirmations)} fresh base worlds. The empty schedule observed
-<code>{escape(observations)}</code>; {escape(reduction_outcome)}.</p>
-<p>No general minimizer claim. Stable deletion trace
-<code>{escape(minimization.trace_digest)}</code></p></section>"""
+<h2 id="minimization">No-crash control</h2>
+<p>Delivered the event twice with no kill in {len(minimization.confirmations)} fresh base worlds
+and observed <code>{escape(observations)}</code>: {escape(reduction_outcome)}. This separates a
+crash/retry bug from a handler that is simply wrong.</p>
+<p>Control receipt <code>{escape(minimization.trace_digest)}</code></p></section>"""
     else:
         minimization_section = ""
     proposal_section = _proposal_section(proposal) + _author_section(

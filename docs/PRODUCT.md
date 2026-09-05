@@ -38,9 +38,9 @@ The packaged fixture command is the audited shortcut because its contract is alr
    With `init --nemotron`, Nemotron proposes the catalog binding and expected single effect from
    the issue and base handler only; fixed rules accept or refuse the proposal before any draft.
 2. Before candidate materialization, run two fixed base hypotheses, select the canonical
-   reproducer, then delete its sole fault action in two fresh worlds. Proceed only when both
-   no-fault replays finish exactly once, proving this one-action schedule necessary for the
-   counterexample.
+   reproducer, then run the no-crash control: deliver the same event twice with no kill in two
+   fresh base worlds. Proceed only when both end exactly once, which shows the base's duplicate
+   needs the crash and is not a handler that is simply wrong.
 3. In every proof world, observe the durable `$25` effect, send process-group `SIGKILL`, confirm
    exit `-9`, start a fresh worker, and replay the byte-identical event.
 4. Require five fresh base and candidate worlds, plus five corrected worlds when supplied. A
@@ -50,7 +50,7 @@ The packaged fixture command is the audited shortcut because its contract is alr
    crash the base had; the sweep proves it did not introduce a new one (a handler that marks first
    and credits second loses the credit when killed between the two). Fixed rules emit the verdict
    from independently probed durable state.
-5. For the complete path, publish capsule, contract, event, hunt, single-action necessity receipt,
+5. For the complete path, publish capsule, contract, event, hunt, no-crash control receipt,
    metadata, regression, manifest, and report. `replay` evaluates the unchanged capsule against
    another exact tree.
 
@@ -116,7 +116,7 @@ code, repair generation, PR comments, and a hosted control plane.
 | --- | --- | --- | --- |
 | Real durable checkpoint, process-group kill, fresh replay worker, identical event | `sqlite_credit.py`, `crashcheck.py` | `test_sqlite_credit.py`, `test_crashcheck.py` | `LOCAL` / `FIXTURE`; [successful workflow at exact `f05ae921cf3d866f69adf8415d6d7bd52071bf37`](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355) |
 | Candidate-blind two-hypothesis selection before candidate materialization | `crashcheck.py` | candidate-invariance and hunt tests | Same exact workflow above |
-| Sole crash action is necessary for this capsule | `crashcheck.py`, `crash_models.py` | deletion, freshness, and tamper tests | Two fresh no-fault confirmations; not a general minimizer |
+| The base's duplicate needs the crash (no-crash control) | `crashcheck.py`, `crash_models.py` | control, freshness, and tamper tests | Two fresh no-kill base deliveries end exactly once |
 | Five fresh worlds per claimed tree and scoped verdicts | `crash_models.py`, `crashcheck.py` | role and verdict model/integration tests | Same exact workflow above |
 | Portable capsule, manifest, report, regression, and replay | `_publish`, `report.py` | artifact relocation/export/replay tests | Same workflow includes installed-wheel replay |
 | Composite GitHub Action | `action.yml` | local Action job plus release tests | GitHub-hosted at the same exact SHA; expected candidate rejection is exit 1 |
