@@ -78,6 +78,7 @@ _ENGINE_RESOURCES = (
     "crash_fixture.py",
     "crash_models.py",
     "crashcheck.py",
+    "display.py",
     "doctor.py",
     "hashing.py",
     "local.py",
@@ -136,6 +137,14 @@ class _Source:
 def initialize(issue: str | Path, target: str, base: str | Path, scenario_id: str) -> Path:
     """Write strict, non-executable project configuration under ``.nemisis``."""
     scenario = _scenario(scenario_id)
+    base_ref = str(base)
+    if base_ref.startswith("fixture:") and not base_ref.startswith(
+        f"fixture:{scenario.scenario_id}/"
+    ):
+        raise CrashCheckError(
+            f"base {base_ref} belongs to another scenario; pass --scenario "
+            f"{base_ref.removeprefix('fixture:').partition('/')[0]}"
+        )
     issue_path = Path(issue)
     if not issue_path.is_file() or issue_path.stat().st_size > 50_000:
         raise CrashCheckError("issue must be a UTF-8 file no larger than 50,000 bytes")
@@ -609,7 +618,7 @@ def _scenario(scenario_id: object) -> Scenario:
     try:
         return scenario_for(scenario_id)
     except ValueError as error:
-        raise CrashCheckError(str(error)) from error
+        raise CrashCheckError(f"UNSUPPORTED_TARGET: {error}") from error
 
 
 def _audited_contract(scenario: Scenario) -> RetryContract:
@@ -1180,6 +1189,42 @@ def _load_capsule(value: str | Path | ReproCapsule) -> ReproCapsule:
     return capsule
 
 
+def _require_scratch_untouched(root: Path, expected: set[Path]) -> None:
+    """Nothing but CrashCheck's own directories may appear in the run's scratch tree.
+
+    A handler that climbs out of its world with ``../../..`` lands here, in a directory every
+    sibling world shares; that is durable state no store commit made and a channel between
+    worlds, so the run stops without a verdict and names the entries.
+    """
+    extra = sorted(
+        path.relative_to(root).as_posix() for path in root.iterdir() if path not in expected
+    )
+    if extra:
+        raise CrashCheckError(
+            "the handler wrote outside its world into CrashCheck's scratch tree "
+            f"({', '.join(extra[:5])}); kill points are store commits, so no crash window around "
+            "that state can be reached and no verdict is issued"
+        )
+
+
+def _expected_run_entries(run_root: Path) -> set[Path]:
+    """The run's temporary root holds only the source copies and the phase roots it created."""
+    return {
+        path
+        for path in run_root.iterdir()
+        if path.name in {"source-base", "source-candidate", "source-corrected", "source"}
+        or (
+            path.is_dir()
+            and len(path.name) == 32
+            and all(c in "0123456789abcdef" for c in path.name)
+        )
+    }
+
+
+def _worlds(work_root: Path, count: int) -> list[Path]:
+    return [work_root / uuid.uuid4().hex for _ in range(count)]
+
+
 def _execute_confirmations(
     capsule: ReproCapsule,
     binding: AnchorBinding,
@@ -1188,6 +1233,7 @@ def _execute_confirmations(
     role: WorldRole,
 ) -> tuple[AttemptReceipt, ...]:
     work_root.mkdir(parents=True, exist_ok=False)
+    worlds = _worlds(work_root, CONFIRMATIONS)
 
     def one(index: int) -> AttemptReceipt:
         nonce = uuid.uuid4().hex
@@ -1196,7 +1242,7 @@ def _execute_confirmations(
                 capsule=capsule,
                 binding=binding,
                 source_tree=source,
-                work_dir=work_root / uuid.uuid4().hex,
+                work_dir=worlds[index - 1],
                 role=role,
                 execution_nonce=nonce,
             )
@@ -1212,7 +1258,10 @@ def _execute_confirmations(
 
     with ThreadPoolExecutor(max_workers=CONFIRMATIONS) as executor:
         futures = [executor.submit(one, index) for index in range(1, CONFIRMATIONS + 1)]
-        return tuple(future.result() for future in futures)
+        attempts = tuple(future.result() for future in futures)
+    _require_scratch_untouched(work_root, set(worlds))
+    _require_scratch_untouched(work_root.parent, _expected_run_entries(work_root.parent))
+    return attempts
 
 
 def _execute_sweep(
@@ -1224,19 +1273,21 @@ def _execute_sweep(
 ) -> CommitSweepReceipt:
     """Count the handler's store commits without a kill, then kill once after each of them."""
     work_root.mkdir(parents=True, exist_ok=False)
+    census_world = work_root / uuid.uuid4().hex
     nonce = uuid.uuid4().hex
     try:
         census = execute_no_fault_replay(
             capsule=capsule,
             binding=binding,
             source_tree=source,
-            work_dir=work_root / uuid.uuid4().hex,
+            work_dir=census_world,
             execution_nonce=nonce,
             role=role,
         )
     except Exception as error:  # Preserve a fail-closed census receipt.
         census = _failed_census(capsule, binding, role, nonce, type(error).__name__)
     attempts: tuple[AttemptReceipt, ...] = ()
+    sweep_worlds: list[str] = []
     if (
         census.execution_status is ExecutionStatus.COMPLETED
         and census.integrity_status is IntegrityStatus.VALID
@@ -1244,12 +1295,14 @@ def _execute_sweep(
 
         def one(index: int) -> AttemptReceipt:
             attempt_nonce = uuid.uuid4().hex
+            world = uuid.uuid4().hex
+            sweep_worlds.append(world)
             try:
                 return execute_attempt(
                     capsule=capsule,
                     binding=binding,
                     source_tree=source,
-                    work_dir=work_root / uuid.uuid4().hex,
+                    work_dir=work_root / world,
                     role=role,
                     execution_nonce=attempt_nonce,
                     kill_after_commit=index,
@@ -1269,6 +1322,10 @@ def _execute_sweep(
         with ThreadPoolExecutor(max_workers=max(1, len(kill_points))) as executor:
             futures = [executor.submit(one, index) for index in kill_points]
             attempts = tuple(future.result() for future in futures)
+    _require_scratch_untouched(
+        work_root, {census_world, *(work_root / name for name in sweep_worlds)}
+    )
+    _require_scratch_untouched(work_root.parent, _expected_run_entries(work_root.parent))
     return CommitSweepReceipt.with_digest(
         role=role,
         capsule_digest=capsule.digest,
@@ -1307,6 +1364,28 @@ def _failed_census(
     )
 
 
+def _schedule_split(
+    attempts: tuple[AttemptReceipt, ...], sweep: CommitSweepReceipt | None
+) -> str | None:
+    """A kill world's commits must be a prefix of the census's; otherwise the handler's schedule
+    depends on something CrashCheck cannot see (a file by absolute path, the wall clock, a
+    counter), and the sweep's kill points were derived from a schedule the kill worlds did not
+    run. Say so instead of judging."""
+    if sweep is None or sweep.census.execution_status is not ExecutionStatus.COMPLETED:
+        return None
+    census = sweep.census.first_delivery_operations
+    for attempt in attempts:
+        own = attempt.first_worker_operations
+        if attempt.execution_status is ExecutionStatus.COMPLETED and own != census[: len(own)]:
+            return (
+                f"a kill world committed {', '.join(own) or 'nothing'} where the census committed "
+                f"{', '.join(census) or 'nothing'}: the handler's commit schedule differs between "
+                "worlds, so it depends on state CrashCheck cannot see and no kill point can be "
+                "trusted. No verdict is issued."
+            )
+    return None
+
+
 def _claimed_fix_verdict(
     observation: CrashObservation,
     attempts: tuple[AttemptReceipt, ...],
@@ -1314,6 +1393,9 @@ def _claimed_fix_verdict(
     capsule: ReproCapsule,
 ) -> tuple[CrashVerdict, str]:
     """Decide for a candidate or corrected role from its boundary worlds and its sweep."""
+    split = _schedule_split(attempts, sweep)
+    if split is not None:
+        return CrashVerdict.EVIDENCE_INCOMPLETE, split
     boundary = _confirmed_observation(attempts, capsule)
     if observation is CrashObservation.DUPLICATE_EFFECT:
         verdict = CrashVerdict.PATCH_FAILED_STILL_REPRODUCES

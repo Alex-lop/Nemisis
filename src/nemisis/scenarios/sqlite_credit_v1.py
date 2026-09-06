@@ -121,6 +121,11 @@ class CreditStore(StoreBase):
 STORE_OPERATIONS = ("credit", "mark_processed", "credit_and_mark")
 
 
+def _next_rowid(rows: list[list[object]]) -> int:
+    """SQLite's next rowid for a table nothing ever deletes from: one past the largest."""
+    return max((row[0] for row in rows if isinstance(row[0], int)), default=0) + 1
+
+
 def normalize_event(value: object) -> Event:
     if not isinstance(value, Mapping) or set(value) != {"account_id", "amount_cents", "event_id"}:
         raise ValueError("event must contain exactly account_id, amount_cents, and event_id")
@@ -161,30 +166,32 @@ def tables(connection: sqlite3.Connection) -> Tables:
         "accounts": [
             list(row)
             for row in connection.execute(
-                "SELECT account_id, balance_cents FROM accounts ORDER BY account_id"
+                "SELECT rowid, account_id, balance_cents FROM accounts ORDER BY account_id"
             )
         ],
         "credit_ledger": [
             list(row)
             for row in connection.execute(
-                "SELECT event_id, account_id, amount_cents FROM credit_ledger ORDER BY id"
+                "SELECT id, event_id, account_id, amount_cents FROM credit_ledger ORDER BY id"
             )
         ],
         "processed_events": [
             list(row)
-            for row in connection.execute("SELECT event_id FROM processed_events ORDER BY event_id")
+            for row in connection.execute(
+                "SELECT rowid, event_id FROM processed_events ORDER BY event_id"
+            )
         ],
     }
 
 
 def snapshot(rows: Tables, event: Event) -> StateSnapshot:
     """The four numbers a receipt carries, projected from the whole-database content."""
-    balance = next((row[1] for row in rows["accounts"] if row[0] == event["account_id"]), None)
+    balance = next((row[2] for row in rows["accounts"] if row[1] == event["account_id"]), None)
     if not isinstance(balance, int):
         raise ValueError("the event's account row is missing")
-    ledger = [row for row in rows["credit_ledger"] if row[0] == event["event_id"]]
-    total = sum(row[2] for row in ledger if isinstance(row[2], int))
-    marker = sum(1 for row in rows["processed_events"] if row[0] == event["event_id"])
+    ledger = [row for row in rows["credit_ledger"] if row[1] == event["event_id"]]
+    total = sum(row[3] for row in ledger if isinstance(row[3], int))
+    marker = sum(1 for row in rows["processed_events"] if row[1] == event["event_id"])
     return StateSnapshot.with_digest(
         subject_total=balance,
         event_effect_count=len(ledger),
@@ -199,12 +206,15 @@ def apply(rows: Tables, operation: str, event: Event) -> Tables:
     after: Tables = {name: [list(row) for row in table] for name, table in rows.items()}
     if operation in {"credit", "credit_and_mark"}:
         for row in after["accounts"]:
-            if row[0] == account_id and isinstance(row[1], int) and isinstance(amount, int):
-                row[1] = row[1] + amount
-        after["credit_ledger"].append([event_id, account_id, amount])
+            if row[1] == account_id and isinstance(row[2], int) and isinstance(amount, int):
+                row[2] = row[2] + amount
+        after["credit_ledger"].append(
+            [_next_rowid(after["credit_ledger"]), event_id, account_id, amount]
+        )
     if operation in {"mark_processed", "credit_and_mark"}:
         after["processed_events"] = sorted(
-            [*after["processed_events"], [event_id]], key=lambda row: str(row[0])
+            [*after["processed_events"], [_next_rowid(after["processed_events"]), event_id]],
+            key=lambda row: str(row[1]),
         )
     if operation not in STORE_OPERATIONS:
         raise ValueError(f"unknown store operation {operation!r}")
@@ -243,6 +253,11 @@ def describe_final(final: StateSnapshot, event: Event) -> str:
     marker = f"{final.event_marker_count} marker"
     if final.event_effect_count == 0 and final.event_marker_count == 1:
         cause = f"{event_id} was marked processed but never credited, so the credit is lost"
+    elif final.event_effect_count == 1 and final.event_marker_count == 0:
+        cause = (
+            f"{event_id} was credited but never marked processed, so the next retry credits it "
+            "again"
+        )
     elif final.event_effect_count == 2:
         cause = f"{event_id} was credited twice"
     elif final.event_effect_count > 2:

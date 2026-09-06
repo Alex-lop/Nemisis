@@ -123,11 +123,48 @@ def test_store_base_requires_exact_types_and_reports_commits(tmp_path: Path) -> 
         worker.close()
 
 
+@pytest.mark.parametrize("scenario", list(SCENARIOS.values()), ids=lambda s: s.scenario_id)
+def test_every_scenario_pins_its_trees_and_models_its_store(
+    scenario: Scenario, tmp_path: Path
+) -> None:
+    """The invariants above hold for every registered scenario, not only the hero's."""
+    import inspect
+
+    for variant in scenario.variants:
+        materialized = materialize_fixture(scenario.ref(variant), tmp_path / variant)
+        assert materialized.tree_digest == scenario.tree_digests[variant]
+    public = {
+        name
+        for name in vars(scenario.store_class)
+        if not name.startswith("_") and callable(getattr(scenario.store_class, name))
+    }
+    committing = {
+        name
+        for name in public
+        if "_pause(" in inspect.getsource(getattr(scenario.store_class, name))
+    }
+    assert set(scenario.store_operations) == committing
+    event = load_event(scenario)
+    database = tmp_path / "seed.sqlite3"
+    _seed_database(scenario, database, event)
+    ledger = _ledger(scenario, database, event)
+    assert ledger.snapshot.subject_total == scenario.initial_total(event)
+    assert (ledger.snapshot.event_effect_count, ledger.snapshot.event_marker_count) == (0, 0)
+    for operation in scenario.store_operations:
+        after = scenario.apply(ledger.content["tables"], operation, event)  # type: ignore[arg-type]
+        predicted = scenario.snapshot(after, event)
+        assert predicted.digest != ledger.snapshot.digest
+    with pytest.raises(ValueError, match="unknown store operation"):
+        scenario.apply(ledger.content["tables"], "transfer", event)  # type: ignore[arg-type]
+
+
 def test_scenario_modules_are_trusted_engine_resources() -> None:
-    assert {
-        "scenario.py",
-        "scenarios/__init__.py",
-        "scenarios/sqlite_credit_v1.py",
-        "scenarios/sqlite_inventory_v1.py",
-    } <= set(_ENGINE_RESOURCES)
+    import nemisis
+
+    scenario_files = {
+        f"scenarios/{path.name}"
+        for path in (Path(nemisis.__file__).parent / "scenarios").glob("*.py")
+    }
+    assert scenario_files <= set(_ENGINE_RESOURCES)
+    assert {"scenario.py", "display.py", "sqlite_runner.py"} <= set(_ENGINE_RESOURCES)
     assert isinstance(CREDIT, Scenario)

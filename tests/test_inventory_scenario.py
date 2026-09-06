@@ -197,10 +197,12 @@ def test_init_accept_and_check_bind_an_inventory_contract(
     result = check(BUGGY, ATOMIC, config, mode="local")
     assert result.verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE
 
-    with pytest.raises(CrashCheckError, match="unsupported scenario"):
+    with pytest.raises(CrashCheckError, match="UNSUPPORTED_TARGET: unsupported scenario"):
         initialize(issue, TARGET, BUGGY, "sqlite-widgets-v9")
     with pytest.raises(CrashCheckError, match="pass --scenario sqlite-inventory-v1"):
         check(BUGGY, ATOMIC, "sqlite-credit-v1", mode="local")
+    with pytest.raises(CrashCheckError, match="pass --scenario sqlite-inventory-v1"):
+        initialize(issue, TARGET, BUGGY, "sqlite-credit-v1")
 
 
 ATOMIC_INVENTORY_MODULE = '''"""Inventory reservation handler, fixed."""

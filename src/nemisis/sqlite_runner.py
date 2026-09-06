@@ -18,6 +18,7 @@ import platform
 import signal
 import socket
 import sqlite3
+import stat
 import subprocess
 import sys
 import threading
@@ -312,6 +313,7 @@ def execute_attempt(
         )
         _make_sandbox(work_dir)
         initial_file_digest = _seed_database(scenario, database, event)
+        tree_before = _tree_state(root)
         timeline.append(_entry(TimelineState.DATABASE_SEEDED, database_id))
         ledger = _ledger(scenario, database, event)
         pre = ledger.snapshot
@@ -349,6 +351,8 @@ def execute_attempt(
         post_kill = _require_unchanged(
             scenario, database, event, ledger, "durable checkpoint changed after worker death"
         )
+        # The crashed world is scanned now, before the replay can tidy a flag away.
+        _require_only_the_store_wrote(work_dir, database)
         timeline.append(_entry(TimelineState.POST_KILL_PROBED, post_kill.digest))
 
         replay_worker = _spawn_worker(
@@ -378,10 +382,11 @@ def execute_attempt(
         timeline.append(_entry(TimelineState.EVENT_REPLAYED, capsule.event_digest))
         timeline.append(_entry(TimelineState.FINAL_STATE_PROBED, final.digest))
         tree_after = sha256_tree(root, ignored_names=frozenset({"__pycache__"}))
-        if tree_after != binding.tree_digest:
+        if tree_after != binding.tree_digest or _tree_state(root) != tree_before:
             raise _AttemptFailure(
                 ExecutionStatus.INTEGRITY_ERROR,
-                "source tree changed during trusted execution",
+                "source tree changed during trusted execution (a file, a bytecode cache, or a "
+                "directory the handler wrote into its own tree)",
                 integrity=IntegrityStatus.INVALID,
             )
         _require_only_the_store_wrote(work_dir, database)
@@ -390,7 +395,7 @@ def execute_attempt(
         )
     except _AttemptFailure as error:
         status, integrity, failure_detail = error.status, error.integrity, error.detail
-    except (OSError, sqlite3.Error, ValueError) as error:
+    except (OSError, sqlite3.Error, ValueError, TypeError) as error:
         status = ExecutionStatus.SETUP_ERROR
         integrity = IntegrityStatus.INCOMPLETE
         failure_detail = f"{type(error).__name__}: {str(error)[:800]}"
@@ -478,6 +483,7 @@ def execute_no_fault_replay(
         )
         _make_sandbox(work_dir)
         initial_file_digest = _seed_database(scenario, database, event)
+        tree_before = _tree_state(root)
         ledger = _ledger(scenario, database, event)
         initial = ledger.snapshot
 
@@ -503,6 +509,7 @@ def execute_no_fault_replay(
             event=event,
             ledger=ledger,
         )
+        _require_only_the_store_wrote(work_dir, database)
 
         replay_worker = _spawn_worker(
             scenario=scenario,
@@ -527,10 +534,11 @@ def execute_no_fault_replay(
             ledger=ledger,
         )
         tree_after = sha256_tree(root, ignored_names=frozenset({"__pycache__"}))
-        if tree_after != binding.tree_digest:
+        if tree_after != binding.tree_digest or _tree_state(root) != tree_before:
             raise _AttemptFailure(
                 ExecutionStatus.INTEGRITY_ERROR,
-                "source tree changed during no-fault replay",
+                "source tree changed during no-fault replay (a file, a bytecode cache, or a "
+                "directory the handler wrote into its own tree)",
                 integrity=IntegrityStatus.INVALID,
             )
         _require_only_the_store_wrote(work_dir, database)
@@ -539,7 +547,7 @@ def execute_no_fault_replay(
         )
     except _AttemptFailure as error:
         status, integrity, failure_detail = error.status, error.integrity, error.detail
-    except (OSError, sqlite3.Error, ValueError) as error:
+    except (OSError, sqlite3.Error, ValueError, TypeError) as error:
         status = ExecutionStatus.SETUP_ERROR
         integrity = IntegrityStatus.INCOMPLETE
         failure_detail = f"{type(error).__name__}: {str(error)[:800]}"
@@ -634,6 +642,48 @@ def _require_only_the_store_wrote(work_dir: Path, database: Path) -> None:
             "store commits, so crash windows around that state cannot be reached and no verdict "
             "is issued",
         )
+    status = database.stat()
+    if stat.S_IMODE(status.st_mode) != _SEED_MODE or _xattrs(database):
+        raise _AttemptFailure(
+            ExecutionStatus.UNSUPPORTED,
+            "the handler changed the database file's permission bits or extended attributes; "
+            "that is durable state no store commit made, so no verdict is issued",
+        )
+
+
+_SEED_MODE = 0o600
+
+
+def _xattrs(path: Path) -> list[str]:
+    listxattr = getattr(os, "listxattr", None)
+    if listxattr is None:
+        return []
+    try:
+        return sorted(listxattr(path))
+    except OSError:
+        return []
+
+
+def _tree_state(root: Path) -> str:
+    """Every entry in the bound tree, of any kind, with file bytes: the integrity comparison.
+
+    The binding digest ignores ``__pycache__`` and non-files so an identity is stable; the
+    integrity check ignores nothing, because a handler that stores a flag as a bytecode-cache
+    file or an empty directory in its own tree has durable state no store commit made.
+    """
+    entries: list[list[object]] = []
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        status = path.lstat()
+        kind = (
+            "file"
+            if stat.S_ISREG(status.st_mode)
+            else "dir"
+            if stat.S_ISDIR(status.st_mode)
+            else "other"
+        )
+        entries.append([relative, kind, sha256_bytes(path.read_bytes()) if kind == "file" else ""])
+    return sha256_json(entries)
 
 
 def _after_cleanup(
@@ -704,7 +754,10 @@ def _preflight(
 
 def _seed_database(scenario: Scenario, path: Path, event: Mapping[str, object]) -> str:
     normalized = scenario.normalize_event(event)
-    with sqlite3.connect(path) as connection:
+    path.touch(mode=_SEED_MODE, exist_ok=False)
+    os.chmod(path, _SEED_MODE)
+    connection = sqlite3.connect(path)
+    try:
         if connection.execute("PRAGMA journal_mode=WAL").fetchone() != ("wal",):
             raise sqlite3.OperationalError("SQLite WAL mode unavailable")
         connection.execute("PRAGMA synchronous=FULL")
@@ -713,9 +766,14 @@ def _seed_database(scenario: Scenario, path: Path, event: Mapping[str, object]) 
         scenario.seed(connection, normalized)
         connection.commit()
         connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
-        connection.execute("PRAGMA journal_mode=DELETE").fetchone()
-    if Path(f"{path}-wal").exists() or Path(f"{path}-shm").exists():
-        raise sqlite3.OperationalError("seed database retained WAL sidecars")
+    finally:
+        # The last connection's close checkpoints and removes the sidecars; the header keeps
+        # WAL mode, so the journal bits are constant for the whole run and no handler can use
+        # them as a flag, and the store's own connection flips nothing durable.
+        connection.close()
+    for sidecar in (Path(f"{path}-wal"), Path(f"{path}-shm")):
+        if sidecar.exists():
+            raise sqlite3.OperationalError("seed database retained WAL sidecars")
     return sha256_bytes(path.read_bytes())
 
 
@@ -754,15 +812,40 @@ def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -
                 )
             ]
             header = {
-                "application_id": connection.execute("PRAGMA application_id").fetchone()[0],
-                "user_version": connection.execute("PRAGMA user_version").fetchone()[0],
+                name: connection.execute(f"PRAGMA {name}").fetchone()[0] for name in _HEADER_PRAGMAS
             }
-            tables = scenario.tables(connection)
+            tables = {
+                name: [[_json_safe(value) for value in row] for row in rows]
+                for name, rows in scenario.tables(connection).items()
+            }
     except sqlite3.Error as error:
         raise _AttemptFailure(
             ExecutionStatus.PROBE_ERROR, f"read-only state probe failed ({error})"
         ) from error
     return {"header": header, "schema": schema, "tables": tables}
+
+
+# Every durable header field a handler can set and a store commit never changes: the journal
+# mode (the seed leaves WAL, and the store keeps it), the schema cookie, the free-page count (the
+# stores only insert and update), the page size and vacuum mode (a VACUUM changes them), the
+# encoding, and the two application fields.
+_HEADER_PRAGMAS = (
+    "application_id",
+    "auto_vacuum",
+    "encoding",
+    "freelist_count",
+    "journal_mode",
+    "page_size",
+    "schema_version",
+    "user_version",
+)
+
+
+def _json_safe(value: object) -> object:
+    """Row values the canonical JSON can carry; a BLOB is tagged by its hex, never dropped."""
+    if isinstance(value, bytes):
+        return {"blob": value.hex()}
+    return value
 
 
 def _ledger(scenario: Scenario, path: Path, event: Mapping[str, object]) -> _Ledger:
