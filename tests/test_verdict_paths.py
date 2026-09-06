@@ -162,7 +162,7 @@ def test_over_crediting_candidate_is_a_failed_patch_not_missing_evidence(
     assert {a.observation for a in candidate_attempts} == {CrashObservation.INVARIANT_FAILED}
     assert all(a.execution_status is ExecutionStatus.COMPLETED for a in candidate_attempts)
     final = candidate_attempts[0].final_snapshot
-    assert final is not None and final.account_balance_cents == 7_500
+    assert final is not None and final.subject_total == 7_500
     assert cli._exit_code(result.verdict) == 1
 
 
@@ -319,22 +319,22 @@ def test_a_delivery_that_leaves_the_marker_for_later_fails_the_census(
     """Red team, round two: a single no-crash delivery must already be exactly once. This handler
     credits and never marks, so it is caught at the boundary; the census rule is exercised directly
     on its receipts below."""
-    from nemisis.crash_models import CreditSnapshot, classify_delivery
+    from nemisis.crash_models import StateSnapshot, classify_delivery
 
-    once = CreditSnapshot.with_digest(
-        account_balance_cents=2500,
-        event_ledger_count=1,
-        event_ledger_total_cents=2500,
+    once = StateSnapshot.with_digest(
+        subject_total=2500,
+        event_effect_count=1,
+        event_effect_total=2500,
         event_marker_count=1,
     )
-    unmarked = CreditSnapshot.with_digest(
-        account_balance_cents=2500,
-        event_ledger_count=1,
-        event_ledger_total_cents=2500,
+    unmarked = StateSnapshot.with_digest(
+        subject_total=2500,
+        event_effect_count=1,
+        event_effect_total=2500,
         event_marker_count=0,
     )
-    assert classify_delivery(once, once, 2500) is CrashObservation.EXACTLY_ONCE
-    assert classify_delivery(unmarked, once, 2500) is CrashObservation.INVARIANT_FAILED
+    assert classify_delivery(once, once, 2500, 0) is CrashObservation.EXACTLY_ONCE
+    assert classify_delivery(unmarked, once, 2500, 0) is CrashObservation.INVARIANT_FAILED
     monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
     result = check(BUGGY_REF, _tree(tmp_path, "mark-later", MARK_ON_REDELIVERY), SCENARIO_ID)
     assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
@@ -389,7 +389,7 @@ def test_handler_that_never_credits_is_reported_with_its_no_crash_money(
     assert sweep.role is WorldRole.CANDIDATE
     assert sweep.census.first_delivery_operations == ("mark_processed",)
     first = sweep.census.first_delivery_snapshot
-    assert first is not None and (first.account_balance_cents, first.event_marker_count) == (0, 1)
+    assert first is not None and (first.subject_total, first.event_marker_count) == (0, 1)
     # The redelivery marks the event a second time and raises, so the census itself is incomplete.
     assert sweep.census.execution_status is ExecutionStatus.REPLAY_ERROR
     assert cli._exit_code(result.verdict) == 2
@@ -516,7 +516,7 @@ def test_candidate_that_never_marks_still_duplicates_and_fails(
     assert {a.observation for a in candidate_attempts} == {CrashObservation.DUPLICATE_EFFECT}
     final = candidate_attempts[0].final_snapshot
     assert final is not None
-    assert (final.account_balance_cents, final.event_ledger_count, final.event_marker_count) == (
+    assert (final.subject_total, final.event_effect_count, final.event_marker_count) == (
         5_000,
         2,
         0,
@@ -576,7 +576,7 @@ def test_raw_sql_judge_handler_is_told_the_one_line_change(
     assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
     assert cli._exit_code(result.verdict) == 2
     assert "changed the database without a single CreditStore commit" in result.summary
-    assert "balance 2500 cents, 1 ledger row(s), 1 marker" in result.summary
+    assert "balance $25.00, 1 credit row(s), 1 marker" in result.summary
     assert "no kill point exists inside that write" in result.summary
     assert "store.credit_and_mark(account_id, event_id, amount_cents)" in result.summary
     assert "docs/PRODUCT.md#the-store-api" in result.summary

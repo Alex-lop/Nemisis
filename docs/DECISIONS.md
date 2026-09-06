@@ -173,15 +173,20 @@ only instance is `nemisis.scenarios.sqlite_credit_v1.SCENARIO`. It supplies the 
 target, the packaged resources and their pinned digests, the SQLite schema and seed, the trusted
 store class the handler is handed, the delta each store operation may make (attribution), the
 event shape and its normalization, the checkpoint predicate, the effect delta the verdict rule
-uses, the repro directory name, and the words a summary prints. The kernel in `sqlite_credit.py`
+uses, the repro directory name, and the words a summary prints. The kernel in `sqlite_runner.py`
 and `crashcheck.py` reads the scenario and special-cases nothing; the worker is told the scenario
 id on its command line and constructs the scenario's store. The scenario modules are trusted
 engine resources and enter the engine code digest.
 
-This refactor changed no behavior: every packaged tree keeps its verdict, exit code, and summary,
-and the capsule and hunt contents are identical apart from the engine and runner digests that
-cover the moved bytes. What it does not yet do is make the receipts generic: `CreditSnapshot`,
-`classify_final`, the capsule's `account_id` and `amount_cents`, and `money()` in the CLI and
-report are still credit-shaped. A second scenario has to rename those honestly (a generic
-four-field snapshot whose names do not lie) and regenerate the hero; that is the next seam, not
-this one.
+The seam landed in two steps. The first changed no behavior: every packaged tree kept its verdict,
+exit code, and summary, and the capsule and hunt contents were identical apart from the engine and
+runner digests that cover the moved bytes. The second made the receipts generic so a second
+scenario could be honest: `CreditSnapshot` became `StateSnapshot` (`subject_total`,
+`event_effect_count`, `event_effect_total`, `event_marker_count`, names that say what they hold for
+a balance or a stock level), `amount_cents` on the receipts became the signed `effect_delta` one
+delivery makes, the capsule carries its whole `event` plus `event_id` and `effect_delta` instead of
+credit fields, `classify_final` takes the delta and the seeded total, the contract proposal names
+its scalar, and the CLI and report ask the scenario how to print its quantity. The runner was
+renamed `sqlite_runner.py` (runner id `sqlite-runner-v2`) because it no longer knows about credits.
+The committed hero was recorded under the old shape; `tests/test_static_hero.py` checks it
+structurally until it is regenerated at this engine.

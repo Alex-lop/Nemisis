@@ -10,11 +10,13 @@ from nemisis.crash_models import (
     CommitSweepReceipt,
     ContractProposal,
     CrashCheckResult,
-    CreditSnapshot,
     PatchProposal,
     ReproCapsule,
+    StateSnapshot,
 )
 from nemisis.models import ArtifactStatus, RunManifest
+from nemisis.scenario import Scenario
+from nemisis.scenarios import scenario_for
 
 
 def write_crash_report(
@@ -25,14 +27,15 @@ def write_crash_report(
     proposal: ContractProposal | None = None,
 ) -> None:
     """Render verdict-first static CrashCheck evidence with no executable controls."""
+    scenario = scenario_for(capsule.scenario_id)
     rows = "".join(
         "<tr>"
         f'<th scope="row"><code>{escape(attempt.receipt_id)}</code><br>'
         f"{escape(attempt.role.value)}</th>"
         f"<td>{escape(attempt.execution_status.value)}</td>"
         f"<td>{escape(attempt.observation.value)}</td>"
-        f"<td>{escape(_snapshot_text(attempt.checkpoint_snapshot))}</td>"
-        f"<td>{escape(_snapshot_text(attempt.final_snapshot))}</td>"
+        f"<td>{escape(_snapshot_text(attempt.checkpoint_snapshot, scenario))}</td>"
+        f"<td>{escape(_snapshot_text(attempt.final_snapshot, scenario))}</td>"
         "</tr>"
         for attempt in result.attempts
     )
@@ -109,7 +112,9 @@ crash/retry bug from a handler that is simply wrong.</p>
     proposal_section = _proposal_section(proposal) + _author_section(
         getattr(result, "candidate_author", None)
     )
-    sweep_section = "".join(_sweep_section(sweep) for sweep in getattr(result, "sweeps", ()))
+    sweep_section = "".join(
+        _sweep_section(sweep, scenario) for sweep in getattr(result, "sweeps", ())
+    )
     representative = next(
         (attempt for attempt in result.attempts if attempt.execution_status.value != "COMPLETED"),
         next(
@@ -135,7 +140,7 @@ crash/retry bug from a handler that is simply wrong.</p>
     first_spawn = next((spawn for spawn in representative.spawns if spawn.phase == "first"), None)
     replay_spawn = next((spawn for spawn in representative.spawns if spawn.phase == "replay"), None)
     checkpoint_story = (
-        f"<strong>Checkpoint reached.</strong> {escape(_snapshot_text(checkpoint))}"
+        f"<strong>Checkpoint reached.</strong> {escape(_snapshot_text(checkpoint, scenario))}"
         if representative.checkpoint_reached and checkpoint is not None
         else "<strong>Checkpoint not recorded.</strong>"
     )
@@ -167,7 +172,7 @@ crash/retry bug from a handler that is simply wrong.</p>
         else "<strong>Replay not acknowledged.</strong>"
     )
     final_story = (
-        f"<strong>Final state observed.</strong> {escape(_snapshot_text(final))}"
+        f"<strong>Final state observed.</strong> {escape(_snapshot_text(final, scenario))}"
         if final is not None
         else "<strong>Final state not recorded.</strong>"
     )
@@ -187,7 +192,10 @@ crash/retry bug from a handler that is simply wrong.</p>
         )
     )
     tone = _verdict_tone(result.verdict.value)
-    observed = money(final.account_balance_cents) if final is not None else "Not recorded"
+    observed = scenario.format_subject(final.subject_total) if final is not None else "Not recorded"
+    event = scenario.normalize_event(capsule.event)
+    expected = scenario.format_subject(scenario.initial_total(event) + capsule.effect_delta)
+    subject = escape(scenario.subject_noun)
     document = f"""<!doctype html>
 <html lang="en">
 <head>
@@ -243,11 +251,11 @@ body {{ padding: .75rem; }} .comparison {{ grid-template-columns: 1fr; }}
 <h1>{escape(_verdict_title(result.verdict.value))}</h1>
 <p class="summary">{escape(result.summary)}</p>
 <div class="comparison" aria-label="Expected and observed effects">
-<div class="measure"><span>Expected single effect</span>
-<strong>{money(capsule.amount_cents)}</strong>
+<div class="measure"><span>Expected {subject} after one delivery</span>
+<strong>{expected}</strong>
 <small>event <code>{escape(capsule.event_id)}</code></small></div>
 <span class="versus" aria-hidden="true">vs</span>
-<div class="measure"><span>Observed final balance</span><strong>{observed}</strong>
+<div class="measure"><span>Observed final {subject}</span><strong>{observed}</strong>
 <small>{escape(representative.observation.value)}</small></div>
 </div>
 <dl class="identity" aria-label="Evidence identity">
@@ -303,7 +311,7 @@ source-tree binding(s).</caption>
     path.write_text(document, encoding="utf-8")
 
 
-def _sweep_section(sweep: CommitSweepReceipt) -> str:
+def _sweep_section(sweep: CommitSweepReceipt, scenario: Scenario) -> str:
     operations = sweep.census.first_delivery_operations
     attempts = sweep.attempts
     role = escape(sweep.role.value)
@@ -312,8 +320,8 @@ def _sweep_section(sweep: CommitSweepReceipt) -> str:
         "<tr>"
         f'<th scope="row">after commit {attempt.kill_after_commit}</th>'
         f"<td><code>{escape(operations[attempt.kill_after_commit - 1])}</code></td>"
-        f"<td>{escape(_snapshot_text(attempt.checkpoint_snapshot))}</td>"
-        f"<td>{escape(_snapshot_text(attempt.final_snapshot))}</td>"
+        f"<td>{escape(_snapshot_text(attempt.checkpoint_snapshot, scenario))}</td>"
+        f"<td>{escape(_snapshot_text(attempt.final_snapshot, scenario))}</td>"
         f"<td>{escape(attempt.observation.value)}</td>"
         "</tr>"
         for attempt in attempts
@@ -371,10 +379,11 @@ def _proposal_section(proposal: ContractProposal | None) -> str:
 <p>Before any candidate was read, <code>{escape(receipt.model_id)}</code> on Token Factory \
 (<code>{escape(receipt.endpoint_region)}</code>) saw only the issue and the base handler \
 <code>{escape(proposal.handler_path)}</code>. It {escape(intent)} fault intent \
-<code>{escape(proposal.required_catalog_id)}</code> and proposed an expected single effect of \
-{money(proposal.proposed_amount_cents)}; deterministic code {escape(decision)} that against the \
-audited {money(proposal.audited_amount_cents)}. The model never sees candidate code and never \
-emits a verdict; this receipt is provenance for the contract, not crash evidence.</p>
+<code>{escape(proposal.required_catalog_id)}</code> and proposed \
+<code>{escape(proposal.scalar_name)}={proposal.proposed_scalar}</code>; deterministic code \
+{escape(decision)} that against the audited {proposal.audited_scalar}. The model never sees \
+candidate code and never emits a verdict; this receipt is provenance for the contract, not crash \
+evidence.</p>
 <dl class="identity" aria-label="Model call receipt">
 <div><dt>Truth label</dt><dd><code>{escape(label)}</code></dd></div>
 <div><dt>Prompt digest</dt><dd><code>{escape(receipt.prompt_template_digest)}</code></dd></div>
@@ -389,19 +398,13 @@ def _latency(value: int | None) -> str:
     return f"{value} ms" if value is not None else "n/a"
 
 
-def _snapshot_text(snapshot: CreditSnapshot | None) -> str:
+def _snapshot_text(snapshot: StateSnapshot | None, scenario: Scenario) -> str:
     if snapshot is None:
         return "not recorded"
     return (
-        f"{money(snapshot.account_balance_cents)} / ledger {snapshot.event_ledger_count} / "
-        f"marker {snapshot.event_marker_count}"
+        f"{scenario.format_subject(snapshot.subject_total)} / {scenario.effect_noun} rows "
+        f"{snapshot.event_effect_count} / marker {snapshot.event_marker_count}"
     )
-
-
-def money(cents: int) -> str:
-    sign = "-" if cents < 0 else ""
-    absolute = abs(cents)
-    return f"{sign}${absolute // 100:,}.{absolute % 100:02d}"
 
 
 def _transport_label(label: str) -> str:

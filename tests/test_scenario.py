@@ -14,7 +14,7 @@ from nemisis.crashcheck import _ENGINE_RESOURCES
 from nemisis.scenario import Scenario, StoreBase
 from nemisis.scenarios import SCENARIOS, scenario_for
 from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
-from nemisis.sqlite_credit import _probe, _seed_database
+from nemisis.sqlite_runner import _probe, _seed_database
 
 
 def test_registry_holds_the_credit_scenario_and_refuses_the_rest() -> None:
@@ -76,9 +76,9 @@ def test_seed_probe_and_checkpoint_predicate_describe_the_same_database(tmp_path
     _seed_database(CREDIT, database, event)
     seeded = _probe(CREDIT, database, event)
     assert (
-        seeded.account_balance_cents,
-        seeded.event_ledger_count,
-        seeded.event_ledger_total_cents,
+        seeded.subject_total,
+        seeded.event_effect_count,
+        seeded.event_effect_total,
         seeded.event_marker_count,
     ) == (0, 0, 0, 0)
     assert not CREDIT.checkpoint_reached(seeded, event, FaultBoundary.EFFECT_COMMIT)

@@ -25,10 +25,9 @@ from nemisis.crashcheck import (
 from nemisis.hashing import canonical_json, sha256_text
 from nemisis.nemotron import NemotronClient, NemotronContractGeneration
 from nemisis.scenarios import scenario_for
-from nemisis.sqlite_credit import AnchorResolutionError, bind_anchor
+from nemisis.sqlite_runner import AnchorResolutionError, bind_anchor
 
 PROPOSAL_NAME = "proposal.json"
-AMOUNT_BOUNDS = (1, 1_000_000)
 
 
 class ProposalError(ValueError):
@@ -101,9 +100,11 @@ def propose_contract(
     )
     proposer = client if client is not None else NemotronClient()
     generation = proposer.generate_contract(
-        issue_text, material, offered, {"amount_cents": AMOUNT_BOUNDS}
+        issue_text, material, offered, {scenario.scalar_name: scenario.scalar_bounds}
     )
     event = load_event(scenario)
+    audited_scalar = event[scenario.scalar_name]
+    assert isinstance(audited_scalar, int)
     proposal = ContractProposal.with_digest(
         scenario_id=scenario_id,
         target=target,
@@ -114,11 +115,12 @@ def propose_contract(
         offered_catalog_ids=offered,
         required_catalog_id=audited["fault_intent_id"],
         proposed_catalog_ids=generation.catalog_ids,
-        audited_amount_cents=event["amount_cents"],
-        proposed_amount_cents=generation.scalars["amount_cents"],
+        scalar_name=scenario.scalar_name,
+        audited_scalar=audited_scalar,
+        proposed_scalar=generation.scalars[scenario.scalar_name],
         accepted=(
             audited["fault_intent_id"] in generation.catalog_ids
-            and generation.scalars["amount_cents"] == event["amount_cents"]
+            and generation.scalars[scenario.scalar_name] == audited_scalar
         ),
         model_call=generation.receipt,
     )
@@ -143,18 +145,18 @@ def describe(proposal: ContractProposal) -> str:
     )
     amount = (
         "matches the audited event"
-        if proposal.proposed_amount_cents == proposal.audited_amount_cents
-        else f"differs from the audited {proposal.audited_amount_cents}"
+        if proposal.proposed_scalar == proposal.audited_scalar
+        else f"differs from the audited {proposal.audited_scalar}"
     )
     return (
         f"{receipt.model_id} ({receipt.truth_label.value}) {intent} fault intent "
-        f"{proposal.required_catalog_id}; amount_cents={proposal.proposed_amount_cents} {amount}; "
-        f"{len(proposal.proposed_catalog_ids)}/{len(proposal.offered_catalog_ids)} catalog IDs"
+        f"{proposal.required_catalog_id}; {proposal.scalar_name}={proposal.proposed_scalar} "
+        f"{amount}; {len(proposal.proposed_catalog_ids)}/{len(proposal.offered_catalog_ids)} "
+        "catalog IDs"
     )
 
 
 __all__ = [
-    "AMOUNT_BOUNDS",
     "PROPOSAL_NAME",
     "ProposalError",
     "Proposer",

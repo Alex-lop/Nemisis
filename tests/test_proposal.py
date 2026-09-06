@@ -96,7 +96,8 @@ def test_accepted_proposal_is_candidate_blind_and_sanitized(issue: Path) -> None
     assert result.handler_path == "app/credits.py"
     assert result.base_tree_digest == AUDITED["originating_base_tree_digest"]
     assert result.required_catalog_id == AUDITED["fault_intent_id"]
-    assert result.proposed_amount_cents == result.audited_amount_cents == 2_500
+    assert result.scalar_name == "amount_cents"
+    assert result.proposed_scalar == result.audited_scalar == 2_500
     messages = cast(list[dict[str, str]], fake.chat.completions.calls[0]["messages"])
     prompt = "\n".join(message["content"] for message in messages)
     assert "apply_credit" in prompt and "evt_1042" in prompt

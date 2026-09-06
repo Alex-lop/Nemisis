@@ -170,8 +170,9 @@ class ContractProposal(_DigestedModel):
     offered_catalog_ids: tuple[SafeId, ...] = Field(min_length=1, max_length=16)
     required_catalog_id: SafeId
     proposed_catalog_ids: tuple[SafeId, ...] = Field(min_length=1, max_length=16)
-    audited_amount_cents: int = Field(gt=0, le=1_000_000)
-    proposed_amount_cents: int = Field(ge=-1_000_000_000, le=1_000_000_000)
+    scalar_name: SafeId
+    audited_scalar: int = Field(ge=-1_000_000, le=1_000_000)
+    proposed_scalar: int = Field(ge=-1_000_000_000, le=1_000_000_000)
     accepted: bool
     model_call: ModelCallReceipt
 
@@ -191,7 +192,7 @@ class ContractProposal(_DigestedModel):
             raise ValueError("proposal receipt must record a schema-valid successful call")
         expected = (
             self.required_catalog_id in self.proposed_catalog_ids
-            and self.proposed_amount_cents == self.audited_amount_cents
+            and self.proposed_scalar == self.audited_scalar
         )
         if self.accepted is not expected:
             raise ValueError("proposal acceptance contradicts its proposed values")
@@ -290,25 +291,33 @@ class AnchorResolutionReceipt(_DigestedModel):
         return self
 
 
-class CreditSnapshot(_DigestedModel):
-    account_balance_cents: int
-    event_ledger_count: int = Field(ge=0)
-    event_ledger_total_cents: int
+class StateSnapshot(_DigestedModel):
+    """Four numbers the read-only probe reads for one event; the names say what they hold.
+
+    ``subject_total`` is the durable quantity the event changes (an account balance in cents, a
+    SKU's units on hand); ``event_effect_count`` and ``event_effect_total`` are the rows this
+    event's effect wrote and their summed signed change to the subject; ``event_marker_count`` is
+    whether the event is marked processed.
+    """
+
+    subject_total: int
+    event_effect_count: int = Field(ge=0)
+    event_effect_total: int
     event_marker_count: int = Field(ge=0, le=1)
 
 
 def classify_delivery(
-    first: CreditSnapshot, final: CreditSnapshot, amount_cents: int
+    first: StateSnapshot, final: StateSnapshot, effect_delta: int, initial_total: int
 ) -> CrashObservation:
     """A no-kill run is exactly once only if one delivery already is and the redelivery keeps it.
 
-    A handler that credits on the first delivery and leaves the marker for a redelivery is wrong on
-    the plain path even though the state after two deliveries looks right.
+    A handler that applies the effect on the first delivery and leaves the marker for a
+    redelivery is wrong on the plain path even though the state after two deliveries looks right.
     """
-    after_redelivery = classify_final(final, amount_cents)
+    after_redelivery = classify_final(final, effect_delta, initial_total)
     if after_redelivery is not CrashObservation.EXACTLY_ONCE:
         return after_redelivery
-    after_one = classify_final(first, amount_cents)
+    after_one = classify_final(first, effect_delta, initial_total)
     return (
         CrashObservation.EXACTLY_ONCE
         if after_one is CrashObservation.EXACTLY_ONCE
@@ -316,14 +325,31 @@ def classify_delivery(
     )
 
 
-def classify_final(snapshot: CreditSnapshot, amount_cents: int) -> CrashObservation:
-    """The only rule that turns a final durable state into an observation."""
-    state = _snapshot_state(snapshot)
-    if state[:3] == (amount_cents * 2, 2, amount_cents * 2):
+def classify_final(
+    snapshot: StateSnapshot, effect_delta: int, initial_total: int
+) -> CrashObservation:
+    """The only rule that turns a final durable state into an observation.
+
+    ``effect_delta`` is the signed change one delivery makes to the subject (+2500 cents, -2
+    units); ``initial_total`` is the seeded subject total. Exactly once is one effect row, the
+    subject moved by the delta, one marker; the duplicate is two effect rows and twice the delta,
+    marker or not; anything else broke the invariant.
+    """
+    state = _snapshot_state(snapshot, initial_total)
+    if state[:3] == (effect_delta * 2, 2, effect_delta * 2):
         return CrashObservation.DUPLICATE_EFFECT
-    if state == (amount_cents, 1, amount_cents, 1):
+    if state == (effect_delta, 1, effect_delta, 1):
         return CrashObservation.EXACTLY_ONCE
     return CrashObservation.INVARIANT_FAILED
+
+
+def _seeded(snapshot: StateSnapshot) -> bool:
+    """No effect rows, no effect, no marker: the state a fresh seed presents for this event."""
+    return (
+        snapshot.event_effect_count == 0
+        and snapshot.event_effect_total == 0
+        and snapshot.event_marker_count == 0
+    )
 
 
 class TimelineEntry(StrictModel):
@@ -372,7 +398,7 @@ class AttemptReceipt(_DigestedModel):
     post_execution_tree_digest: Sha256 | None = None
     environment_digest: Sha256
     event_digest: Sha256
-    amount_cents: int = Field(gt=0, le=1_000_000)
+    effect_delta: int = Field(ge=-1_000_000, le=1_000_000)
     initial_database_digest: Sha256
     initial_database_file_digest: Sha256 | None = None
     database_id: SafeId
@@ -381,10 +407,10 @@ class AttemptReceipt(_DigestedModel):
     ended_at: datetime
     timeline: tuple[TimelineEntry, ...] = Field(min_length=1, max_length=32)
     spawns: tuple[WorkerSpawnReceipt, ...] = Field(max_length=2)
-    pre_crash_snapshot: CreditSnapshot | None = None
-    checkpoint_snapshot: CreditSnapshot | None = None
-    post_kill_snapshot: CreditSnapshot | None = None
-    final_snapshot: CreditSnapshot | None = None
+    pre_crash_snapshot: StateSnapshot | None = None
+    checkpoint_snapshot: StateSnapshot | None = None
+    post_kill_snapshot: StateSnapshot | None = None
+    final_snapshot: StateSnapshot | None = None
     checkpoint_reached: bool
     first_worker_operations: tuple[SafeId, ...] = Field(default=(), max_length=MAX_SWEEP_COMMITS)
     kill_after_commit: int | None = Field(default=None, ge=1, le=MAX_SWEEP_COMMITS)
@@ -398,6 +424,8 @@ class AttemptReceipt(_DigestedModel):
     def evidence_is_coherent(self) -> AttemptReceipt:
         if self.ended_at < self.started_at:
             raise ValueError("attempt ended before it started")
+        if self.effect_delta == 0:
+            raise ValueError("an attempt must expect a nonzero effect")
         timestamps = [entry.timestamp for entry in self.timeline]
         if timestamps != sorted(timestamps):
             raise ValueError("attempt timeline is not ordered")
@@ -448,13 +476,13 @@ class AttemptReceipt(_DigestedModel):
             final = self.final_snapshot
             assert pre is not None and checkpoint is not None and post_kill is not None
             assert final is not None
-            if _snapshot_state(pre) != (0, 0, 0, 0):
+            if not _seeded(pre):
                 raise ValueError("completed attempt pre-crash snapshot is not the seeded state")
             if post_kill.digest != checkpoint.digest:
                 raise ValueError("completed attempt checkpoint changed after worker death")
             # The checkpoint is whatever the handler had committed when it was killed; only the
             # final state decides, through the one shared rule.
-            if self.observation is not classify_final(final, self.amount_cents):
+            if self.observation is not classify_final(final, self.effect_delta, pre.subject_total):
                 raise ValueError("completed attempt observation contradicts its final state")
         elif self.failure_detail is None:
             raise ValueError("incomplete attempt requires a failure detail")
@@ -483,7 +511,7 @@ class NoFaultReplayReceipt(_DigestedModel):
     post_execution_tree_digest: Sha256 | None = None
     environment_digest: Sha256
     event_digest: Sha256
-    amount_cents: int = Field(gt=0, le=1_000_000)
+    effect_delta: int = Field(ge=-1_000_000, le=1_000_000)
     initial_database_digest: Sha256
     initial_database_file_digest: Sha256 | None = None
     database_id: SafeId
@@ -495,15 +523,17 @@ class NoFaultReplayReceipt(_DigestedModel):
     first_delivery_commit_count: int = Field(default=0, ge=0)
     replay_operations: tuple[SafeId, ...] = Field(default=(), max_length=MAX_SWEEP_COMMITS)
     replay_commit_count: int = Field(default=0, ge=0)
-    initial_snapshot: CreditSnapshot | None = None
-    first_delivery_snapshot: CreditSnapshot | None = None
-    final_snapshot: CreditSnapshot | None = None
+    initial_snapshot: StateSnapshot | None = None
+    first_delivery_snapshot: StateSnapshot | None = None
+    final_snapshot: StateSnapshot | None = None
     failure_detail: str | None = Field(default=None, max_length=1_000)
 
     @model_validator(mode="after")
     def evidence_is_coherent(self) -> NoFaultReplayReceipt:
         if self.ended_at < self.started_at:
             raise ValueError("no-fault replay ended before it started")
+        if self.effect_delta == 0:
+            raise ValueError("a no-fault replay must expect a nonzero effect")
         if len({spawn.spawn_index for spawn in self.spawns}) != len(self.spawns):
             raise ValueError("no-fault worker spawn indices must be unique")
         if any(spawn.event_digest != self.event_digest for spawn in self.spawns):
@@ -531,10 +561,13 @@ class NoFaultReplayReceipt(_DigestedModel):
                 or self.final_snapshot is None
             ):
                 raise ValueError("completed no-fault replay lacks exact two-process evidence")
-            if _snapshot_state(self.initial_snapshot) != (0, 0, 0, 0):
+            if not _seeded(self.initial_snapshot):
                 raise ValueError("no-fault replay did not begin from the seeded state")
             if self.observation is not classify_delivery(
-                self.first_delivery_snapshot, self.final_snapshot, self.amount_cents
+                self.first_delivery_snapshot,
+                self.final_snapshot,
+                self.effect_delta,
+                self.initial_snapshot.subject_total,
             ):
                 raise ValueError("no-fault replay observation contradicts its delivery states")
             if not self.first_delivery_operations:
@@ -747,9 +780,9 @@ class ReproCapsule(_DigestedModel):
     engine_code_digest: Sha256
     scenario_id: SafeId
     scenario_version: SafeId
+    event: dict[str, str | int] = Field(min_length=1, max_length=16)
     event_id: SafeId
-    account_id: SafeId
-    amount_cents: int = Field(gt=0, le=1_000_000)
+    effect_delta: int = Field(ge=-1_000_000, le=1_000_000)
     event_digest: Sha256
     fault_intent_id: SafeId
     fault_boundary: FaultBoundary
@@ -764,13 +797,12 @@ class ReproCapsule(_DigestedModel):
 
     @model_validator(mode="after")
     def event_and_predicates_are_canonical(self) -> ReproCapsule:
-        event = {
-            "account_id": self.account_id,
-            "amount_cents": self.amount_cents,
-            "event_id": self.event_id,
-        }
-        if sha256_json(event) != self.event_digest:
+        if sha256_json(self.event) != self.event_digest:
             raise ValueError("capsule event digest mismatch")
+        if self.event.get("event_id") != self.event_id:
+            raise ValueError("capsule event_id differs from its event")
+        if self.effect_delta == 0:
+            raise ValueError("a capsule must expect a nonzero effect")
         if len(set(self.predicate_ids)) != len(self.predicate_ids):
             raise ValueError("predicate IDs must be unique")
         return self
@@ -1147,11 +1179,11 @@ def _validate_conclusive_hypothesis_receipts(
         raise ValueError("selected hypothesis contradicts deterministic ordering")
 
 
-def _snapshot_state(snapshot: CreditSnapshot) -> tuple[int, int, int, int]:
+def _snapshot_state(snapshot: StateSnapshot, initial_total: int) -> tuple[int, int, int, int]:
     return (
-        snapshot.account_balance_cents,
-        snapshot.event_ledger_count,
-        snapshot.event_ledger_total_cents,
+        snapshot.subject_total - initial_total,
+        snapshot.event_effect_count,
+        snapshot.event_effect_total,
         snapshot.event_marker_count,
     )
 
@@ -1197,7 +1229,7 @@ def _validate_sweeps(result: CrashCheckResult) -> None:
                 or world.event_digest != reference.event_digest
                 or world.environment_digest != reference.environment_digest
                 or world.initial_database_digest != reference.initial_database_digest
-                or world.amount_cents != reference.amount_cents
+                or world.effect_delta != reference.effect_delta
                 or (
                     world.execution_status is ExecutionStatus.COMPLETED
                     and world.post_execution_tree_digest != binding.tree_digest

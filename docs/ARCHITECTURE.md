@@ -40,7 +40,8 @@ The core records are:
 - `RetryContract`: accepted issue/base/target binding and trusted event, fault, probe, and predicate
   catalog IDs.
 - `ContractProposal`: the candidate-blind Nemotron receipt for a draft: offered and proposed catalog
-  IDs, audited and proposed `amount_cents`, the fixed accept/refuse decision, and the sanitized
+  IDs, the audited and proposed scalar (`amount_cents` for the credit scenario), the fixed
+  accept/refuse decision, and the sanitized
   `ModelCallReceipt`. Provenance only; it is outside the capsule address.
 - `PatchProposal`: the receipt for a candidate tree whose handler Nemotron wrote (`propose-patch`):
   base and candidate tree digests, module digest, rationale, and the sanitized `ModelCallReceipt`.

@@ -141,7 +141,7 @@ untrusted input and is judged like any other.
 
 | Claim | Implementation | Executable check | Truth / exact evidence |
 | --- | --- | --- | --- |
-| Real durable checkpoint, process-group kill, fresh replay worker, identical event | `sqlite_credit.py`, `crashcheck.py` | `test_sqlite_credit.py`, `test_crashcheck.py` | `LOCAL` / `FIXTURE`; [successful workflow at exact `f05ae921cf3d866f69adf8415d6d7bd52071bf37`](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355) |
+| Real durable checkpoint, process-group kill, fresh replay worker, identical event | `sqlite_runner.py`, `crashcheck.py` | `test_sqlite_runner.py`, `test_crashcheck.py` | `LOCAL` / `FIXTURE`; [successful workflow at exact `f05ae921cf3d866f69adf8415d6d7bd52071bf37`](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355) |
 | Candidate-blind two-hypothesis selection before candidate materialization | `crashcheck.py` | candidate-invariance and hunt tests | Same exact workflow above |
 | The base's duplicate needs the crash (no-crash control) | `crashcheck.py`, `crash_models.py` | control, freshness, and tamper tests | Two fresh no-kill base deliveries end exactly once |
 | Five fresh worlds per claimed tree and scoped verdicts | `crash_models.py`, `crashcheck.py` | role and verdict model/integration tests | Same exact workflow above |

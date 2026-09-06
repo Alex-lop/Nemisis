@@ -26,7 +26,7 @@ from nemisis.crash_models import (
 from nemisis.crashcheck import _audited_contract, _seal_capsule
 from nemisis.hashing import canonical_json, sha256_bytes
 from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
-from nemisis.sqlite_credit import (
+from nemisis.sqlite_runner import (
     AnchorResolutionError,
     _AttemptFailure,
     _attributed_probe,
@@ -134,7 +134,7 @@ def test_attributed_probe_accepts_only_the_delta_its_operation_explains(tmp_path
 
 
 def test_store_requires_exact_types_and_values(tmp_path: Path) -> None:
-    from nemisis.sqlite_credit import CreditStore
+    from nemisis.sqlite_runner import CreditStore
 
     event: dict[str, str | int] = {
         "account_id": "acct_7",

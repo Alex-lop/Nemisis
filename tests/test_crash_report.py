@@ -8,11 +8,11 @@ from nemisis.crash_models import (
     CrashCheckResult,
     CrashObservation,
     CrashVerdict,
-    CreditSnapshot,
     ExecutionStatus,
     FaultBoundary,
     IntegrityStatus,
     ReproCapsule,
+    StateSnapshot,
     WorldRole,
 )
 from nemisis.models import TruthLabel
@@ -27,18 +27,18 @@ def _render_report(
     minimization_irreducible: bool | None = None,
 ) -> str:
     checkpoint = cast(
-        CreditSnapshot,
+        StateSnapshot,
         SimpleNamespace(
-            account_balance_cents=1234,
-            event_ledger_count=1,
+            subject_total=1234,
+            event_effect_count=1,
             event_marker_count=0,
         ),
     )
     final = cast(
-        CreditSnapshot,
+        StateSnapshot,
         SimpleNamespace(
-            account_balance_cents=1234 if fixed else 2468,
-            event_ledger_count=1 if fixed else 2,
+            subject_total=1234 if fixed else 2468,
+            event_effect_count=1 if fixed else 2,
             event_marker_count=1,
         ),
     )
@@ -164,9 +164,10 @@ def _render_report(
     capsule = cast(
         ReproCapsule,
         SimpleNamespace(
+            scenario_id="sqlite-credit-v1",
+            event={"account_id": "acct_report", "amount_cents": 1234, "event_id": "evt_report"},
             event_id="evt_report",
-            account_id="acct_report",
-            amount_cents=1234,
+            effect_delta=1234,
             truth_label=TruthLabel.FIXTURE if complete else TruthLabel.LOCAL,
             digest="capsule-digest<&",
             model_dump=lambda **_: {"event_id": "evt_report"},
@@ -185,16 +186,16 @@ def test_crash_report_uses_receipt_and_capsule_values_and_escapes_html(tmp_path:
     assert "LOCAL EXECUTION · AUDITED FIXTURE CAPSULE" in report
     assert '<main id="main" class="verdict-fail">' in report
     assert "Patch still duplicates the effect" in report
-    assert "Expected single effect</span>\n<strong>$12.34</strong>" in report
+    assert "Expected balance after one delivery</span>\n<strong>$12.34</strong>" in report
     assert "Observed final balance</span><strong>$24.68</strong>" in report
-    assert "<strong>Checkpoint reached.</strong> $12.34 / ledger 1 / marker 0" in report
+    assert "<strong>Checkpoint reached.</strong> $12.34 / credit rows 1 / marker 0" in report
     assert "<strong>Kill recorded.</strong> Signal 15; first worker PID 101" in report
     assert "process group 201, exit -15" in report
     assert "<strong>Fresh replay worker.</strong> Spawn 2; PID 102, process group 202" in report
     assert "replay-worker&lt;&amp;" in report
     assert "replay-session&lt;&amp;" in report
     assert "<strong>Replay acknowledged.</strong> Event <code>evt_report</code>" in report
-    assert "<strong>Final state observed.</strong> $24.68 / ledger 2 / marker 1" in report
+    assert "<strong>Final state observed.</strong> $24.68 / credit rows 2 / marker 1" in report
     assert f"<code>{'a' * 40}</code>" in report
     assert f"<code>{'e' * 64}</code>" in report
     assert "2-hypothesis candidate-blind hunt" in report
@@ -222,7 +223,7 @@ def test_crash_report_uses_receipt_and_capsule_values_and_escapes_html(tmp_path:
     assert "evt_1042" not in report
     assert "Five fresh worlds" not in report
     assert "byte-identical" not in report
-    assert report.index("Expected single effect") < report.index("Independent result axes")
+    assert report.index("Expected balance after") < report.index("Independent result axes")
 
 
 def test_fixed_report_prominently_shows_exact_observed_effect_in_green(tmp_path: Path) -> None:
@@ -230,7 +231,7 @@ def test_fixed_report_prominently_shows_exact_observed_effect_in_green(tmp_path:
 
     assert '<main id="main" class="verdict-pass">' in report
     assert "Fix proven for this capsule only" in report
-    assert "Expected single effect</span>\n<strong>$12.34</strong>" in report
+    assert "Expected balance after one delivery</span>\n<strong>$12.34</strong>" in report
     assert "Observed final balance</span><strong>$12.34</strong>" in report
     assert "EXACTLY_ONCE" in report
 

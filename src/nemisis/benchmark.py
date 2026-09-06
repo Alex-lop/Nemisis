@@ -47,7 +47,7 @@ from nemisis.crashcheck import CONFIRMATIONS, _write_exact, check
 from nemisis.hashing import canonical_json, sha256_json, sha256_tree
 from nemisis.local import _run_process, source_commit
 from nemisis.models import Sha256, StrictModel, TruthLabel
-from nemisis.sqlite_credit import runner_environment_digest
+from nemisis.sqlite_runner import runner_environment_digest
 
 SCHEMA_VERSION: Literal["nemisis.crashcheck.benchmark.v1"] = "nemisis.crashcheck.benchmark.v1"
 PYTEST_TIMEOUT_SECONDS = 30
@@ -689,7 +689,7 @@ def _validate_attempts(
         ):
             raise BenchmarkError("CrashCheck attempt evidence is incomplete or inconsistent")
         state = _state_from_attempt(attempt)
-        amount = capsule.amount_cents
+        amount = capsule.effect_delta
         expected_state = (
             StateCounts(
                 balance_cents=amount * 2,
@@ -714,9 +714,9 @@ def _state_from_attempt(attempt: AttemptReceipt) -> StateCounts:
     if snapshot is None:
         raise BenchmarkError("CrashCheck attempt has no final state")
     return StateCounts(
-        balance_cents=snapshot.account_balance_cents,
-        ledger_count=snapshot.event_ledger_count,
-        ledger_total_cents=snapshot.event_ledger_total_cents,
+        balance_cents=snapshot.subject_total,
+        ledger_count=snapshot.event_effect_count,
+        ledger_total_cents=snapshot.event_effect_total,
         marker_count=snapshot.event_marker_count,
     )
 

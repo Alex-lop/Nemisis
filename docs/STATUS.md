@@ -16,7 +16,7 @@ Committed hero evidence (regenerated 2026-09-05 at the current engine):
 
 Current tree:
 
-- engine code digest: `47d9a6cfb9161b2e6e60da2faf01c6ec5e90a6cbd3a00432fb6ba95cde033682`
+- engine code digest: `564cb3f5f46e0f7773ed3e0b861842d62fd2bfd91b2ba32266748d03872338b6`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
@@ -78,7 +78,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 376 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 377 tests, and package build: pass locally on
   Python 3.12.13 (the suite also passed on 3.13 during development);
 - exact engine CI for the committed hero: [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355);
 - exact measured-source CI: [successful run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096);
@@ -134,5 +134,5 @@ Option A is retained: one excellent SQLite slice, made undeniable. In order:
 A second scenario or backend is still deferred. The overnight work chose depth over width: the
 kernel now proves a patch survives every kill point of its own, not only the base's, and thirty
 adversarial handlers were run against it. The seam a second scenario needs (schema, store class,
-seed, probe, and final-state rule are the hardcoded points in `sqlite_credit.py` and
+seed, probe, and final-state rule are the hardcoded points in `sqlite_runner.py` and
 `crash_models.py`) is listed in `MORNING.md`.

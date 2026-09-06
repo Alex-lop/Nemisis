@@ -36,7 +36,7 @@ from nemisis.crashcheck import (
 from nemisis.hashing import canonical_json, sha256_text, sha256_tree
 from nemisis.nemotron import NemotronClient, NemotronPatchGeneration
 from nemisis.scenarios import scenario_for
-from nemisis.sqlite_credit import AnchorResolutionError, bind_anchor
+from nemisis.sqlite_runner import AnchorResolutionError, bind_anchor
 
 RECEIPTS_DIR = Path(".nemisis/agent-patches")
 _ALLOWED_IMPORT_MODULES = frozenset({"typing", "__future__"})

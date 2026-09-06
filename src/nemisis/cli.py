@@ -6,7 +6,7 @@ import argparse
 import json
 import os
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -19,8 +19,8 @@ from nemisis.fixture import FIXTURE_ID
 from nemisis.hashing import canonical_json
 from nemisis.local import LocalVerification, verify_local
 from nemisis.models import RuntimeMode
-from nemisis.report import money
-from nemisis.scenarios import SCENARIOS
+from nemisis.scenario import Scenario
+from nemisis.scenarios import SCENARIOS, scenario_for
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -192,6 +192,7 @@ def _print_crash_result(
     print(f"engine code digest: {result.engine_code_digest}")
     if result.engine_source_commit is not None:
         print(f"engine source commit: {result.engine_source_commit}")
+    quantity = _subject_formatter(result)
     if result.hypothesis_receipts:
         selected = next(
             (receipt for receipt in result.hypothesis_receipts if receipt.selected), None
@@ -221,7 +222,7 @@ def _print_crash_result(
         points = ", ".join(
             f"#{attempt.kill_after_commit} -> "
             + (
-                money(attempt.final_snapshot.account_balance_cents)
+                quantity(attempt.final_snapshot.subject_total)
                 if attempt.final_snapshot is not None
                 else "no final state"
             )
@@ -268,8 +269,8 @@ def _print_crash_result(
             )
             print(
                 "timeline: "
-                f"{money(checkpoint.account_balance_cents)} durable{kill_point} -> "
-                f"{signal_name} -> fresh worker -> {money(final.account_balance_cents)}"
+                f"{quantity(checkpoint.subject_total)} durable{kill_point} -> "
+                f"{signal_name} -> fresh worker -> {quantity(final.subject_total)}"
             )
     author = getattr(result, "candidate_author", None)
     if author is not None:
@@ -285,6 +286,26 @@ def _print_crash_result(
     for name, path in sorted(result.artifacts.items()):
         projected = Path(path) if artifact_root is None else artifact_root / path
         print(f"{name}: {projected}")
+
+
+def _subject_formatter(result: CrashCheckResult) -> Callable[[int], str]:
+    """The scenario's own words for its quantity; the scenario id travels with every binding."""
+    scenario_id = next(
+        (
+            item.scenario_id
+            for group in (
+                getattr(result, "bindings", ()),
+                getattr(result, "anchor_resolutions", ()),
+            )
+            for item in group
+        ),
+        None,
+    )
+    try:
+        scenario: Scenario = scenario_for(scenario_id)
+    except ValueError:
+        return str
+    return scenario.format_subject
 
 
 def _print_doctor(result: DoctorResult, *, as_json: bool) -> None:
