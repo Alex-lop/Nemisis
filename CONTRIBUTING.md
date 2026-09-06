@@ -27,8 +27,8 @@ installed-wheel smoke test.
 ## Adding a candidate to the zoo
 
 Drop a tree under `src/nemisis/fixtures/sqlite_credit_v1/trees/<name>/app/credits.py`, register the
-ref and its tree digest in `src/nemisis/crash_fixture.py`, and add its expected verdict to
-`tests/test_verdict_paths.py`. A candidate that earns `FIX_PROVEN_FOR_THIS_CAPSULE` while being
+variant and its tree digest in `src/nemisis/scenarios/sqlite_credit_v1.py`, and add its expected
+verdict to `tests/test_verdict_paths.py`. A candidate that earns `FIX_PROVEN_FOR_THIS_CAPSULE` while being
 wrong is the most valuable contribution possible; please open it as an issue even if you cannot
 fix the checker.
 

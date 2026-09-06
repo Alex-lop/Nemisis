@@ -41,9 +41,9 @@ generated tests.
 
 ## CrashCheck trusted computing base
 
-The controller, fixed hypothesis catalog, `CreditStore` adapter, socket protocol, read-only probe,
-contract/capsule validators, source binder, SQLite runner, verdict derivation, and report renderer
-are trusted. Their installed source/catalog bytes are hashed into `engine_code_digest`, which is
+The controller, fixed hypothesis catalog, the scenario object and its `CreditStore` adapter,
+socket protocol, read-only probe, contract/capsule validators, source binder, SQLite runner, verdict
+derivation, and report renderer are trusted. Their installed source/catalog bytes are hashed into `engine_code_digest`, which is
 required by both the capsule and result and validated before replay execution. Issue text,
 repository content, refs, config imports, capsules, IPC messages, logs, and provider responses are
 untrusted inputs.
