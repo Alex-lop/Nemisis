@@ -1,5 +1,5 @@
-# Publishes the site (site/) and the committed evidence viewer (docs/assets/crashcheck-hero/) to
-# GitHub Pages.
+# Publishes the site (index.html + site/) and the committed evidence viewer
+# (docs/assets/crashcheck-hero/) to GitHub Pages.
 #
 # The viewer is static and fail-closed: it renders no claim unless the committed manifest and
 # benchmark validate in the browser, exactly as when served locally with `python -m http.server`.
@@ -15,6 +15,7 @@ on:
   push:
     branches: [main]
     paths:
+      - index.html
       - site/**
       - docs/assets/crashcheck-hero/**
       - docs/assets/nemisis-banner-dark.png
