@@ -4,13 +4,13 @@ Updated 2026-09-05 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
 
 ## Exact identities
 
-Committed hero evidence (regenerated 2026-09-05 at the current engine):
+Committed hero evidence (regenerated 2026-09-06 at the current engine):
 
-- measured clean source: `305667621ef62b49523d35a65491dafbf1e779ef`
-- evidence/viewer publication: the commit that follows it on `overnight/hardening`
-- engine code digest at that source: `99ef8ade38b4616013c2d68ca9b1e8179041bf6b03aae0a58ef54928a59e1c22`
-- capsule digest: `41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c`
-- benchmark result digest: `fe98afd23f5a5bf3b5cf72a52a42558f2fb6d32ef848392fbc7f6dd26b51f8ef`
+- measured clean source: `14cd428bc01d4da44bf05758afb1cb69188479f5`
+- evidence/viewer publication: the commit that follows it on `overnight2/docs-and-evidence`
+- engine code digest at that source: `39833a5640c9053727c7832d6b72ddb14b4684d21b04daa6043c4e32c182e53b`
+- capsule digest: `800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572`
+- benchmark result digest: `b7a03b92f4bb8cf1a6416b1e88a4ff26d62f74d5fd172607d800c8aab7b96643`
 - the capsule and benchmark digests are bound to CPython 3.12.13 / SQLite 3.53.1 / Darwin arm64
   through the runner environment digest; only the engine code digest is environment-independent
 
