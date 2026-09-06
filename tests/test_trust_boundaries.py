@@ -23,12 +23,13 @@ from nemisis.crashcheck import (
 )
 from nemisis.hashing import canonical_json
 from nemisis.models import TruthLabel
+from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
 
 
 def _relabelled(
     *, accepted: bool, label: TruthLabel, issue_digest: str | None = None
 ) -> RetryContract:
-    audited = _audited_contract()
+    audited = _audited_contract(CREDIT)
     values = audited.model_dump(mode="python", exclude={"digest", "accepted", "truth_label"})
     if issue_digest is not None:
         values["issue_digest"] = issue_digest
@@ -134,7 +135,9 @@ def test_replay_refuses_an_untrusted_fork_before_spawning_any_worker(
     monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
     _pull_request_event(tmp_path, monkeypatch, forked=True)
 
-    result = replay(_seal_capsule(_audited_contract()), MISLEADING_GREEN_REF, role="candidate")
+    result = replay(
+        _seal_capsule(_audited_contract(CREDIT)), MISLEADING_GREEN_REF, role="candidate"
+    )
 
     assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
     assert "untrusted fork" in result.summary
@@ -163,6 +166,8 @@ def test_same_repository_pull_request_is_not_treated_as_a_fork(
     monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
     _pull_request_event(tmp_path, monkeypatch, forked=False)
 
-    result = replay(_seal_capsule(_audited_contract()), MISLEADING_GREEN_REF, role="candidate")
+    result = replay(
+        _seal_capsule(_audited_contract(CREDIT)), MISLEADING_GREEN_REF, role="candidate"
+    )
 
     assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES

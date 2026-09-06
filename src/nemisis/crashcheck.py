@@ -21,14 +21,7 @@ from io import BytesIO
 from pathlib import Path
 from typing import cast
 
-from nemisis.crash_fixture import (
-    BUGGY_REF,
-    FIXTURE_REFS,
-    SCENARIO_ID,
-    load_contract,
-    load_event,
-    materialize_fixture,
-)
+from nemisis.crash_fixture import FIXTURE_REFS, load_contract, load_event, materialize_fixture
 from nemisis.crash_models import (
     REQUIRED_CONFIRMATIONS,
     AnchorBinding,
@@ -59,8 +52,10 @@ from nemisis.doctor import doctor
 from nemisis.hashing import canonical_json, sha256_bytes, sha256_json, sha256_text, sha256_tree
 from nemisis.local import source_commit
 from nemisis.models import TruthLabel
-from nemisis.report import money, write_crash_report
+from nemisis.report import write_crash_report
 from nemisis.safety import safe_destination, safe_relative_path
+from nemisis.scenario import Scenario
+from nemisis.scenarios import SCENARIOS, scenario_for
 from nemisis.sqlite_credit import (
     RUNNER_ID,
     RUNNER_VERSION,
@@ -88,6 +83,9 @@ _ENGINE_RESOURCES = (
     "models.py",
     "report.py",
     "safety.py",
+    "scenario.py",
+    "scenarios/__init__.py",
+    "scenarios/sqlite_credit_v1.py",
     "sqlite_credit.py",
     "fixtures/sqlite_credit_v1/contract.json",
     "fixtures/sqlite_credit_v1/event.json",
@@ -133,8 +131,7 @@ class _Source:
 
 def initialize(issue: str | Path, target: str, base: str | Path, scenario_id: str) -> Path:
     """Write strict, non-executable project configuration under ``.nemisis``."""
-    if scenario_id != SCENARIO_ID:
-        raise CrashCheckError(f"unsupported scenario: {scenario_id}")
+    scenario = _scenario(scenario_id)
     issue_path = Path(issue)
     if not issue_path.is_file() or issue_path.stat().st_size > 50_000:
         raise CrashCheckError("issue must be a UTF-8 file no larger than 50,000 bytes")
@@ -144,7 +141,7 @@ def initialize(issue: str | Path, target: str, base: str | Path, scenario_id: st
         raise CrashCheckError("issue must be valid UTF-8") from error
     with tempfile.TemporaryDirectory(prefix="nemisis-init-") as temporary:
         source = _materialize_source(base, Path(temporary) / "base")
-        audited = _audited_contract()
+        audited = _audited_contract(scenario)
         accepted = (
             target == audited.target
             and source.ref == audited.originating_base_ref
@@ -152,6 +149,7 @@ def initialize(issue: str | Path, target: str, base: str | Path, scenario_id: st
             and sha256_text(issue_text) == audited.issue_digest
         )
         contract = _contract(
+            scenario,
             base_ref=source.ref,
             base_digest=source.tree_digest,
             issue_digest=sha256_text(issue_text),
@@ -570,7 +568,7 @@ def replay(
             if world_role is WorldRole.BASE:
                 if observation is CrashObservation.DUPLICATE_EFFECT:
                     verdict = CrashVerdict.BUG_REPRODUCED
-                    detail = _summary(verdict)
+                    detail = _summary(verdict, sealed)
                 elif observation is CrashObservation.EXACTLY_ONCE:
                     verdict = CrashVerdict.EVIDENCE_INCOMPLETE
                     detail = (
@@ -603,9 +601,17 @@ def replay(
         )
 
 
-def _audited_contract() -> RetryContract:
-    raw = load_contract()
+def _scenario(scenario_id: object) -> Scenario:
+    try:
+        return scenario_for(scenario_id)
+    except ValueError as error:
+        raise CrashCheckError(str(error)) from error
+
+
+def _audited_contract(scenario: Scenario) -> RetryContract:
+    raw = load_contract(scenario)
     return _contract(
+        scenario,
         base_ref=raw["originating_base_ref"],
         base_digest=raw["originating_base_tree_digest"],
         issue_digest=raw["issue_digest"],
@@ -616,6 +622,7 @@ def _audited_contract() -> RetryContract:
 
 
 def _contract(
+    scenario: Scenario,
     *,
     base_ref: str,
     base_digest: str,
@@ -624,7 +631,7 @@ def _contract(
     accepted: bool,
     truth_label: TruthLabel,
 ) -> RetryContract:
-    raw = load_contract()
+    raw = load_contract(scenario)
     return RetryContract.with_digest(
         scenario_id=raw["scenario_id"],
         originating_base_ref=base_ref,
@@ -645,15 +652,20 @@ def _contract(
 def _contract_for_check(scenario: str | Path | RetryContract, base: _Source) -> RetryContract:
     if isinstance(scenario, RetryContract):
         contract = scenario
-    elif str(scenario) == SCENARIO_ID:
-        audited = _audited_contract()
-        if base.ref == BUGGY_REF and base.tree_digest == audited.originating_base_tree_digest:
+    elif str(scenario) in SCENARIOS:
+        registered = SCENARIOS[str(scenario)]
+        audited = _audited_contract(registered)
+        if (
+            base.ref == registered.buggy_ref
+            and base.tree_digest == audited.originating_base_tree_digest
+        ):
             contract = audited
         elif base.config_bytes is not None:
             _, contract = _load_config_bytes(base.config_bytes)
         else:
             raise CrashCheckError(
-                "exact supplied base has no accepted .nemisis/config.json for sqlite-credit-v1"
+                "exact supplied base has no accepted .nemisis/config.json for "
+                f"{registered.scenario_id}"
             )
     elif Path(str(scenario)).is_file():
         _, contract = _load_config(Path(str(scenario)))
@@ -670,7 +682,7 @@ def _proposal_for_check(
     scenario: str | Path | RetryContract, contract: RetryContract
 ) -> ContractProposal | None:
     """Attach the sidecar Nemotron proposal only for a config path whose sibling binds it."""
-    if isinstance(scenario, RetryContract) or str(scenario) == SCENARIO_ID:
+    if isinstance(scenario, RetryContract) or str(scenario) in SCENARIOS:
         return None
     return _load_proposal(Path(str(scenario)).with_name("proposal.json"), contract)
 
@@ -743,7 +755,7 @@ def _load_proposal(path: Path, contract: RetryContract) -> ContractProposal | No
 def _contract_for_capsule(
     capsule: ReproCapsule, exported_contract: Path | None = None
 ) -> RetryContract:
-    audited = _audited_contract()
+    audited = _audited_contract(_scenario(capsule.scenario_id))
     if exported_contract is not None and exported_contract.exists():
         contract = _load_exported_contract(exported_contract)
         if not contract.accepted or contract.digest != capsule.contract_digest:
@@ -777,7 +789,8 @@ def _load_exported_contract(path: Path) -> RetryContract:
 
 
 def _validate_capsule_contract(capsule: ReproCapsule, contract: RetryContract) -> None:
-    event = load_event()
+    scenario = _scenario(capsule.scenario_id)
+    event = load_event(scenario)
     expected = {
         "contract_digest": capsule.contract_digest == contract.digest,
         "originating_base_tree_digest": (
@@ -796,7 +809,7 @@ def _validate_capsule_contract(capsule: ReproCapsule, contract: RetryContract) -
         "runner_version": capsule.runner_version == RUNNER_VERSION,
         "environment_digest": capsule.environment_digest == runner_environment_digest(),
         "initial_database_digest": (
-            capsule.initial_database_digest == initial_database_digest(event)
+            capsule.initial_database_digest == initial_database_digest(scenario, event)
         ),
         "truth_label": capsule.truth_label is contract.truth_label,
     }
@@ -914,8 +927,9 @@ def _seal_capsule(
     fault_boundary: FaultBoundary = FaultBoundary.EFFECT_COMMIT,
     minimization_trace: tuple[str, ...] = (),
 ) -> ReproCapsule:
-    event = load_event()
-    if contract.event_digest != load_contract()["event_digest"]:
+    scenario = _scenario(contract.scenario_id)
+    event = load_event(scenario)
+    if contract.event_digest != load_contract(scenario)["event_digest"]:
         raise CrashCheckError("contract event digest differs from the trusted catalog")
     return ReproCapsule.with_digest(
         contract_digest=contract.digest,
@@ -934,7 +948,7 @@ def _seal_capsule(
         runner_id=RUNNER_ID,
         runner_version=RUNNER_VERSION,
         environment_digest=runner_environment_digest(),
-        initial_database_digest=initial_database_digest(event),
+        initial_database_digest=initial_database_digest(scenario, event),
         minimization_trace=minimization_trace,
         truth_label=contract.truth_label,
     )
@@ -1150,7 +1164,7 @@ def _load_capsule(value: str | Path | ReproCapsule) -> ReproCapsule:
         capsule = ReproCapsule.model_validate_json(path.read_bytes())
     except ValueError as error:
         raise CrashCheckError("capsule failed strict schema or digest validation") from error
-    if capsule.scenario_id != SCENARIO_ID:
+    if capsule.scenario_id not in SCENARIOS:
         raise CrashCheckError("capsule scenario is unsupported")
     return capsule
 
@@ -1293,7 +1307,7 @@ def _claimed_fix_verdict(
     if observation is CrashObservation.DUPLICATE_EFFECT:
         verdict = CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
         if boundary is CrashObservation.DUPLICATE_EFFECT or sweep is None:
-            return verdict, _summary(verdict)
+            return verdict, _summary(verdict, capsule)
         return verdict, _sweep_summary(sweep, capsule)
     if observation is CrashObservation.INVARIANT_FAILED:
         verdict = CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
@@ -1302,7 +1316,7 @@ def _claimed_fix_verdict(
         return verdict, _sweep_summary(sweep, capsule)
     if observation is CrashObservation.EXACTLY_ONCE and sweep is not None:
         verdict = CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE
-        return verdict, _summary(verdict) + " " + _sweep_summary(sweep, capsule)
+        return verdict, _summary(verdict, capsule) + " " + _sweep_summary(sweep, capsule)
     if sweep is not None and boundary is CrashObservation.EXACTLY_ONCE:
         return CrashVerdict.EVIDENCE_INCOMPLETE, _sweep_summary(sweep, capsule)
     return CrashVerdict.EVIDENCE_INCOMPLETE, _unsupported_observation_summary(observation, attempts)
@@ -1336,7 +1350,7 @@ def _unreached_summary(
         return base
     return (
         f"{base} {observed}; the crash test could not run because the handler never reached the "
-        "credit, so this is reported, not judged."
+        f"{_scenario(capsule.scenario_id).effect_noun}, so this is reported, not judged."
     )
 
 
@@ -1392,18 +1406,8 @@ def _sweep_summary(sweep: CommitSweepReceipt, capsule: ReproCapsule) -> str:
 
 
 def _describe_final(final: CreditSnapshot, capsule: ReproCapsule) -> str:
-    money_now = money(final.account_balance_cents)
-    rows = f"{final.event_ledger_count} ledger row{'s' if final.event_ledger_count != 1 else ''}"
-    marker = f"{final.event_marker_count} marker"
-    if final.event_ledger_count == 0 and final.event_marker_count == 1:
-        cause = f"{capsule.event_id} was marked processed but never credited, so the credit is lost"
-    elif final.event_ledger_count == 2:
-        cause = f"{capsule.event_id} was credited twice"
-    elif final.event_ledger_count > 2:
-        cause = f"{capsule.event_id} was credited {final.event_ledger_count} times"
-    else:
-        cause = "the final state matches neither exactly-once nor the capsule's duplicate shape"
-    return f"{money_now} instead of {money(capsule.amount_cents)} ({rows}, {marker}): {cause}"
+    scenario = _scenario(capsule.scenario_id)
+    return scenario.describe_final(final, capsule.event_id, capsule.amount_cents)
 
 
 def _confirmed_observation(
@@ -1514,9 +1518,10 @@ def _publish(
         raise CrashCheckError(
             "capsule one-action deletion trace differs from its fixture necessity receipt"
         )
+    scenario = _scenario(capsule.scenario_id)
     root = _absolute(Path(os.environ.get("NEMISIS_ARTIFACT_ROOT", ".nemisis")))
     run_relative = Path("runs") / run_id
-    repro_relative = Path("repros") / "double-credit" / capsule.digest
+    repro_relative = Path("repros") / scenario.repro_dir / capsule.digest
     run_dir = root / run_relative
     repro_dir = root / repro_relative
     artifacts = {
@@ -1596,7 +1601,7 @@ def _publish(
     _ensure_directory(repro_dir, exist_ok=True)
     _write_exact(repro_dir / "capsule.json", canonical_json(capsule) + b"\n")
     _write_exact(repro_dir / "contract.json", canonical_json(contract) + b"\n")
-    _write_exact(repro_dir / "event.json", canonical_json(load_event()) + b"\n")
+    _write_exact(repro_dir / "event.json", canonical_json(load_event(scenario)) + b"\n")
     metadata = {
         "capsule_digest": capsule.digest,
         "contract_digest": contract.digest,
@@ -1889,7 +1894,7 @@ def _require_contract_label(contract: RetryContract) -> None:
     """Only the packaged contract is FIXTURE; accepted user contracts are LOCAL; drafts PLANNED."""
     if not contract.accepted:
         expected = TruthLabel.PLANNED
-    elif contract.digest == _audited_contract().digest:
+    elif contract.digest == _audited_contract(_scenario(contract.scenario_id)).digest:
         expected = TruthLabel.FIXTURE
     else:
         expected = TruthLabel.LOCAL
@@ -2071,24 +2076,9 @@ def _run_id(mode: str) -> str:
     return f"{mode}-{datetime.now(UTC):%Y%m%dT%H%M%S}-{uuid.uuid4().hex[:8]}"
 
 
-def _summary(verdict: CrashVerdict) -> str:
-    return {
-        CrashVerdict.BUG_REPRODUCED: (
-            "The base replayed evt_1042 to a durable +$50 duplicate effect."
-        ),
-        CrashVerdict.PATCH_FAILED_STILL_REPRODUCES: (
-            "The candidate replayed evt_1042 to a durable +$50 duplicate effect."
-        ),
-        CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN: (
-            "The candidate completed every world in a state that is neither exactly-once nor "
-            "the capsule's duplicate."
-        ),
-        CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE: (
-            "Five fresh worlds ended at exactly +$25, one ledger effect, and one marker."
-        ),
-        CrashVerdict.EVIDENCE_INCOMPLETE: "Required crash evidence was incomplete.",
-        CrashVerdict.UNSUPPORTED_TARGET: "The supplied target is unsupported.",
-    }[verdict]
+def _summary(verdict: CrashVerdict, capsule: ReproCapsule) -> str:
+    scenario = _scenario(capsule.scenario_id)
+    return scenario.verdict_summary(verdict, capsule.event_id, capsule.amount_cents)
 
 
 __all__ = ["accept_contract", "check", "initialize", "replay"]

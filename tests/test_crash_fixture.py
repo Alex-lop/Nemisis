@@ -52,7 +52,7 @@ class MemoryStore:
 
 def test_audited_contract_issue_and_event_are_exactly_bound() -> None:
     contract = load_contract()
-    event = load_event()
+    event = cast(FixtureEvent, load_event())
 
     assert sha256_json(contract) == AUDITED_CONTRACT_DIGEST
     assert sha256_text(load_issue()) == contract["issue_digest"]
@@ -95,7 +95,7 @@ def test_materializes_exact_tree_and_preserves_expected_duplicate_behavior(
         runpy.run_path(str(result.path / "app/credits.py"))["apply_credit"],
     )
     store = MemoryStore()
-    event = load_event()
+    event = cast(FixtureEvent, load_event())
     handler(store, event)
     handler(store, event)
     assert store.balance_cents == expected_balance
@@ -126,7 +126,7 @@ def test_raw_sql_tree_cannot_run_the_in_memory_unit_test(tmp_path: Path) -> None
     )
 
     with pytest.raises(AttributeError, match="_database"):
-        handler(MemoryStore(), load_event())
+        handler(MemoryStore(), cast(FixtureEvent, load_event()))
 
 
 def test_rejects_a_changed_packaged_contract(
@@ -134,8 +134,8 @@ def test_rejects_a_changed_packaged_contract(
 ) -> None:
     original = crash_fixture._resource_bytes
 
-    def changed_contract(relative: str) -> bytes:
-        return b"{}" if relative == "contract.json" else original(relative)
+    def changed_contract(scenario: object, relative: str) -> bytes:
+        return b"{}" if relative == "contract.json" else original(scenario, relative)  # type: ignore[arg-type]
 
     monkeypatch.setattr(crash_fixture, "_resource_bytes", changed_contract)
     with pytest.raises(ValueError, match="contract bytes changed"):

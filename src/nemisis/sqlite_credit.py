@@ -1,4 +1,10 @@
-"""Trusted SQLite crash supervisor and worker for ``sqlite-credit-v1``."""
+"""Trusted SQLite crash supervisor and worker.
+
+The kernel: seed a database, spawn the handler in its own process group, pause at every store
+commit, kill at the capsule's boundary, replay in a fresh worker, and probe durable state through
+read-only connections. Everything about *which* database, store, event, and rule is a
+:class:`nemisis.scenario.Scenario`; the kernel reads it and never special-cases one.
+"""
 
 from __future__ import annotations
 
@@ -49,37 +55,12 @@ from nemisis.crash_models import (
 from nemisis.hashing import canonical_json, sha256_bytes, sha256_json, sha256_tree
 from nemisis.models import TruthLabel
 from nemisis.safety import safe_relative_path
+from nemisis.scenario import MAX_MESSAGE_BYTES, Event, Scenario, StoreBase, worker_send
+from nemisis.scenarios import scenario_for
+from nemisis.scenarios.sqlite_credit_v1 import STORE_REMEDY, CreditStore
 
 RUNNER_ID = "sqlite-credit-runner-v1"
-# What a handler that wrote around the store is told, on the first run, in the summary and report.
-STORE_REMEDY = (
-    "Kill points are store commits, so a write the store did not make has no kill point and "
-    "earns no verdict. Express the same fix through the store: store.credit_and_mark(account_id, "
-    "event_id, amount_cents) commits the credit and its marker together in one durable "
-    "transaction; store.processed(event_id), store.credit(...), and store.mark_processed(event_id) "
-    "are the three-step form; see docs/PRODUCT.md#the-store-api"
-)
 RUNNER_VERSION = "1"
-MAX_MESSAGE_BYTES = 8_192
-_SCENARIO_ID = "sqlite-credit-v1"
-_ADAPTER_ID = "credit-store-v1"
-_FAULT_ID = "first-credit-effect-commit-v1"
-_PROBE_ID = "credit-state-v1"
-_PREDICATE_ID = "single-credit-and-marker-v1"
-_TARGET = "app.credits:apply_credit"
-_SCHEMA = """
-CREATE TABLE accounts(
-    account_id TEXT PRIMARY KEY,
-    balance_cents INTEGER NOT NULL
-);
-CREATE TABLE credit_ledger(
-    id INTEGER PRIMARY KEY,
-    event_id TEXT NOT NULL,
-    account_id TEXT NOT NULL,
-    amount_cents INTEGER NOT NULL
-);
-CREATE TABLE processed_events(event_id TEXT PRIMARY KEY);
-"""
 
 
 class _AttemptFailure(RuntimeError):
@@ -162,18 +143,9 @@ class _Spawn:
             self.drains = (_Drain(self.process.stdout), _Drain(self.process.stderr))
 
 
-def initial_database_digest(event: Mapping[str, object]) -> str:
+def initial_database_digest(scenario: Scenario, event: Mapping[str, object]) -> str:
     """Digest the trusted logical seed independently from SQLite file layout."""
-    normalized = _event(event)
-    return sha256_json(
-        {
-            "account": {"account_id": normalized["account_id"], "balance_cents": 0},
-            "journal_mode": "WAL",
-            "schema": _SCHEMA,
-            "schema_version": "1",
-            "synchronous": "FULL",
-        }
-    )
+    return sha256_json(scenario.seed_identity(scenario.normalize_event(event)))
 
 
 def runner_environment_digest() -> str:
@@ -192,6 +164,17 @@ def runner_environment_digest() -> str:
     )
 
 
+def capsule_event(capsule: ReproCapsule) -> Event:
+    """The exact event a capsule replays, in the shape its scenario validates."""
+    return scenario_for(capsule.scenario_id).normalize_event(
+        {
+            "account_id": capsule.account_id,
+            "amount_cents": capsule.amount_cents,
+            "event_id": capsule.event_id,
+        }
+    )
+
+
 def bind_anchor(
     contract: RetryContract,
     source_tree: Path,
@@ -202,13 +185,17 @@ def bind_anchor(
     """Resolve exactly one accepted synchronous two-argument handler."""
     if not contract.accepted:
         raise ValueError("retry contract has not been accepted")
+    try:
+        scenario = scenario_for(contract.scenario_id)
+    except ValueError:
+        scenario = None
     if (
-        contract.scenario_id != _SCENARIO_ID
-        or contract.adapter_id != _ADAPTER_ID
-        or contract.fault_intent_id != _FAULT_ID
-        or contract.probe_id != _PROBE_ID
-        or contract.predicate_ids != (_PREDICATE_ID,)
-        or contract.target != _TARGET
+        scenario is None
+        or contract.adapter_id != scenario.adapter_id
+        or contract.fault_intent_id != scenario.fault_intent_id
+        or contract.probe_id != scenario.probe_id
+        or contract.predicate_ids != (scenario.predicate_id,)
+        or contract.target != scenario.target
     ):
         raise ValueError("retry contract uses an unsupported trusted catalog binding")
     root = source_tree.resolve()
@@ -322,21 +309,21 @@ def execute_attempt(
     database_id = f"db-{uuid.uuid4().hex}"
     tree_after: str | None = None
     root = source_tree.resolve()
-    event = {
-        "account_id": capsule.account_id,
-        "amount_cents": capsule.amount_cents,
-        "event_id": capsule.event_id,
-    }
     database = work_dir.resolve() / f"{database_id}.sqlite3"
     try:
-        _preflight(capsule, binding, root, work_dir.resolve(), execution_nonce, timeout_seconds)
+        scenario = _scenario(capsule)
+        event = capsule_event(capsule)
+        _preflight(
+            scenario, capsule, binding, root, work_dir.resolve(), execution_nonce, timeout_seconds
+        )
         work_dir.mkdir(parents=True, exist_ok=False)
-        initial_file_digest = _seed_database(database, event)
+        initial_file_digest = _seed_database(scenario, database, event)
         timeline.append(_entry(TimelineState.DATABASE_SEEDED, database_id))
-        pre = _probe(database, event)
+        pre = _probe(scenario, database, event)
         timeline.append(_entry(TimelineState.PRE_CRASH_PROBED))
 
         first = _spawn_worker(
+            scenario=scenario,
             capsule=capsule,
             binding=binding,
             source_tree=root,
@@ -349,6 +336,7 @@ def execute_attempt(
         timeline.append(_entry(TimelineState.FIRST_WORKER_STARTED, str(first.process.pid)))
         _expect_hello(first, capsule, execution_nonce, timeout_seconds)
         checkpoint = _wait_for_checkpoint(
+            scenario,
             first,
             database,
             event,
@@ -362,8 +350,8 @@ def execute_attempt(
         _kill_and_wait(first, timeout_seconds)
         kill_signal = signal.SIGKILL
         timeline.append(_entry(TimelineState.WORKER_KILLED, str(first.process.returncode)))
-        post_kill = _probe(database, event)
-        _require_others_untouched(database, event)
+        post_kill = _probe(scenario, database, event)
+        _require_others_untouched(scenario, database, event)
         if post_kill.digest != checkpoint.digest:
             raise _AttemptFailure(
                 ExecutionStatus.INTEGRITY_ERROR,
@@ -373,6 +361,7 @@ def execute_attempt(
         timeline.append(_entry(TimelineState.POST_KILL_PROBED, post_kill.digest))
 
         replay_worker = _spawn_worker(
+            scenario=scenario,
             capsule=capsule,
             binding=binding,
             source_tree=root,
@@ -385,6 +374,7 @@ def execute_attempt(
         timeline.append(_entry(TimelineState.REPLAY_WORKER_STARTED, str(replay_worker.process.pid)))
         _expect_hello(replay_worker, capsule, execution_nonce, timeout_seconds)
         final = _finish_replay(
+            scenario,
             replay_worker,
             capsule,
             execution_nonce,
@@ -404,7 +394,7 @@ def execute_attempt(
                 integrity=IntegrityStatus.INVALID,
             )
         _require_only_the_store_wrote(work_dir.resolve(), database)
-        observation = _observation(final, capsule.amount_cents)
+        observation = classify_final(final, scenario.effect_delta(event))
     except _AttemptFailure as error:
         status, integrity, failure_detail = error.status, error.integrity, error.detail
     except (OSError, sqlite3.Error, ValueError) as error:
@@ -486,19 +476,19 @@ def execute_no_fault_replay(
     failure_detail: str | None = None
     database_id = f"db-{uuid.uuid4().hex}"
     root = source_tree.resolve()
-    event = {
-        "account_id": capsule.account_id,
-        "amount_cents": capsule.amount_cents,
-        "event_id": capsule.event_id,
-    }
     database = work_dir.resolve() / f"{database_id}.sqlite3"
     try:
-        _preflight(capsule, binding, root, work_dir.resolve(), execution_nonce, timeout_seconds)
+        scenario = _scenario(capsule)
+        event = capsule_event(capsule)
+        _preflight(
+            scenario, capsule, binding, root, work_dir.resolve(), execution_nonce, timeout_seconds
+        )
         work_dir.mkdir(parents=True, exist_ok=False)
-        initial_file_digest = _seed_database(database, event)
-        initial = _probe(database, event)
+        initial_file_digest = _seed_database(scenario, database, event)
+        initial = _probe(scenario, database, event)
 
         first = _spawn_worker(
+            scenario=scenario,
             capsule=capsule,
             binding=binding,
             source_tree=root,
@@ -510,6 +500,7 @@ def execute_no_fault_replay(
         spawns.append(first)
         _expect_hello(first, capsule, execution_nonce, timeout_seconds)
         first_delivery = _finish_replay(
+            scenario,
             first,
             capsule,
             execution_nonce,
@@ -520,6 +511,7 @@ def execute_no_fault_replay(
         )
 
         replay_worker = _spawn_worker(
+            scenario=scenario,
             capsule=capsule,
             binding=binding,
             source_tree=root,
@@ -531,6 +523,7 @@ def execute_no_fault_replay(
         spawns.append(replay_worker)
         _expect_hello(replay_worker, capsule, execution_nonce, timeout_seconds)
         final = _finish_replay(
+            scenario,
             replay_worker,
             capsule,
             execution_nonce,
@@ -547,7 +540,7 @@ def execute_no_fault_replay(
                 integrity=IntegrityStatus.INVALID,
             )
         _require_only_the_store_wrote(work_dir.resolve(), database)
-        observation = classify_delivery(first_delivery, final, capsule.amount_cents)
+        observation = classify_delivery(first_delivery, final, scenario.effect_delta(event))
     except _AttemptFailure as error:
         status, integrity, failure_detail = error.status, error.integrity, error.detail
     except (OSError, sqlite3.Error, ValueError) as error:
@@ -594,6 +587,13 @@ def execute_no_fault_replay(
     )
 
 
+def _scenario(capsule: ReproCapsule) -> Scenario:
+    try:
+        return scenario_for(capsule.scenario_id)
+    except ValueError as error:
+        raise _AttemptFailure(ExecutionStatus.UNSUPPORTED, str(error)) from error
+
+
 def _require_only_the_store_wrote(work_dir: Path, database: Path) -> None:
     """Refuse handlers that keep durable state beside the database.
 
@@ -632,6 +632,7 @@ def _after_cleanup(
 
 
 def _preflight(
+    scenario: Scenario,
     capsule: ReproCapsule,
     binding: AnchorBinding,
     source_tree: Path,
@@ -674,12 +675,7 @@ def _preflight(
             "capsule runner environment differs from this runner",
             integrity=IntegrityStatus.INVALID,
         )
-    event = {
-        "account_id": capsule.account_id,
-        "amount_cents": capsule.amount_cents,
-        "event_id": capsule.event_id,
-    }
-    if capsule.initial_database_digest != initial_database_digest(event):
+    if capsule.initial_database_digest != initial_database_digest(scenario, capsule_event(capsule)):
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
             "capsule initial database digest changed",
@@ -687,19 +683,15 @@ def _preflight(
         )
 
 
-def _seed_database(path: Path, event: Mapping[str, object]) -> str:
-    normalized = _event(event)
+def _seed_database(scenario: Scenario, path: Path, event: Mapping[str, object]) -> str:
+    normalized = scenario.normalize_event(event)
     with sqlite3.connect(path) as connection:
         if connection.execute("PRAGMA journal_mode=WAL").fetchone() != ("wal",):
             raise sqlite3.OperationalError("SQLite WAL mode unavailable")
         connection.execute("PRAGMA synchronous=FULL")
         if connection.execute("PRAGMA synchronous").fetchone() != (2,):
             raise sqlite3.OperationalError("SQLite FULL synchronous mode unavailable")
-        connection.executescript(_SCHEMA)
-        connection.execute(
-            "INSERT INTO accounts(account_id, balance_cents) VALUES (?, 0)",
-            (normalized["account_id"],),
-        )
+        scenario.seed(connection, normalized)
         connection.commit()
         connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
         connection.execute("PRAGMA journal_mode=DELETE").fetchone()
@@ -708,48 +700,25 @@ def _seed_database(path: Path, event: Mapping[str, object]) -> str:
     return sha256_bytes(path.read_bytes())
 
 
-def _connect(path: Path) -> sqlite3.Connection:
-    connection = sqlite3.connect(path, timeout=5, isolation_level=None)
-    if connection.execute("PRAGMA journal_mode=WAL").fetchone() != ("wal",):
-        connection.close()
-        raise sqlite3.OperationalError("worker could not enable WAL")
-    connection.execute("PRAGMA synchronous=FULL")
+def _read_only(path: Path) -> sqlite3.Connection:
+    uri = f"file:{quote(str(path.resolve()))}?mode=ro"
+    connection = sqlite3.connect(uri, uri=True, timeout=5)
+    connection.execute("PRAGMA query_only=ON")
     return connection
 
 
-def _probe_others(path: Path, event: Mapping[str, object]) -> str:
+def _probe_others(scenario: Scenario, path: Path, event: Mapping[str, object]) -> str:
     """Digest every row that is not this event's: they must never change during a run."""
-    normalized = _event(event)
-    uri = f"file:{quote(str(path.resolve()))}?mode=ro"
-    with sqlite3.connect(uri, uri=True, timeout=5) as connection:
-        connection.execute("PRAGMA query_only=ON")
-        others = {
-            "accounts": connection.execute(
-                "SELECT account_id, balance_cents FROM accounts WHERE account_id IS NOT ? "
-                "ORDER BY account_id",
-                (normalized["account_id"],),
-            ).fetchall(),
-            "credit_ledger": connection.execute(
-                "SELECT id, event_id, account_id, amount_cents FROM credit_ledger "
-                "WHERE event_id IS NOT ? ORDER BY id",
-                (normalized["event_id"],),
-            ).fetchall(),
-            "processed_events": connection.execute(
-                "SELECT event_id FROM processed_events WHERE event_id IS NOT ? ORDER BY event_id",
-                (normalized["event_id"],),
-            ).fetchall(),
-        }
-    return sha256_json({name: [list(row) for row in rows] for name, rows in others.items()})
+    normalized = scenario.normalize_event(event)
+    with _read_only(path) as connection:
+        return sha256_json(scenario.others(connection, normalized))
 
 
-# The seed has exactly one account (this event's) and nothing else, so every other row set is
-# empty. Any later difference means something wrote around the trusted store.
-_SEEDED_OTHERS_DIGEST = sha256_json({"accounts": [], "credit_ledger": [], "processed_events": []})
-
-
-def _require_others_untouched(database: Path, event: Mapping[str, object]) -> None:
+def _require_others_untouched(
+    scenario: Scenario, database: Path, event: Mapping[str, object]
+) -> None:
     """Every row that is not this event's must still be exactly as seeded."""
-    if _probe_others(database, event) != _SEEDED_OTHERS_DIGEST:
+    if _probe_others(scenario, database, event) != scenario.seeded_others_digest:
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
             "rows that belong to other accounts or events changed during the run; something "
@@ -758,35 +727,20 @@ def _require_others_untouched(database: Path, event: Mapping[str, object]) -> No
         )
 
 
-def _probe(path: Path, event: Mapping[str, object]) -> CreditSnapshot:
-    normalized = _event(event)
-    uri = f"file:{quote(str(path.resolve()))}?mode=ro"
-    with sqlite3.connect(uri, uri=True, timeout=5) as connection:
-        connection.execute("PRAGMA query_only=ON")
-        account = connection.execute(
-            "SELECT balance_cents FROM accounts WHERE account_id = ?",
-            (normalized["account_id"],),
-        ).fetchone()
-        ledger = connection.execute(
-            "SELECT COUNT(*), COALESCE(SUM(amount_cents), 0) FROM credit_ledger WHERE event_id = ?",
-            (normalized["event_id"],),
-        ).fetchone()
-        marker = connection.execute(
-            "SELECT COUNT(*) FROM processed_events WHERE event_id = ?",
-            (normalized["event_id"],),
-        ).fetchone()
-    if account is None or ledger is None or marker is None:
-        raise _AttemptFailure(ExecutionStatus.PROBE_ERROR, "read-only state probe was incomplete")
-    return CreditSnapshot.with_digest(
-        account_balance_cents=int(account[0]),
-        event_ledger_count=int(ledger[0]),
-        event_ledger_total_cents=int(ledger[1]),
-        event_marker_count=int(marker[0]),
-    )
+def _probe(scenario: Scenario, path: Path, event: Mapping[str, object]) -> CreditSnapshot:
+    normalized = scenario.normalize_event(event)
+    try:
+        with _read_only(path) as connection:
+            return scenario.probe(connection, normalized)
+    except sqlite3.OperationalError as error:
+        raise _AttemptFailure(
+            ExecutionStatus.PROBE_ERROR, "read-only state probe was incomplete"
+        ) from error
 
 
 def _spawn_worker(
     *,
+    scenario: Scenario,
     capsule: ReproCapsule,
     binding: AnchorBinding,
     source_tree: Path,
@@ -804,17 +758,12 @@ def _spawn_worker(
         "-m",
         "nemisis.sqlite_credit",
         "_worker",
+        scenario.scenario_id,
         str(source_tree),
         binding.handler_path,
         binding.handler_symbol,
         str(database),
-        canonical_json(
-            {
-                "account_id": capsule.account_id,
-                "amount_cents": capsule.amount_cents,
-                "event_id": capsule.event_id,
-            }
-        ).decode(),
+        canonical_json(capsule_event(capsule)).decode(),
         execution_nonce,
         worker_nonce,
         session_id,
@@ -884,6 +833,7 @@ def _expect_hello(
 
 
 def _wait_for_checkpoint(
+    scenario: Scenario,
     spawn: _Spawn,
     database: Path,
     event: Mapping[str, object],
@@ -893,15 +843,13 @@ def _wait_for_checkpoint(
     previous: CreditSnapshot,
     kill_after_commit: int | None = None,
 ) -> CreditSnapshot:
-    amount = _event(event)["amount_cents"]
-    if not isinstance(amount, int):
-        raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "event amount changed")
+    normalized = scenario.normalize_event(event)
     deadline = monotonic() + timeout_seconds
     while True:
         message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
         kind = message.get("type")
         if kind == "commit":
-            snapshot = _attributed_probe(database, event, previous, message, spawn=spawn)
+            snapshot = _attributed_probe(scenario, database, event, previous, message, spawn=spawn)
             spawn.operations.append(str(message.get("operation")))
             previous = snapshot
             if kill_after_commit is not None:
@@ -909,54 +857,57 @@ def _wait_for_checkpoint(
                     return snapshot
                 _send(spawn.channel, {"type": "continue"})
                 continue
-            if (
-                snapshot.account_balance_cents == amount
-                and snapshot.event_ledger_count == 1
-                and snapshot.event_ledger_total_cents == amount
-                and (
-                    fault_boundary is FaultBoundary.EFFECT_COMMIT
-                    or snapshot.event_marker_count == 1
-                )
-            ):
+            if scenario.checkpoint_reached(snapshot, normalized, fault_boundary):
                 return snapshot
             _send(spawn.channel, {"type": "continue"})
         elif kind in {"done", "error"}:
             if kind == "done" and not spawn.operations:
-                detail = _no_commit_detail(database, event, previous)
+                detail = _no_commit_detail(scenario, database, event, previous)
             elif kind == "done":
                 detail = (
-                    "the handler finished without ever committing the credit "
-                    f"(commits seen: {', '.join(spawn.operations)}); check it credits at all "
-                    "before crash-testing it"
+                    f"the handler finished without ever committing the {scenario.effect_noun} "
+                    f"(commits seen: {', '.join(spawn.operations)}); check it "
+                    f"{_verb(scenario)} at all before crash-testing it"
                 )
             else:
                 detail = (
                     f"the handler raised {message.get('error', 'an exception')} before the "
-                    "durable credit checkpoint"
+                    f"durable {scenario.effect_noun} checkpoint"
                 )
             raise _AttemptFailure(ExecutionStatus.CHECKPOINT_NOT_REACHED, detail)
         else:
             raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "unexpected worker message")
 
 
-def _no_commit_detail(database: Path, event: Mapping[str, object], seeded: CreditSnapshot) -> str:
+def _verb(scenario: Scenario) -> str:
+    return {"credit": "credits"}.get(scenario.effect_noun, f"makes its {scenario.effect_noun}")
+
+
+def _no_commit_detail(
+    scenario: Scenario, database: Path, event: Mapping[str, object], seeded: CreditSnapshot
+) -> str:
     """The worker finished without one store commit: say whether it wrote around the store.
 
     The textbook atomic fix written as one raw SQL transaction lands here. It is correct and it is
     unjudgeable, because no kill can be placed inside a write the store did not make; the judge
     who wrote it is told the store call that expresses the same fix.
     """
-    after = _probe(database, event)
-    if after.digest == seeded.digest and _probe_others(database, event) == _SEEDED_OTHERS_DIGEST:
+    store = scenario.store_class.__name__
+    after = _probe(scenario, database, event)
+    if (
+        after.digest == seeded.digest
+        and _probe_others(scenario, database, event) == scenario.seeded_others_digest
+    ):
         return (
-            "the handler finished without a single CreditStore commit and left the database as "
-            "seeded, so there is no durable credit to crash-test"
+            f"the handler finished without a single {store} commit and left the database as "
+            f"seeded, so there is no durable {scenario.effect_noun} to crash-test"
         )
     return (
-        "the handler changed the database without a single CreditStore commit (this event now "
+        f"the handler changed the database without a single {store} commit (this event now "
         f"shows balance {after.account_balance_cents} cents, {after.event_ledger_count} ledger "
         f"row(s), {after.event_marker_count} marker), so the money moved through a connection "
-        f"CrashCheck does not own and no kill point exists inside that write. {STORE_REMEDY}"
+        f"CrashCheck does not own and no kill point exists inside that write. "
+        f"{scenario.store_remedy}"
     )
 
 
@@ -975,6 +926,7 @@ def _kill_and_wait(spawn: _Spawn, timeout_seconds: float) -> None:
 
 
 def _finish_replay(
+    scenario: Scenario,
     spawn: _Spawn,
     capsule: ReproCapsule,
     execution_nonce: str,
@@ -990,7 +942,7 @@ def _finish_replay(
         message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
         kind = message.get("type")
         if kind == "commit":
-            previous = _attributed_probe(database, event, previous, message, spawn=spawn)
+            previous = _attributed_probe(scenario, database, event, previous, message, spawn=spawn)
             spawn.operations.append(str(message.get("operation")))
             _send(spawn.channel, {"type": "continue"})
             continue
@@ -1019,28 +971,21 @@ def _finish_replay(
     _collect(spawn)
     if return_code != 0:
         raise _AttemptFailure(ExecutionStatus.REPLAY_ERROR, "replay worker returned nonzero")
-    final = _probe(database, event)
-    _require_others_untouched(database, event)
+    final = _probe(scenario, database, event)
+    _require_others_untouched(scenario, database, event)
     if final.digest != previous.digest:
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
             "the database changed after the worker's last reported store commit; something wrote "
             "around the trusted store (an exit hook, a thread, a child, or a direct connection). "
-            + STORE_REMEDY,
+            + scenario.store_remedy,
             integrity=IntegrityStatus.INVALID,
         )
     return final
 
 
-# What each trusted store operation may change: (balance, ledger rows, ledger total, marker).
-_STORE_DELTAS: dict[str, Callable[[int], tuple[int, int, int, int]]] = {
-    "credit": lambda amount: (amount, 1, amount, 0),
-    "mark_processed": lambda amount: (0, 0, 0, 1),
-    "credit_and_mark": lambda amount: (amount, 1, amount, 1),
-}
-
-
 def _attributed_probe(
+    scenario: Scenario,
     database: Path,
     event: Mapping[str, object],
     previous: CreditSnapshot,
@@ -1054,12 +999,12 @@ def _attributed_probe(
     controller, so its effect would surface here as an unattributed delta. That is an integrity
     failure, not a verdict: the kill point can no longer be trusted to sit where the money moved.
     """
-    amount = _event(event)["amount_cents"]
+    normalized = scenario.normalize_event(event)
     operation = message.get("operation")
-    snapshot = _probe(database, event)
-    _require_others_untouched(database, event)
-    expected = _STORE_DELTAS.get(str(operation))
-    if not isinstance(amount, int) or expected is None:
+    snapshot = _probe(scenario, database, event)
+    _require_others_untouched(scenario, database, event)
+    expected = scenario.store_operations.get(str(operation))
+    if expected is None:
         raise _AttemptFailure(
             ExecutionStatus.PROTOCOL_ERROR,
             f"worker reported an unknown store operation {operation!r}",
@@ -1070,15 +1015,15 @@ def _attributed_probe(
         snapshot.event_ledger_total_cents - previous.event_ledger_total_cents,
         snapshot.event_marker_count - previous.event_marker_count,
     )
-    if observed != expected(amount):
-        wanted = expected(amount)
+    wanted = expected(normalized)
+    if observed != wanted:
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
             f"the durable change after {operation} was not the one {operation} makes: the probe "
             f"saw balance {observed[0]:+d}, ledger rows {observed[1]:+d}, marker {observed[3]:+d} "
             f"for this event, not balance {wanted[0]:+d}, ledger rows {wanted[1]:+d}, marker "
             f"{wanted[3]:+d}; either something wrote around the trusted store or a store call "
-            f"was made with values that are not this event's. {STORE_REMEDY}",
+            f"was made with values that are not this event's. {scenario.store_remedy}",
             integrity=IntegrityStatus.INVALID,
         )
     return snapshot
@@ -1209,123 +1154,31 @@ def _spawn_receipt(spawn: _Spawn, event_digest: str) -> WorkerSpawnReceipt:
     )
 
 
-def _observation(snapshot: CreditSnapshot, amount: int) -> CrashObservation:
-    return classify_final(snapshot, amount)
-
-
 def _entry(state: TimelineState, detail: str = "") -> TimelineEntry:
     return TimelineEntry(state=state, timestamp=datetime.now(UTC), detail=detail)
 
 
-_UNSET: object = object()
-
-
-class CreditStore:
-    """Fixed trusted store exposed to the candidate handler."""
-
-    def __init__(self, database: Path, channel: socket.socket, event: Mapping[str, object]) -> None:
-        self._database = database
-        self._channel = channel
-        self._event = _event(event)
-        self._sequence = 0
-
-    def processed(self, event_id: str) -> bool:
-        self._require(event_id=event_id)
-        with _connect(self._database) as connection:
-            row = connection.execute(
-                "SELECT 1 FROM processed_events WHERE event_id = ?", (event_id,)
-            ).fetchone()
-        return row is not None
-
-    def credit(self, account_id: str, event_id: str, amount_cents: int) -> None:
-        self._require(account_id, event_id, amount_cents)
-        with _connect(self._database) as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            connection.execute(
-                "UPDATE accounts SET balance_cents = balance_cents + ? WHERE account_id = ?",
-                (amount_cents, account_id),
-            )
-            connection.execute(
-                "INSERT INTO credit_ledger(event_id, account_id, amount_cents) VALUES (?, ?, ?)",
-                (event_id, account_id, amount_cents),
-            )
-            connection.commit()
-        self._pause("credit")
-
-    def mark_processed(self, event_id: str) -> None:
-        self._require(event_id=event_id)
-        with _connect(self._database) as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            connection.execute("INSERT INTO processed_events(event_id) VALUES (?)", (event_id,))
-            connection.commit()
-        self._pause("mark_processed")
-
-    def credit_and_mark(self, account_id: str, event_id: str, amount_cents: int) -> None:
-        self._require(account_id, event_id, amount_cents)
-        with _connect(self._database) as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            if connection.execute(
-                "SELECT 1 FROM processed_events WHERE event_id = ?", (event_id,)
-            ).fetchone():
-                connection.rollback()
-                return
-            connection.execute(
-                "UPDATE accounts SET balance_cents = balance_cents + ? WHERE account_id = ?",
-                (amount_cents, account_id),
-            )
-            connection.execute(
-                "INSERT INTO credit_ledger(event_id, account_id, amount_cents) VALUES (?, ?, ?)",
-                (event_id, account_id, amount_cents),
-            )
-            connection.execute("INSERT INTO processed_events(event_id) VALUES (?)", (event_id,))
-            connection.commit()
-        self._pause("credit_and_mark")
-
-    def _require(
-        self,
-        account_id: object = _UNSET,
-        event_id: object = _UNSET,
-        amount_cents: object = _UNSET,
-    ) -> None:
-        """Every supplied value must be the event's exact value and exact type.
-
-        ``type(x) is str`` (not ``isinstance``, not ``==``) so a ``str`` subclass with a lying
-        ``__eq__``, an object with ``__conform__``, a ``bool``, or ``None`` cannot smuggle a
-        different row or a NULL into the trusted store's own SQL.
-        """
-        expected = self._event
-        checks = (
-            account_id is _UNSET
-            or (type(account_id) is str and account_id == expected["account_id"]),
-            event_id is _UNSET or (type(event_id) is str and event_id == expected["event_id"]),
-            amount_cents is _UNSET
-            or (type(amount_cents) is int and amount_cents == expected["amount_cents"]),
-        )
-        if not all(checks):
-            raise ValueError("handler attempted an event outside the accepted contract")
-
-    def _pause(self, operation: str) -> None:
-        self._sequence += 1
-        _worker_send(
-            self._channel,
-            {"operation": operation, "sequence": self._sequence, "type": "commit"},
-        )
-        message = _worker_receive(self._channel)
-        if message != {"type": "continue"}:
-            raise RuntimeError("controller returned an invalid commit acknowledgement")
-
-
 def _worker(argv: list[str]) -> int:
-    if len(argv) != 9:
+    if len(argv) != 10:
         return 2
-    source, handler_path, symbol, database, event_json, execution_nonce, nonce, session_id, fd = (
-        argv
-    )
+    (
+        scenario_id,
+        source,
+        handler_path,
+        symbol,
+        database,
+        event_json,
+        execution_nonce,
+        nonce,
+        session_id,
+        fd,
+    ) = argv
     channel = socket.socket(fileno=int(fd))
-    event = _event(json.loads(event_json))
+    scenario = scenario_for(scenario_id)
+    event = scenario.normalize_event(json.loads(event_json))
     event_digest = sha256_json(event)
     try:
-        _worker_send(
+        worker_send(
             channel,
             {
                 "event_digest": event_digest,
@@ -1338,15 +1191,16 @@ def _worker(argv: list[str]) -> int:
             },
         )
         handler = _load_handler(Path(source), handler_path, symbol)
-        handler(CreditStore(Path(database), channel, event), event)
-        _worker_send(
+        store = scenario.store_class(Path(database), channel, event)
+        handler(store, event)
+        worker_send(
             channel,
             {"event_digest": event_digest, "execution_nonce": execution_nonce, "type": "done"},
         )
         return 0
     except Exception as error:  # Candidate exceptions are bounded protocol evidence.
         with suppress(OSError):
-            _worker_send(channel, {"error": type(error).__name__, "type": "error"})
+            worker_send(channel, {"error": type(error).__name__, "type": "error"})
         return 3
     finally:
         channel.close()
@@ -1354,7 +1208,7 @@ def _worker(argv: list[str]) -> int:
 
 def _load_handler(
     source: Path, relative: str, symbol: str
-) -> Callable[[CreditStore, dict[str, str | int]], object]:
+) -> Callable[[StoreBase, dict[str, str | int]], object]:
     root = source.resolve()
     path = (root / safe_relative_path(relative)).resolve()
     if not path.is_relative_to(root) or not path.is_file() or path.is_symlink():
@@ -1370,46 +1224,13 @@ def _load_handler(
     handler = getattr(module, symbol, None)
     if not callable(handler) or len(inspect.signature(handler).parameters) != 2:
         raise ValueError("bound handler is not callable as (store, event)")
-    return cast(Callable[[CreditStore, dict[str, str | int]], object], handler)
+    return cast(Callable[[StoreBase, dict[str, str | int]], object], handler)
 
 
 def _append_source_path(root: Path) -> None:
     value = str(root)
     if value not in sys.path:
         sys.path.append(value)
-
-
-def _worker_send(channel: socket.socket, value: Mapping[str, object]) -> None:
-    channel.sendall(canonical_json(value) + b"\n")
-
-
-def _worker_receive(channel: socket.socket) -> dict[str, object]:
-    data = bytearray()
-    while not data.endswith(b"\n"):
-        chunk = channel.recv(min(1024, MAX_MESSAGE_BYTES + 1 - len(data)))
-        if not chunk or len(data) + len(chunk) > MAX_MESSAGE_BYTES:
-            raise RuntimeError("controller IPC closed or overflowed")
-        data.extend(chunk)
-    value = json.loads(data)
-    if not isinstance(value, dict):
-        raise RuntimeError("controller IPC was not a JSON object")
-    return value
-
-
-def _event(value: Mapping[str, object] | object) -> dict[str, str | int]:
-    if not isinstance(value, Mapping) or set(value) != {"account_id", "amount_cents", "event_id"}:
-        raise ValueError("event must contain exactly account_id, amount_cents, and event_id")
-    account_id, amount, event_id = value["account_id"], value["amount_cents"], value["event_id"]
-    if (
-        not isinstance(account_id, str)
-        or not account_id
-        or type(amount) is not int
-        or amount <= 0
-        or not isinstance(event_id, str)
-        or not event_id
-    ):
-        raise ValueError("event fields are invalid")
-    return {"account_id": account_id, "amount_cents": amount, "event_id": event_id}
 
 
 def _main() -> int:
@@ -1420,3 +1241,19 @@ def _main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(_main())
+
+
+__all__ = [
+    "MAX_MESSAGE_BYTES",
+    "RUNNER_ID",
+    "RUNNER_VERSION",
+    "STORE_REMEDY",
+    "AnchorResolutionError",
+    "CreditStore",
+    "bind_anchor",
+    "capsule_event",
+    "execute_attempt",
+    "execute_no_fault_replay",
+    "initial_database_digest",
+    "runner_environment_digest",
+]

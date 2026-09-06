@@ -25,6 +25,7 @@ from nemisis.crash_models import (
 )
 from nemisis.crashcheck import _audited_contract, _seal_capsule
 from nemisis.hashing import canonical_json, sha256_bytes
+from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
 from nemisis.sqlite_credit import (
     AnchorResolutionError,
     _AttemptFailure,
@@ -42,7 +43,7 @@ from nemisis.sqlite_credit import (
 
 
 def test_anchor_resolution_distinguishes_zero_one_and_multiple(tmp_path: Path) -> None:
-    contract = _audited_contract()
+    contract = _audited_contract(CREDIT)
     zero = tmp_path / "zero"
     zero.mkdir()
     with pytest.raises(AnchorResolutionError) as missing:
@@ -64,7 +65,7 @@ def test_anchor_resolution_distinguishes_zero_one_and_multiple(tmp_path: Path) -
 
 
 def test_anchor_resolution_marks_an_async_handler_invalid(tmp_path: Path) -> None:
-    contract = _audited_contract()
+    contract = _audited_contract(CREDIT)
     source = materialize_fixture(BUGGY_REF, tmp_path / "async-handler").path
     (source / "app/credits.py").write_text(
         "async def apply_credit(store, event):\n    return None\n",
@@ -79,7 +80,7 @@ def test_anchor_resolution_marks_an_async_handler_invalid(tmp_path: Path) -> Non
 
 
 def test_anchor_resolution_counts_handler_definitions(tmp_path: Path) -> None:
-    contract = _audited_contract()
+    contract = _audited_contract(CREDIT)
     missing = materialize_fixture(BUGGY_REF, tmp_path / "missing-handler").path
     (missing / "app/credits.py").write_text(
         "def another_handler(store, event):\n    return None\n",
@@ -108,19 +109,19 @@ def test_anchor_resolution_counts_handler_definitions(tmp_path: Path) -> None:
 def test_attributed_probe_accepts_only_the_delta_its_operation_explains(tmp_path: Path) -> None:
     event = {"account_id": "acct_7", "amount_cents": 2500, "event_id": "evt_1042"}
     database = tmp_path / "probe.sqlite3"
-    _seed_database(database, event)
-    seeded = _probe(database, event)
+    _seed_database(CREDIT, database, event)
+    seeded = _probe(CREDIT, database, event)
 
     # Nothing changed, and mark_processed claims a marker: unattributed.
     with pytest.raises(
         _AttemptFailure, match="was not the one mark_processed makes"
     ) as unattributed:
-        _attributed_probe(database, event, seeded, {"operation": "mark_processed"})
+        _attributed_probe(CREDIT, database, event, seeded, {"operation": "mark_processed"})
     assert unattributed.value.status is ExecutionStatus.INTEGRITY_ERROR
     assert unattributed.value.integrity is IntegrityStatus.INVALID
 
     with pytest.raises(_AttemptFailure, match="unknown store operation") as unknown:
-        _attributed_probe(database, event, seeded, {"operation": "transfer"})
+        _attributed_probe(CREDIT, database, event, seeded, {"operation": "transfer"})
     assert unknown.value.status is ExecutionStatus.PROTOCOL_ERROR
 
     import sqlite3
@@ -128,16 +129,20 @@ def test_attributed_probe_accepts_only_the_delta_its_operation_explains(tmp_path
     with sqlite3.connect(database) as connection:
         connection.execute("INSERT INTO processed_events(event_id) VALUES ('evt_1042')")
         connection.commit()
-    marked = _attributed_probe(database, event, seeded, {"operation": "mark_processed"})
+    marked = _attributed_probe(CREDIT, database, event, seeded, {"operation": "mark_processed"})
     assert marked.event_marker_count == 1
 
 
 def test_store_requires_exact_types_and_values(tmp_path: Path) -> None:
     from nemisis.sqlite_credit import CreditStore
 
-    event = {"account_id": "acct_7", "amount_cents": 2500, "event_id": "evt_1042"}
+    event: dict[str, str | int] = {
+        "account_id": "acct_7",
+        "amount_cents": 2500,
+        "event_id": "evt_1042",
+    }
     database = tmp_path / "store.sqlite3"
-    _seed_database(database, event)
+    _seed_database(CREDIT, database, event)
     controller, worker = socket.socketpair()
     store = CreditStore(database, worker, event)
 
@@ -160,7 +165,7 @@ def test_store_requires_exact_types_and_values(tmp_path: Path) -> None:
             with pytest.raises(ValueError, match="outside the accepted contract"):
                 bad()
         assert store.processed("evt_1042") is False
-        assert _probe(database, event).event_marker_count == 0
+        assert _probe(CREDIT, database, event).event_marker_count == 0
     finally:
         controller.close()
         worker.close()
@@ -185,7 +190,7 @@ def test_receive_preserves_a_coalesced_second_frame() -> None:
 def _execute_fixture(
     tmp_path: Path, fixture_ref: str, fault_boundary: FaultBoundary
 ) -> AttemptReceipt:
-    contract = _audited_contract()
+    contract = _audited_contract(CREDIT)
     sealed = _seal_capsule(contract)
     capsule = ReproCapsule.with_digest(
         **sealed.model_dump(mode="python", exclude={"digest", "fault_boundary"}),

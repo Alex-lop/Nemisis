@@ -28,7 +28,6 @@ from nemisis.crash_fixture import (
     MISLEADING_GREEN_REF,
     SCENARIO_ID,
     FixtureEvent,
-    FixtureVariant,
     HeroVariant,
     load_event,
     materialize_fixture,
@@ -298,9 +297,7 @@ def run_benchmark(output: Path) -> BenchmarkResult:
 
     with tempfile.TemporaryDirectory(prefix="nemisis-benchmark-") as temporary:
         root = Path(temporary)
-        measured: dict[
-            str, tuple[FixtureVariant, str, PytestMeasurement, SequentialMeasurement]
-        ] = {}
+        measured: dict[str, tuple[str, str, PytestMeasurement, SequentialMeasurement]] = {}
         for ref in HERO_REFS:
             fixture = materialize_fixture(ref, root / "trees" / fixture_name(ref))
             pytest_result = _measure_pytest(fixture.path, root / "pytest" / fixture.variant)
@@ -504,7 +501,7 @@ def _measure_sequential(source: Path) -> SequentialMeasurement:
         )
         if not callable(handler):
             raise TypeError("apply_credit is not callable")
-        event = load_event()
+        event = cast(FixtureEvent, load_event())
         store = _SequentialStore()
         handler(store, event)
         handler(store, event)
@@ -540,7 +537,7 @@ def _measure_sequential(source: Path) -> SequentialMeasurement:
 def _measure_crashcheck(
     result: object,
     capsule: ReproCapsule,
-    measured: dict[str, tuple[FixtureVariant, str, PytestMeasurement, SequentialMeasurement]],
+    measured: dict[str, tuple[str, str, PytestMeasurement, SequentialMeasurement]],
 ) -> dict[str, CrashMeasurement]:
     if not isinstance(result, CrashCheckResult):
         raise BenchmarkError("CrashCheck returned an unsupported result")

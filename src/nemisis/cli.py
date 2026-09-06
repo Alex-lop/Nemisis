@@ -11,7 +11,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from nemisis.benchmark import BenchmarkError, BenchmarkResult, run_benchmark
-from nemisis.crash_fixture import SCENARIO_ID
+from nemisis.crash_fixture import SCENARIO_ID, parse_ref
 from nemisis.crash_models import ContractProposal, CrashCheckResult, CrashVerdict
 from nemisis.crashcheck import CrashCheckError, accept_contract, check, initialize, replay
 from nemisis.doctor import DoctorResult, doctor
@@ -20,6 +20,7 @@ from nemisis.hashing import canonical_json
 from nemisis.local import LocalVerification, verify_local
 from nemisis.models import RuntimeMode
 from nemisis.report import money
+from nemisis.scenarios import SCENARIOS
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -48,7 +49,7 @@ def _parser() -> argparse.ArgumentParser:
         "--target", required=True, help="module:function handler, e.g. app.credits:apply_credit"
     )
     init.add_argument("--base", required=True, help=f"exact base source: {ref_help}")
-    init.add_argument("--scenario", default=SCENARIO_ID, choices=[SCENARIO_ID])
+    init.add_argument("--scenario", default=SCENARIO_ID, choices=sorted(SCENARIOS))
     init.add_argument(
         "--accept-contract",
         metavar="DIGEST",
@@ -70,7 +71,7 @@ def _parser() -> argparse.ArgumentParser:
     propose.add_argument(
         "--out", type=Path, required=True, help="new directory for the candidate tree"
     )
-    propose.add_argument("--scenario", default=SCENARIO_ID, choices=[SCENARIO_ID])
+    propose.add_argument("--scenario", default=SCENARIO_ID, choices=sorted(SCENARIOS))
     propose.add_argument("--json", action="store_true")
 
     crashcheck = commands.add_parser("check", help="run a crash/retry counterexample")
@@ -82,7 +83,10 @@ def _parser() -> argparse.ArgumentParser:
     crashcheck.add_argument(
         "--scenario",
         default=SCENARIO_ID,
-        help=f"{SCENARIO_ID} (audited fixture contract) or a path to an accepted config.json",
+        help=(
+            f"{' or '.join(sorted(SCENARIOS))} (audited fixture contract) or a path to an "
+            "accepted config.json"
+        ),
     )
     crashcheck.add_argument(
         "--mode",
@@ -495,8 +499,8 @@ def main() -> None:
             print(f"tree: {exported.tree_digest}")
             print(f"edit: {exported.path / 'app' / 'credits.py'}")
             print(
-                f"next: nemisis check --base fixture:{SCENARIO_ID}/buggy --candidate {args.out} "
-                "--mode local"
+                f"next: nemisis check --base {parse_ref(args.ref)[0].buggy_ref} "
+                f"--candidate {args.out} --mode local"
             )
             return
 

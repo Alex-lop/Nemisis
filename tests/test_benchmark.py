@@ -26,6 +26,7 @@ from nemisis.crash_models import (
 )
 from nemisis.crashcheck import _audited_contract, _seal_capsule
 from nemisis.hashing import canonical_json, sha256_json
+from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
 from nemisis.sqlite_credit import runner_environment_digest
 
 TREE_DIGESTS = {
@@ -122,7 +123,7 @@ def test_binds_exact_source_capsule_environment_and_canonical_bytes(
     commit = result.source_commit
     assert len(commit) == 40 and not commit.endswith("-dirty")
     assert result.event_digest == EVENT_DIGEST
-    pre_hunt_capsule = _seal_capsule(_audited_contract())
+    pre_hunt_capsule = _seal_capsule(_audited_contract(CREDIT))
     assert result.capsule_digest != pre_hunt_capsule.digest
     assert result.engine_code_digest == pre_hunt_capsule.engine_code_digest
     assert result.environment.crashcheck_environment_digest == runner_environment_digest()
