@@ -51,6 +51,14 @@ from nemisis.models import TruthLabel
 from nemisis.safety import safe_relative_path
 
 RUNNER_ID = "sqlite-credit-runner-v1"
+# What a handler that wrote around the store is told, on the first run, in the summary and report.
+STORE_REMEDY = (
+    "Kill points are store commits, so a write the store did not make has no kill point and "
+    "earns no verdict. Express the same fix through the store: store.credit_and_mark(account_id, "
+    "event_id, amount_cents) commits the credit and its marker together in one durable "
+    "transaction; store.processed(event_id), store.credit(...), and store.mark_processed(event_id) "
+    "are the three-step form; see docs/PRODUCT.md#the-store-api"
+)
 RUNNER_VERSION = "1"
 MAX_MESSAGE_BYTES = 8_192
 _SCENARIO_ID = "sqlite-credit-v1"
@@ -414,7 +422,7 @@ def execute_attempt(
             if status is ExecutionStatus.COMPLETED
             else TimelineState.FAILED,
             timestamp=ended_at,
-            detail=failure_detail or observation.value,
+            detail=(failure_detail or observation.value)[:500],
         )
     )
     spawn_receipts = tuple(_spawn_receipt(item, capsule.event_digest) for item in spawns)
@@ -914,11 +922,7 @@ def _wait_for_checkpoint(
             _send(spawn.channel, {"type": "continue"})
         elif kind in {"done", "error"}:
             if kind == "done" and not spawn.operations:
-                detail = (
-                    "the handler finished without a single CreditStore commit; CrashCheck can "
-                    "only kill at store commits, so a handler that writes around the store "
-                    "cannot be crash-tested"
-                )
+                detail = _no_commit_detail(database, event, previous)
             elif kind == "done":
                 detail = (
                     "the handler finished without ever committing the credit "
@@ -933,6 +937,27 @@ def _wait_for_checkpoint(
             raise _AttemptFailure(ExecutionStatus.CHECKPOINT_NOT_REACHED, detail)
         else:
             raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "unexpected worker message")
+
+
+def _no_commit_detail(database: Path, event: Mapping[str, object], seeded: CreditSnapshot) -> str:
+    """The worker finished without one store commit: say whether it wrote around the store.
+
+    The textbook atomic fix written as one raw SQL transaction lands here. It is correct and it is
+    unjudgeable, because no kill can be placed inside a write the store did not make; the judge
+    who wrote it is told the store call that expresses the same fix.
+    """
+    after = _probe(database, event)
+    if after.digest == seeded.digest and _probe_others(database, event) == _SEEDED_OTHERS_DIGEST:
+        return (
+            "the handler finished without a single CreditStore commit and left the database as "
+            "seeded, so there is no durable credit to crash-test"
+        )
+    return (
+        "the handler changed the database without a single CreditStore commit (this event now "
+        f"shows balance {after.account_balance_cents} cents, {after.event_ledger_count} ledger "
+        f"row(s), {after.event_marker_count} marker), so the money moved through a connection "
+        f"CrashCheck does not own and no kill point exists inside that write. {STORE_REMEDY}"
+    )
 
 
 def _kill_and_wait(spawn: _Spawn, timeout_seconds: float) -> None:
@@ -1000,7 +1025,8 @@ def _finish_replay(
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
             "the database changed after the worker's last reported store commit; something wrote "
-            "around the trusted store (an exit hook, a thread, a child, or a direct connection)",
+            "around the trusted store (an exit hook, a thread, a child, or a direct connection). "
+            + STORE_REMEDY,
             integrity=IntegrityStatus.INVALID,
         )
     return final
@@ -1052,7 +1078,7 @@ def _attributed_probe(
             f"saw balance {observed[0]:+d}, ledger rows {observed[1]:+d}, marker {observed[3]:+d} "
             f"for this event, not balance {wanted[0]:+d}, ledger rows {wanted[1]:+d}, marker "
             f"{wanted[3]:+d}; either something wrote around the trusted store or a store call "
-            "was made with values that are not this event's",
+            f"was made with values that are not this event's. {STORE_REMEDY}",
             integrity=IntegrityStatus.INVALID,
         )
     return snapshot

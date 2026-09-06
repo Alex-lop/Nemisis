@@ -54,6 +54,31 @@ The packaged fixture command is the audited shortcut because its contract is alr
    metadata, regression, manifest, and report. `replay` evaluates the unchanged capsule against
    another exact tree.
 
+## The store API
+
+The handler gets one object, `store`, and every durable change it makes must go through it. Each
+call is one SQLite transaction that the store commits and then reports to the controller, and
+those commits are the only places CrashCheck can kill the worker:
+
+| Call | What it commits | Reported as |
+| --- | --- | --- |
+| `store.processed(event_id) -> bool` | nothing (a read) | not a commit |
+| `store.credit(account_id, event_id, amount_cents)` | the balance update and one ledger row | `credit` |
+| `store.mark_processed(event_id)` | the processed marker | `mark_processed` |
+| `store.credit_and_mark(account_id, event_id, amount_cents)` | balance, ledger row, and marker together, skipped if the marker exists | `credit_and_mark` |
+
+The textbook fix is one line, `store.credit_and_mark(...)`: one durable commit, so no crash can
+land between the credit and its marker. The three-step form (`processed` guard, `credit`,
+`mark_processed`) is the shape the bug lives in; CrashCheck kills between the two commits and shows
+the duplicate.
+
+A write the store did not make has no kill point. A handler that opens its own SQLite connection
+(the same fix written as a raw `BEGIN … COMMIT` transaction, for instance) is not judged: the
+controller sees a durable change that no reported commit explains, names the write, and prints the
+store call that expresses the same fix. That is `EVIDENCE_INCOMPLETE` (exit `2`), never a pass and
+never a fail, because the kill could not be placed where the money moved.
+`fixture:sqlite-credit-v1/raw-sql` is exactly that handler, one flag away.
+
 ## Verdict contract
 
 | Verdict | Exit | Exact meaning |
