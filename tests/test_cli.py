@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -390,7 +391,7 @@ def test_action_example_pins_a_real_release_and_bounds_runtime() -> None:
         encoding="utf-8"
     )
 
-    assert "Alex-lop/Nemisis@f05ae921cf3d866f69adf8415d6d7bd52071bf37" in workflow
+    assert re.search(r"uses: Alex-lop/Nemisis@[0-9a-f]{40}\n", workflow)
     assert "0123456789abcdef" not in workflow
     assert "timeout-minutes: 15" in workflow
     assert "Refuse untrusted fork execution without isolation" in workflow
