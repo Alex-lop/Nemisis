@@ -130,9 +130,10 @@ contract's catalog binding, candidate-blind. See [docs/LIVE_SETUP.md](docs/LIVE_
 
 ## Point it at your code
 
-The alpha audits one handler shape: a synchronous `module:function(store, event)` that uses the
-`CreditStore` API (`processed`, `credit`, `mark_processed`, `credit_and_mark`) against SQLite. Inside
-that shape, the handler body is anything you like.
+The alpha audits one handler shape: a synchronous `module:function(store, event)` that uses a
+scenario's store API against SQLite (`CreditStore`: `processed`, `credit`, `mark_processed`,
+`credit_and_mark`; `InventoryStore`: `reserved`, `reserve`, `mark_reserved`, `reserve_and_mark`).
+Inside that shape, the handler body is anything you like.
 
 ```bash
 uv tool install "git+https://github.com/Alex-lop/Nemisis@main"
@@ -144,8 +145,26 @@ nemisis check --base main --candidate HEAD --scenario .nemisis/config.json
 
 Commit the accepted `.nemisis/config.json` on the base branch, then drop
 [the example workflow](.github/examples/crashcheck.yml) into `.github/workflows/` to run it on every
-pull request. Adding a second scenario (another schema, store, and predicate) is the next seam; the
-kill/restart/replay kernel is not tied to credits, but today's catalog is.
+pull request.
+
+## Two scenarios, one kernel
+
+The kernel is written once; a scenario is one object (schema, seed, store, probe, predicate, words).
+`sqlite-inventory-v1` is the second: an order reserves two units of a SKU, stock goes 10 to 8, and
+a crash between the decrement and its marker oversells to 6. It is the bug the original
+differential verifier could only mark `UNRESOLVED`, decided:
+
+| Scenario | Effect | Buggy | Agent's rewrite | Atomic | `mark-first` |
+| --- | --- | --- | --- | --- | --- |
+| `sqlite-credit-v1` | `$0` to `$25` | `$50` | `$50` | `$25` | `$0`, marked done |
+| `sqlite-inventory-v1` | 10 to 8 units | 6 units | 6 units | 8 units | 10 units, marked reserved |
+
+```bash
+uv run nemisis check --base fixture:sqlite-inventory-v1/buggy --candidate fixture:sqlite-inventory-v1/mark-first
+```
+
+The scenario is inferred from a fixture base ref; `init --scenario sqlite-inventory-v1` binds your
+own `app.inventory:reserve_inventory` the same way the credit contract does.
 
 ## What it never does
 

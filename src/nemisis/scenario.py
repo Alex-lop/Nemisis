@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from nemisis.crash_models import CrashVerdict, CreditSnapshot, FaultBoundary
+from nemisis.crash_models import CrashVerdict, FaultBoundary, StateSnapshot
 from nemisis.hashing import canonical_json
 
 MAX_MESSAGE_BYTES = 8_192
@@ -57,7 +57,7 @@ class Scenario:
     schema: str
     seed_identity: Callable[[Event], dict[str, object]]
     seed: Callable[[sqlite3.Connection, Event], None]
-    probe: Callable[[sqlite3.Connection, Event], CreditSnapshot]
+    probe: Callable[[sqlite3.Connection, Event], StateSnapshot]
     others: Callable[[sqlite3.Connection, Event], dict[str, list[list[object]]]]
     seeded_others_digest: str
     # The store the handler is handed, and what each of its commits may change.
@@ -65,14 +65,24 @@ class Scenario:
     store_operations: Mapping[str, Callable[[Event], StoreDelta]]
     store_remedy: str
     store_api_fallback: str
-    # The event and the rule.
+    # The event and the rule. ``effect_delta`` is the signed change one delivery makes to the
+    # subject; ``initial_total`` is the seeded subject total; ``scalar_name`` is the event field a
+    # contract proposal must reproduce, within ``scalar_bounds``.
     normalize_event: Callable[[object], Event]
     effect_delta: Callable[[Event], int]
-    checkpoint_reached: Callable[[CreditSnapshot, Event, FaultBoundary], bool]
-    # Words.
+    initial_total: Callable[[Event], int]
+    checkpoint_reached: Callable[[StateSnapshot, Event, FaultBoundary], bool]
+    scalar_name: str
+    scalar_bounds: tuple[int, int]
+    # Words. ``subject_noun`` names the quantity ("balance", "stock"); ``effect_noun`` names one
+    # delivery's durable effect ("credit", "reservation"); ``effect_verb`` is its third person.
+    subject_noun: str
     effect_noun: str
-    describe_final: Callable[[CreditSnapshot, str, int], str]
-    verdict_summary: Callable[[CrashVerdict, str, int], str]
+    effect_verb: str
+    others_noun: str
+    format_subject: Callable[[int], str]
+    describe_final: Callable[[StateSnapshot, Event], str]
+    verdict_summary: Callable[[CrashVerdict, Event], str]
 
     @property
     def buggy_ref(self) -> str:

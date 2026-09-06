@@ -32,7 +32,6 @@ from nemisis.crash_models import (
     CrashCheckResult,
     CrashObservation,
     CrashVerdict,
-    CreditSnapshot,
     ExecutionStatus,
     FaultBoundary,
     HypothesisReceipt,
@@ -42,6 +41,7 @@ from nemisis.crash_models import (
     PatchProposal,
     ReproCapsule,
     RetryContract,
+    StateSnapshot,
     TimelineEntry,
     TimelineState,
     WorldRole,
@@ -56,11 +56,12 @@ from nemisis.report import write_crash_report
 from nemisis.safety import safe_destination, safe_relative_path
 from nemisis.scenario import Scenario
 from nemisis.scenarios import SCENARIOS, scenario_for
-from nemisis.sqlite_credit import (
+from nemisis.sqlite_runner import (
     RUNNER_ID,
     RUNNER_VERSION,
     AnchorResolutionError,
     bind_anchor,
+    capsule_event,
     execute_attempt,
     execute_no_fault_replay,
     initial_database_digest,
@@ -86,9 +87,12 @@ _ENGINE_RESOURCES = (
     "scenario.py",
     "scenarios/__init__.py",
     "scenarios/sqlite_credit_v1.py",
-    "sqlite_credit.py",
+    "scenarios/sqlite_inventory_v1.py",
+    "sqlite_runner.py",
     "fixtures/sqlite_credit_v1/contract.json",
     "fixtures/sqlite_credit_v1/event.json",
+    "fixtures/sqlite_inventory_v1/contract.json",
+    "fixtures/sqlite_inventory_v1/event.json",
 )
 _HYPOTHESES = (
     (1, "effect-commit-v1", FaultBoundary.EFFECT_COMMIT, 1),
@@ -655,6 +659,13 @@ def _contract_for_check(scenario: str | Path | RetryContract, base: _Source) -> 
     elif str(scenario) in SCENARIOS:
         registered = SCENARIOS[str(scenario)]
         audited = _audited_contract(registered)
+        if base.ref.startswith("fixture:") and not base.ref.startswith(
+            f"fixture:{registered.scenario_id}/"
+        ):
+            raise CrashCheckError(
+                f"base {base.ref} belongs to another scenario; pass --scenario "
+                f"{base.ref.removeprefix('fixture:').partition('/')[0]}"
+            )
         if (
             base.ref == registered.buggy_ref
             and base.tree_digest == audited.originating_base_tree_digest
@@ -798,9 +809,9 @@ def _validate_capsule_contract(capsule: ReproCapsule, contract: RetryContract) -
         ),
         "engine_code_digest": capsule.engine_code_digest == engine_code_digest(),
         "scenario_id": capsule.scenario_id == contract.scenario_id,
+        "event": capsule.event == event,
         "event_id": capsule.event_id == event["event_id"],
-        "account_id": capsule.account_id == event["account_id"],
-        "amount_cents": capsule.amount_cents == event["amount_cents"],
+        "effect_delta": capsule.effect_delta == scenario.effect_delta(event),
         "event_digest": capsule.event_digest == contract.event_digest,
         "fault_intent_id": capsule.fault_intent_id == contract.fault_intent_id,
         "probe_id": capsule.probe_id == contract.probe_id,
@@ -937,9 +948,9 @@ def _seal_capsule(
         engine_code_digest=engine_code_digest(),
         scenario_id=contract.scenario_id,
         scenario_version="1",
-        event_id=event["event_id"],
-        account_id=event["account_id"],
-        amount_cents=event["amount_cents"],
+        event=event,
+        event_id=str(event["event_id"]),
+        effect_delta=scenario.effect_delta(event),
         event_digest=contract.event_digest,
         fault_intent_id=contract.fault_intent_id,
         fault_boundary=fault_boundary,
@@ -1092,7 +1103,7 @@ def _minimize_witness(
                 post_execution_tree_digest=binding.tree_digest,
                 environment_digest=parent.environment_digest,
                 event_digest=parent.event_digest,
-                amount_cents=parent.amount_cents,
+                effect_delta=parent.effect_delta,
                 initial_database_digest=parent.initial_database_digest,
                 database_id=f"db-{uuid.uuid4().hex}",
                 execution_nonce=nonce,
@@ -1285,7 +1296,7 @@ def _failed_census(
         post_execution_tree_digest=binding.tree_digest,
         environment_digest=capsule.environment_digest,
         event_digest=capsule.event_digest,
-        amount_cents=capsule.amount_cents,
+        effect_delta=capsule.effect_delta,
         initial_database_digest=capsule.initial_database_digest,
         database_id=f"db-{uuid.uuid4().hex}",
         execution_nonce=nonce,
@@ -1405,9 +1416,9 @@ def _sweep_summary(sweep: CommitSweepReceipt, capsule: ReproCapsule) -> str:
     return f"The commit sweep could not complete: {detail}. No verdict is issued."
 
 
-def _describe_final(final: CreditSnapshot, capsule: ReproCapsule) -> str:
+def _describe_final(final: StateSnapshot, capsule: ReproCapsule) -> str:
     scenario = _scenario(capsule.scenario_id)
-    return scenario.describe_final(final, capsule.event_id, capsule.amount_cents)
+    return scenario.describe_final(final, capsule_event(capsule))
 
 
 def _confirmed_observation(
@@ -1423,6 +1434,9 @@ def _confirmed_observation(
     observations = {item.observation for item in attempts}
     if len(observations) != 1:
         return CrashObservation.NOT_OBSERVED
+    scenario = _scenario(capsule.scenario_id)
+    event = capsule_event(capsule)
+    initial = scenario.initial_total(event)
     for attempt in attempts:
         if (
             attempt.execution_status is not ExecutionStatus.COMPLETED
@@ -1431,10 +1445,10 @@ def _confirmed_observation(
             or attempt.event_digest != capsule.event_digest
             or attempt.environment_digest != capsule.environment_digest
             or attempt.pre_crash_snapshot is None
-            or attempt.pre_crash_snapshot.account_balance_cents != 0
+            or attempt.pre_crash_snapshot.subject_total != initial
             or attempt.checkpoint_snapshot is None
-            or attempt.checkpoint_snapshot.account_balance_cents != capsule.amount_cents
-            or attempt.checkpoint_snapshot.event_ledger_count != 1
+            or attempt.checkpoint_snapshot.subject_total != initial + capsule.effect_delta
+            or attempt.checkpoint_snapshot.event_effect_count != 1
             or attempt.post_kill_snapshot is None
             or attempt.post_kill_snapshot.digest != attempt.checkpoint_snapshot.digest
             or len(attempt.spawns) != 2
@@ -1474,7 +1488,7 @@ def _failed_attempt(
         post_execution_tree_digest=binding.tree_digest,
         environment_digest=capsule.environment_digest,
         event_digest=capsule.event_digest,
-        amount_cents=capsule.amount_cents,
+        effect_delta=capsule.effect_delta,
         initial_database_digest=capsule.initial_database_digest,
         database_id=f"db-{uuid.uuid4().hex}",
         execution_nonce=execution_nonce or uuid.uuid4().hex,
@@ -2078,7 +2092,7 @@ def _run_id(mode: str) -> str:
 
 def _summary(verdict: CrashVerdict, capsule: ReproCapsule) -> str:
     scenario = _scenario(capsule.scenario_id)
-    return scenario.verdict_summary(verdict, capsule.event_id, capsule.amount_cents)
+    return scenario.verdict_summary(verdict, capsule_event(capsule))
 
 
 __all__ = ["accept_contract", "check", "initialize", "replay"]

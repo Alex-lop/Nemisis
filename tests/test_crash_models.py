@@ -14,7 +14,6 @@ from nemisis.crash_models import (
     CrashCheckResult,
     CrashObservation,
     CrashVerdict,
-    CreditSnapshot,
     ExecutionStatus,
     FaultBoundary,
     HypothesisReceipt,
@@ -22,6 +21,7 @@ from nemisis.crash_models import (
     MinimizationReceipt,
     NoFaultReplayReceipt,
     ReproCapsule,
+    StateSnapshot,
     TimelineEntry,
     TimelineState,
     WorkerSpawnReceipt,
@@ -34,11 +34,11 @@ NOW = datetime(2026, 8, 30, tzinfo=UTC)
 HASHES = tuple(f"{index:x}" * 64 for index in range(10))
 
 
-def _snapshot(*, effects: int = 1, marker: int = 1) -> CreditSnapshot:
-    return CreditSnapshot.with_digest(
-        account_balance_cents=2_500 * effects,
-        event_ledger_count=effects,
-        event_ledger_total_cents=2_500 * effects,
+def _snapshot(*, effects: int = 1, marker: int = 1) -> StateSnapshot:
+    return StateSnapshot.with_digest(
+        subject_total=2_500 * effects,
+        event_effect_count=effects,
+        event_effect_total=2_500 * effects,
         event_marker_count=marker,
     )
 
@@ -51,9 +51,9 @@ def _capsule() -> ReproCapsule:
         engine_code_digest=HASHES[9],
         scenario_id="sqlite-credit-v1",
         scenario_version="v1",
+        event=event,
         event_id=event["event_id"],
-        account_id=event["account_id"],
-        amount_cents=event["amount_cents"],
+        effect_delta=event["amount_cents"],
         event_digest=sha256_json(event),
         fault_intent_id="after-credit-before-marker",
         fault_boundary=FaultBoundary.EFFECT_COMMIT,
@@ -145,7 +145,7 @@ def _attempt_values(
         "post_execution_tree_digest": binding.tree_digest,
         "environment_digest": capsule.environment_digest,
         "event_digest": capsule.event_digest,
-        "amount_cents": capsule.amount_cents,
+        "effect_delta": capsule.effect_delta,
         "initial_database_digest": capsule.initial_database_digest,
         "initial_database_file_digest": HASHES[7],
         "database_id": f"database-{role.value}-{index}",
@@ -286,7 +286,7 @@ def _no_fault_receipt(
         post_execution_tree_digest=binding.tree_digest,
         environment_digest=capsule.environment_digest,
         event_digest=capsule.event_digest,
-        amount_cents=capsule.amount_cents,
+        effect_delta=capsule.effect_delta,
         initial_database_digest=capsule.initial_database_digest,
         initial_database_file_digest=HASHES[7],
         database_id=f"min-database-{index}",
@@ -433,25 +433,25 @@ def _full_result_values(capsule: ReproCapsule) -> dict[str, object]:
 
 def test_canonical_digest_is_stable_and_tampering_is_rejected() -> None:
     first = _snapshot()
-    second = CreditSnapshot.with_digest(
+    second = StateSnapshot.with_digest(
         event_marker_count=1,
-        event_ledger_total_cents=2_500,
-        event_ledger_count=1,
-        account_balance_cents=2_500,
+        event_effect_total=2_500,
+        event_effect_count=1,
+        subject_total=2_500,
     )
     assert first.digest == second.digest
 
     tampered = first.model_dump(mode="json")
-    tampered["account_balance_cents"] = 5_000
+    tampered["subject_total"] = 5_000
     with pytest.raises(ValidationError, match="digest mismatch"):
-        CreditSnapshot.model_validate(tampered)
+        StateSnapshot.model_validate(tampered)
 
 
 def test_strict_models_reject_extra_fields() -> None:
     payload = _snapshot().model_dump(mode="json")
     payload["candidate_verdict"] = "ACCEPTED"
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
-        CreditSnapshot.model_validate(payload)
+        StateSnapshot.model_validate(payload)
 
 
 @pytest.mark.parametrize(
@@ -683,7 +683,7 @@ def test_completed_attempt_binds_tree_and_observation_to_snapshots() -> None:
     with pytest.raises(ValidationError, match="observation contradicts its final state"):
         AttemptReceipt.with_digest(**wrong_duplicate)
     wrong_amount = _attempt_values(capsule, binding)
-    wrong_amount["amount_cents"] = 1_000
+    wrong_amount["effect_delta"] = 1_000
     with pytest.raises(ValidationError, match="observation contradicts its final state"):
         AttemptReceipt.with_digest(**wrong_amount)
 
@@ -942,8 +942,18 @@ def test_anchor_binding_rejects_unsafe_handler_paths(path: str) -> None:
 def test_capsule_event_fields_are_bound_to_the_event_digest() -> None:
     capsule = _capsule()
     values = capsule.model_dump(mode="python", exclude={"digest"})
-    values["amount_cents"] = 5_000
+    values["event"] = {**values["event"], "amount_cents": 5_000}
     with pytest.raises(ValidationError, match="capsule event digest mismatch"):
+        ReproCapsule.with_digest(**values)
+
+    values = capsule.model_dump(mode="python", exclude={"digest"})
+    values["event_id"] = "evt-other"
+    with pytest.raises(ValidationError, match="event_id differs from its event"):
+        ReproCapsule.with_digest(**values)
+
+    values = capsule.model_dump(mode="python", exclude={"digest"})
+    values["effect_delta"] = 0
+    with pytest.raises(ValidationError, match="nonzero effect"):
         ReproCapsule.with_digest(**values)
 
 

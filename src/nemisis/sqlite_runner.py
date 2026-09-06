@@ -1,4 +1,4 @@
-"""Trusted SQLite crash supervisor and worker.
+"""Trusted SQLite crash supervisor and worker (the kernel).
 
 The kernel: seed a database, spawn the handler in its own process group, pause at every store
 commit, kill at the capsule's boundary, replay in a fresh worker, and probe durable state through
@@ -38,13 +38,13 @@ from nemisis.crash_models import (
     AnchorResolutionStatus,
     AttemptReceipt,
     CrashObservation,
-    CreditSnapshot,
     ExecutionStatus,
     FaultBoundary,
     IntegrityStatus,
     NoFaultReplayReceipt,
     ReproCapsule,
     RetryContract,
+    StateSnapshot,
     TimelineEntry,
     TimelineState,
     WorkerSpawnReceipt,
@@ -59,8 +59,8 @@ from nemisis.scenario import MAX_MESSAGE_BYTES, Event, Scenario, StoreBase, work
 from nemisis.scenarios import scenario_for
 from nemisis.scenarios.sqlite_credit_v1 import STORE_REMEDY, CreditStore
 
-RUNNER_ID = "sqlite-credit-runner-v1"
-RUNNER_VERSION = "1"
+RUNNER_ID = "sqlite-runner-v2"
+RUNNER_VERSION = "2"
 
 
 class _AttemptFailure(RuntimeError):
@@ -166,13 +166,7 @@ def runner_environment_digest() -> str:
 
 def capsule_event(capsule: ReproCapsule) -> Event:
     """The exact event a capsule replays, in the shape its scenario validates."""
-    return scenario_for(capsule.scenario_id).normalize_event(
-        {
-            "account_id": capsule.account_id,
-            "amount_cents": capsule.amount_cents,
-            "event_id": capsule.event_id,
-        }
-    )
+    return scenario_for(capsule.scenario_id).normalize_event(capsule.event)
 
 
 def bind_anchor(
@@ -294,10 +288,10 @@ def execute_attempt(
     started_at = datetime.now(UTC)
     timeline = [TimelineEntry(state=TimelineState.PREFLIGHT, timestamp=started_at)]
     spawns: list[_Spawn] = []
-    pre: CreditSnapshot | None = None
-    checkpoint: CreditSnapshot | None = None
-    post_kill: CreditSnapshot | None = None
-    final: CreditSnapshot | None = None
+    pre: StateSnapshot | None = None
+    checkpoint: StateSnapshot | None = None
+    post_kill: StateSnapshot | None = None
+    final: StateSnapshot | None = None
     initial_file_digest: str | None = None
     status = ExecutionStatus.COMPLETED
     integrity = IntegrityStatus.VALID
@@ -394,7 +388,9 @@ def execute_attempt(
                 integrity=IntegrityStatus.INVALID,
             )
         _require_only_the_store_wrote(work_dir.resolve(), database)
-        observation = classify_final(final, scenario.effect_delta(event))
+        observation = classify_final(
+            final, scenario.effect_delta(event), scenario.initial_total(event)
+        )
     except _AttemptFailure as error:
         status, integrity, failure_detail = error.status, error.integrity, error.detail
     except (OSError, sqlite3.Error, ValueError) as error:
@@ -430,7 +426,7 @@ def execute_attempt(
         post_execution_tree_digest=tree_after,
         environment_digest=capsule.environment_digest,
         event_digest=capsule.event_digest,
-        amount_cents=capsule.amount_cents,
+        effect_delta=capsule.effect_delta,
         initial_database_digest=capsule.initial_database_digest,
         initial_database_file_digest=initial_file_digest,
         database_id=database_id,
@@ -465,9 +461,9 @@ def execute_no_fault_replay(
     """Deliver the event twice in fresh workers with no kill, recording every store commit."""
     started_at = datetime.now(UTC)
     spawns: list[_Spawn] = []
-    initial: CreditSnapshot | None = None
-    first_delivery: CreditSnapshot | None = None
-    final: CreditSnapshot | None = None
+    initial: StateSnapshot | None = None
+    first_delivery: StateSnapshot | None = None
+    final: StateSnapshot | None = None
     initial_file_digest: str | None = None
     tree_after: str | None = None
     status = ExecutionStatus.COMPLETED
@@ -540,7 +536,9 @@ def execute_no_fault_replay(
                 integrity=IntegrityStatus.INVALID,
             )
         _require_only_the_store_wrote(work_dir.resolve(), database)
-        observation = classify_delivery(first_delivery, final, scenario.effect_delta(event))
+        observation = classify_delivery(
+            first_delivery, final, scenario.effect_delta(event), scenario.initial_total(event)
+        )
     except _AttemptFailure as error:
         status, integrity, failure_detail = error.status, error.integrity, error.detail
     except (OSError, sqlite3.Error, ValueError) as error:
@@ -564,7 +562,7 @@ def execute_no_fault_replay(
         post_execution_tree_digest=tree_after,
         environment_digest=capsule.environment_digest,
         event_digest=capsule.event_digest,
-        amount_cents=capsule.amount_cents,
+        effect_delta=capsule.effect_delta,
         initial_database_digest=capsule.initial_database_digest,
         initial_database_file_digest=initial_file_digest,
         database_id=database_id,
@@ -721,13 +719,13 @@ def _require_others_untouched(
     if _probe_others(scenario, database, event) != scenario.seeded_others_digest:
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
-            "rows that belong to other accounts or events changed during the run; something "
+            f"rows that belong to {scenario.others_noun} changed during the run; something "
             "wrote around the trusted store",
             integrity=IntegrityStatus.INVALID,
         )
 
 
-def _probe(scenario: Scenario, path: Path, event: Mapping[str, object]) -> CreditSnapshot:
+def _probe(scenario: Scenario, path: Path, event: Mapping[str, object]) -> StateSnapshot:
     normalized = scenario.normalize_event(event)
     try:
         with _read_only(path) as connection:
@@ -756,7 +754,7 @@ def _spawn_worker(
         "-I",
         "-B",
         "-m",
-        "nemisis.sqlite_credit",
+        "nemisis.sqlite_runner",
         "_worker",
         scenario.scenario_id,
         str(source_tree),
@@ -840,9 +838,9 @@ def _wait_for_checkpoint(
     fault_boundary: FaultBoundary,
     timeout_seconds: float,
     *,
-    previous: CreditSnapshot,
+    previous: StateSnapshot,
     kill_after_commit: int | None = None,
-) -> CreditSnapshot:
+) -> StateSnapshot:
     normalized = scenario.normalize_event(event)
     deadline = monotonic() + timeout_seconds
     while True:
@@ -867,7 +865,7 @@ def _wait_for_checkpoint(
                 detail = (
                     f"the handler finished without ever committing the {scenario.effect_noun} "
                     f"(commits seen: {', '.join(spawn.operations)}); check it "
-                    f"{_verb(scenario)} at all before crash-testing it"
+                    f"{scenario.effect_verb} at all before crash-testing it"
                 )
             else:
                 detail = (
@@ -879,12 +877,8 @@ def _wait_for_checkpoint(
             raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "unexpected worker message")
 
 
-def _verb(scenario: Scenario) -> str:
-    return {"credit": "credits"}.get(scenario.effect_noun, f"makes its {scenario.effect_noun}")
-
-
 def _no_commit_detail(
-    scenario: Scenario, database: Path, event: Mapping[str, object], seeded: CreditSnapshot
+    scenario: Scenario, database: Path, event: Mapping[str, object], seeded: StateSnapshot
 ) -> str:
     """The worker finished without one store commit: say whether it wrote around the store.
 
@@ -904,10 +898,10 @@ def _no_commit_detail(
         )
     return (
         f"the handler changed the database without a single {store} commit (this event now "
-        f"shows balance {after.account_balance_cents} cents, {after.event_ledger_count} ledger "
-        f"row(s), {after.event_marker_count} marker), so the money moved through a connection "
-        f"CrashCheck does not own and no kill point exists inside that write. "
-        f"{scenario.store_remedy}"
+        f"shows {scenario.subject_noun} {scenario.format_subject(after.subject_total)}, "
+        f"{after.event_effect_count} {scenario.effect_noun} row(s), {after.event_marker_count} "
+        f"marker), so the {scenario.effect_noun} moved through a connection CrashCheck does not "
+        f"own and no kill point exists inside that write. {scenario.store_remedy}"
     )
 
 
@@ -934,8 +928,8 @@ def _finish_replay(
     *,
     database: Path,
     event: Mapping[str, object],
-    previous: CreditSnapshot,
-) -> CreditSnapshot:
+    previous: StateSnapshot,
+) -> StateSnapshot:
     """Drive one worker to completion; every durable change must be a store commit it reported."""
     deadline = monotonic() + timeout_seconds
     while True:
@@ -988,11 +982,11 @@ def _attributed_probe(
     scenario: Scenario,
     database: Path,
     event: Mapping[str, object],
-    previous: CreditSnapshot,
+    previous: StateSnapshot,
     message: Mapping[str, object],
     *,
     spawn: _Spawn | None = None,
-) -> CreditSnapshot:
+) -> StateSnapshot:
     """Probe after a reported commit and refuse any change the named operation cannot explain.
 
     A handler that writes to the database through its own connection never pauses the
@@ -1010,18 +1004,19 @@ def _attributed_probe(
             f"worker reported an unknown store operation {operation!r}",
         )
     observed = (
-        snapshot.account_balance_cents - previous.account_balance_cents,
-        snapshot.event_ledger_count - previous.event_ledger_count,
-        snapshot.event_ledger_total_cents - previous.event_ledger_total_cents,
+        snapshot.subject_total - previous.subject_total,
+        snapshot.event_effect_count - previous.event_effect_count,
+        snapshot.event_effect_total - previous.event_effect_total,
         snapshot.event_marker_count - previous.event_marker_count,
     )
     wanted = expected(normalized)
     if observed != wanted:
+        subject, rows = scenario.subject_noun, f"{scenario.effect_noun} rows"
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
             f"the durable change after {operation} was not the one {operation} makes: the probe "
-            f"saw balance {observed[0]:+d}, ledger rows {observed[1]:+d}, marker {observed[3]:+d} "
-            f"for this event, not balance {wanted[0]:+d}, ledger rows {wanted[1]:+d}, marker "
+            f"saw {subject} {observed[0]:+d}, {rows} {observed[1]:+d}, marker {observed[3]:+d} "
+            f"for this event, not {subject} {wanted[0]:+d}, {rows} {wanted[1]:+d}, marker "
             f"{wanted[3]:+d}; either something wrote around the trusted store or a store call "
             f"was made with values that are not this event's. {scenario.store_remedy}",
             integrity=IntegrityStatus.INVALID,

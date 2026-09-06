@@ -16,8 +16,8 @@ CrashCheck is the primary product surface.
 
 - Input: issue text, one synchronous `module:function` target, exact base and candidate sources,
   and an optional corrected control.
-- Contract: accepted, base-owned JSON selecting only the fixed `sqlite-credit-v1` event, fault,
-  probe, predicate, and adapter catalog.
+- Contract: accepted, base-owned JSON selecting only one registered scenario's fixed event,
+  fault, probe, predicate, and adapter catalog (`sqlite-credit-v1` or `sqlite-inventory-v1`).
 - Output: every run publishes a JSON manifest plus the capsule, contract, event, and metadata of its
   content-addressed repro directory. Attempt-bearing runs add a static report; runs that completed
   with valid integrity add the executable regression. A pre-execution anchor failure instead adds a
@@ -79,6 +79,10 @@ store call that expresses the same fix. That is `EVIDENCE_INCOMPLETE` (exit `2`)
 never a fail, because the kill could not be placed where the money moved.
 `fixture:sqlite-credit-v1/raw-sql` is exactly that handler, one flag away.
 
+The inventory scenario's store has the same shape with its own names: `reserved(event_id)`,
+`reserve(sku, event_id, quantity)`, `mark_reserved(event_id)`, and the one-line
+`reserve_and_mark(sku, event_id, quantity)`.
+
 ## Verdict contract
 
 | Verdict | Exit | Exact meaning |
@@ -128,8 +132,9 @@ tree, event, database, worker, execution, and capsule identities.
 ## Alpha boundary
 
 Supported: Python 3.12+, POSIX process groups and `SIGKILL`, SQLite WAL with
-`synchronous=FULL`, the fixed trusted `CreditStore` adapter, `sqlite-credit-v1`, exact fixture/local
-directory/Git sources, and trusted owner checkouts.
+`synchronous=FULL`, the two registered scenarios and their fixed trusted stores (`sqlite-credit-v1`
+/ `CreditStore`, `sqlite-inventory-v1` / `InventoryStore`), exact fixture/local directory/Git
+sources, and trusted owner checkouts.
 
 Unsupported: arbitrary languages, databases, side effects, handlers outside the fixed adapter
 shape, hostile local fork execution, generalized schedule or interleaving search, model-authored
@@ -141,7 +146,7 @@ untrusted input and is judged like any other.
 
 | Claim | Implementation | Executable check | Truth / exact evidence |
 | --- | --- | --- | --- |
-| Real durable checkpoint, process-group kill, fresh replay worker, identical event | `sqlite_credit.py`, `crashcheck.py` | `test_sqlite_credit.py`, `test_crashcheck.py` | `LOCAL` / `FIXTURE`; [successful workflow at exact `f05ae921cf3d866f69adf8415d6d7bd52071bf37`](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355) |
+| Real durable checkpoint, process-group kill, fresh replay worker, identical event | `sqlite_runner.py`, `crashcheck.py` | `test_sqlite_runner.py`, `test_crashcheck.py` | `LOCAL` / `FIXTURE`; [successful workflow at exact `f05ae921cf3d866f69adf8415d6d7bd52071bf37`](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355) |
 | Candidate-blind two-hypothesis selection before candidate materialization | `crashcheck.py` | candidate-invariance and hunt tests | Same exact workflow above |
 | The base's duplicate needs the crash (no-crash control) | `crashcheck.py`, `crash_models.py` | control, freshness, and tamper tests | Two fresh no-kill base deliveries end exactly once |
 | Five fresh worlds per claimed tree and scoped verdicts | `crash_models.py`, `crashcheck.py` | role and verdict model/integration tests | Same exact workflow above |

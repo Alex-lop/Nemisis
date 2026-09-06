@@ -107,13 +107,11 @@ def test_rejects_unknown_refs_before_creating_a_destination(tmp_path: Path) -> N
         materialize_fixture("fixture:sqlite-credit-v1/unknown", destination)
     assert not destination.exists()
     assert HERO_REFS == (BUGGY_REF, MISLEADING_GREEN_REF, ATOMIC_REF)
-    assert (
-        *HERO_REFS,
-        MARK_FIRST_REF,
-        LEFTOVER_CREDIT_REF,
-        NEVER_MARKS_REF,
-        RAW_SQL_REF,
-    ) == FIXTURE_REFS
+    credit_refs = (*HERO_REFS, MARK_FIRST_REF, LEFTOVER_CREDIT_REF, NEVER_MARKS_REF, RAW_SQL_REF)
+    assert FIXTURE_REFS[: len(credit_refs)] == credit_refs
+    assert all(
+        ref.startswith("fixture:sqlite-inventory-v1/") for ref in FIXTURE_REFS[len(credit_refs) :]
+    )
 
 
 def test_raw_sql_tree_cannot_run_the_in_memory_unit_test(tmp_path: Path) -> None:

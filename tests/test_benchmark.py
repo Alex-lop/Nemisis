@@ -27,7 +27,7 @@ from nemisis.crash_models import (
 from nemisis.crashcheck import _audited_contract, _seal_capsule
 from nemisis.hashing import canonical_json, sha256_json
 from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
-from nemisis.sqlite_credit import runner_environment_digest
+from nemisis.sqlite_runner import runner_environment_digest
 
 TREE_DIGESTS = {
     BUGGY_REF: "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",

@@ -1,0 +1,16 @@
+{
+  "adapter_id": "inventory-store-v1",
+  "event_digest": "f476dc612df218114e0073a77fd6a0bd00d4595ea6efb75bccfd8aea440bd0c9",
+  "event_fixture_id": "order-1-v1",
+  "fault_intent_id": "first-reservation-effect-commit-v1",
+  "issue_digest": "9348080afa767b7ea96370dd910e43374a1163e3d7a62a3186e27daf42bbe145",
+  "originating_base_ref": "fixture:sqlite-inventory-v1/buggy",
+  "originating_base_tree_digest": "b7203d3b948d95e5f829839f791fc63e0ce2a9aca0f08a75351d536ac86859a7",
+  "predicate_ids": [
+    "single-reservation-and-marker-v1"
+  ],
+  "probe_id": "stock-state-v1",
+  "scenario_id": "sqlite-inventory-v1",
+  "schema_version": "nemisis.retry-contract.v1",
+  "target": "app.inventory:reserve_inventory"
+}

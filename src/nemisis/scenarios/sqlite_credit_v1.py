@@ -6,9 +6,9 @@ import sqlite3
 from collections.abc import Mapping
 from typing import Any
 
-from nemisis.crash_models import CrashVerdict, CreditSnapshot, FaultBoundary
+from nemisis.crash_models import CrashVerdict, FaultBoundary, StateSnapshot
+from nemisis.display import money
 from nemisis.hashing import sha256_json
-from nemisis.report import money
 from nemisis.scenario import Event, Scenario, StoreBase, connect
 
 SCENARIO_ID = "sqlite-credit-v1"
@@ -159,7 +159,7 @@ def seed(connection: sqlite3.Connection, event: Event) -> None:
     )
 
 
-def probe(connection: sqlite3.Connection, event: Event) -> CreditSnapshot:
+def probe(connection: sqlite3.Connection, event: Event) -> StateSnapshot:
     account = connection.execute(
         "SELECT balance_cents FROM accounts WHERE account_id = ?", (event["account_id"],)
     ).fetchone()
@@ -172,10 +172,10 @@ def probe(connection: sqlite3.Connection, event: Event) -> CreditSnapshot:
     ).fetchone()
     if account is None or ledger is None or marker is None:
         raise sqlite3.OperationalError("read-only state probe was incomplete")
-    return CreditSnapshot.with_digest(
-        account_balance_cents=int(account[0]),
-        event_ledger_count=int(ledger[0]),
-        event_ledger_total_cents=int(ledger[1]),
+    return StateSnapshot.with_digest(
+        subject_total=int(account[0]),
+        event_effect_count=int(ledger[0]),
+        event_effect_total=int(ledger[1]),
         event_marker_count=int(marker[0]),
     )
 
@@ -212,13 +212,17 @@ def effect_delta(event: Event) -> int:
     return amount
 
 
-def checkpoint_reached(snapshot: CreditSnapshot, event: Event, boundary: FaultBoundary) -> bool:
+def initial_total(event: Event) -> int:
+    return 0
+
+
+def checkpoint_reached(snapshot: StateSnapshot, event: Event, boundary: FaultBoundary) -> bool:
     """The capsule's kill point: one durable credit, plus its marker at the marker boundary."""
     amount = effect_delta(event)
     return (
-        snapshot.account_balance_cents == amount
-        and snapshot.event_ledger_count == 1
-        and snapshot.event_ledger_total_cents == amount
+        snapshot.subject_total == amount
+        and snapshot.event_effect_count == 1
+        and snapshot.event_effect_total == amount
         and (boundary is FaultBoundary.EFFECT_COMMIT or snapshot.event_marker_count == 1)
     )
 
@@ -227,22 +231,24 @@ def _plus_dollars(cents: int) -> str:
     return f"+${cents // 100}" if cents % 100 == 0 else f"+${cents / 100:.2f}"
 
 
-def describe_final(final: CreditSnapshot, event_id: str, amount: int) -> str:
-    money_now = money(final.account_balance_cents)
-    rows = f"{final.event_ledger_count} ledger row{'s' if final.event_ledger_count != 1 else ''}"
+def describe_final(final: StateSnapshot, event: Event) -> str:
+    event_id, amount = event["event_id"], effect_delta(event)
+    money_now = money(final.subject_total)
+    rows = f"{final.event_effect_count} ledger row{'s' if final.event_effect_count != 1 else ''}"
     marker = f"{final.event_marker_count} marker"
-    if final.event_ledger_count == 0 and final.event_marker_count == 1:
+    if final.event_effect_count == 0 and final.event_marker_count == 1:
         cause = f"{event_id} was marked processed but never credited, so the credit is lost"
-    elif final.event_ledger_count == 2:
+    elif final.event_effect_count == 2:
         cause = f"{event_id} was credited twice"
-    elif final.event_ledger_count > 2:
-        cause = f"{event_id} was credited {final.event_ledger_count} times"
+    elif final.event_effect_count > 2:
+        cause = f"{event_id} was credited {final.event_effect_count} times"
     else:
         cause = "the final state matches neither exactly-once nor the capsule's duplicate shape"
     return f"{money_now} instead of {money(amount)} ({rows}, {marker}): {cause}"
 
 
-def verdict_summary(verdict: CrashVerdict, event_id: str, amount: int) -> str:
+def verdict_summary(verdict: CrashVerdict, event: Event) -> str:
+    event_id, amount = event["event_id"], effect_delta(event)
     duplicate = _plus_dollars(amount * 2)
     return {
         CrashVerdict.BUG_REPRODUCED: (
@@ -299,8 +305,15 @@ SCENARIO = Scenario(
     store_api_fallback=STORE_API_FALLBACK,
     normalize_event=normalize_event,
     effect_delta=effect_delta,
+    initial_total=initial_total,
     checkpoint_reached=checkpoint_reached,
+    scalar_name="amount_cents",
+    scalar_bounds=(1, 1_000_000),
+    subject_noun="balance",
     effect_noun="credit",
+    effect_verb="credits",
+    others_noun="other accounts or events",
+    format_subject=money,
     describe_final=describe_final,
     verdict_summary=verdict_summary,
 )

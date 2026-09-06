@@ -6,7 +6,7 @@ import argparse
 import json
 import os
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -19,8 +19,8 @@ from nemisis.fixture import FIXTURE_ID
 from nemisis.hashing import canonical_json
 from nemisis.local import LocalVerification, verify_local
 from nemisis.models import RuntimeMode
-from nemisis.report import money
-from nemisis.scenarios import SCENARIOS
+from nemisis.scenario import Scenario
+from nemisis.scenarios import SCENARIOS, scenario_for
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -49,7 +49,12 @@ def _parser() -> argparse.ArgumentParser:
         "--target", required=True, help="module:function handler, e.g. app.credits:apply_credit"
     )
     init.add_argument("--base", required=True, help=f"exact base source: {ref_help}")
-    init.add_argument("--scenario", default=SCENARIO_ID, choices=sorted(SCENARIOS))
+    init.add_argument(
+        "--scenario",
+        default=None,
+        choices=sorted(SCENARIOS),
+        help=f"default: the scenario a fixture base names, else {SCENARIO_ID}",
+    )
     init.add_argument(
         "--accept-contract",
         metavar="DIGEST",
@@ -71,7 +76,12 @@ def _parser() -> argparse.ArgumentParser:
     propose.add_argument(
         "--out", type=Path, required=True, help="new directory for the candidate tree"
     )
-    propose.add_argument("--scenario", default=SCENARIO_ID, choices=sorted(SCENARIOS))
+    propose.add_argument(
+        "--scenario",
+        default=None,
+        choices=sorted(SCENARIOS),
+        help=f"default: the scenario a fixture base names, else {SCENARIO_ID}",
+    )
     propose.add_argument("--json", action="store_true")
 
     crashcheck = commands.add_parser("check", help="run a crash/retry counterexample")
@@ -82,10 +92,11 @@ def _parser() -> argparse.ArgumentParser:
     crashcheck.add_argument("--corrected", help=f"optional known-good control: {ref_help}")
     crashcheck.add_argument(
         "--scenario",
-        default=SCENARIO_ID,
+        default=None,
         help=(
-            f"{' or '.join(sorted(SCENARIOS))} (audited fixture contract) or a path to an "
-            "accepted config.json"
+            f"{' or '.join(sorted(SCENARIOS))} (that scenario's audited fixture contract) or a "
+            f"path to an accepted config.json; default: the scenario a fixture base names, else "
+            f"{SCENARIO_ID}"
         ),
     )
     crashcheck.add_argument(
@@ -192,6 +203,7 @@ def _print_crash_result(
     print(f"engine code digest: {result.engine_code_digest}")
     if result.engine_source_commit is not None:
         print(f"engine source commit: {result.engine_source_commit}")
+    quantity = _subject_formatter(result)
     if result.hypothesis_receipts:
         selected = next(
             (receipt for receipt in result.hypothesis_receipts if receipt.selected), None
@@ -221,7 +233,7 @@ def _print_crash_result(
         points = ", ".join(
             f"#{attempt.kill_after_commit} -> "
             + (
-                money(attempt.final_snapshot.account_balance_cents)
+                quantity(attempt.final_snapshot.subject_total)
                 if attempt.final_snapshot is not None
                 else "no final state"
             )
@@ -268,8 +280,8 @@ def _print_crash_result(
             )
             print(
                 "timeline: "
-                f"{money(checkpoint.account_balance_cents)} durable{kill_point} -> "
-                f"{signal_name} -> fresh worker -> {money(final.account_balance_cents)}"
+                f"{quantity(checkpoint.subject_total)} durable{kill_point} -> "
+                f"{signal_name} -> fresh worker -> {quantity(final.subject_total)}"
             )
     author = getattr(result, "candidate_author", None)
     if author is not None:
@@ -285,6 +297,38 @@ def _print_crash_result(
     for name, path in sorted(result.artifacts.items()):
         projected = Path(path) if artifact_root is None else artifact_root / path
         print(f"{name}: {projected}")
+
+
+def _scenario_argument(scenario: str | None, base: str) -> str:
+    """An unstated scenario is the one a fixture base belongs to; otherwise the hero's."""
+    if scenario is not None:
+        return scenario
+    if base.startswith("fixture:"):
+        try:
+            return parse_ref(base)[0].scenario_id
+        except ValueError:
+            return SCENARIO_ID
+    return SCENARIO_ID
+
+
+def _subject_formatter(result: CrashCheckResult) -> Callable[[int], str]:
+    """The scenario's own words for its quantity; the scenario id travels with every binding."""
+    scenario_id = next(
+        (
+            item.scenario_id
+            for group in (
+                getattr(result, "bindings", ()),
+                getattr(result, "anchor_resolutions", ()),
+            )
+            for item in group
+        ),
+        None,
+    )
+    try:
+        scenario: Scenario = scenario_for(scenario_id)
+    except ValueError:
+        return str
+    return scenario.format_subject
 
 
 def _print_doctor(result: DoctorResult, *, as_json: bool) -> None:
@@ -424,6 +468,7 @@ def main() -> None:
             return
 
         if args.command == "init":
+            args.scenario = _scenario_argument(args.scenario, args.base)
             proposal = None
             if args.nemotron:
                 from nemisis.nemotron import NemotronError
@@ -458,6 +503,7 @@ def main() -> None:
             from nemisis.agent_patch import PatchError, describe, propose_patch
             from nemisis.nemotron import NemotronError
 
+            args.scenario = _scenario_argument(args.scenario, args.base)
             try:
                 patch = propose_patch(args.issue, args.base, args.out, args.scenario)
             except (NemotronError, PatchError) as error:
@@ -495,12 +541,13 @@ def main() -> None:
             from nemisis.crash_fixture import materialize_fixture
 
             exported = materialize_fixture(args.ref, args.out)
+            scenario = parse_ref(args.ref)[0]
             print(f"exported: {exported.path}")
             print(f"tree: {exported.tree_digest}")
-            print(f"edit: {exported.path / 'app' / 'credits.py'}")
+            print(f"edit: {exported.path / scenario.handler_relative}")
             print(
-                f"next: nemisis check --base {parse_ref(args.ref)[0].buggy_ref} "
-                f"--candidate {args.out} --mode local"
+                f"next: nemisis check --base {scenario.buggy_ref} --candidate {args.out} "
+                "--mode local"
             )
             return
 
@@ -522,7 +569,7 @@ def main() -> None:
                 crash_result = check(
                     args.base,
                     args.candidate,
-                    args.scenario,
+                    _scenario_argument(args.scenario, args.base),
                     corrected=args.corrected,
                     mode=args.mode,
                 )

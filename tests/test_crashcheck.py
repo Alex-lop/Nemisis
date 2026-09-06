@@ -797,27 +797,27 @@ def test_git_source_archive_enforces_the_file_cap(
 
 
 @pytest.mark.parametrize(
-    ("field", "value"),
-    [("event_id", "evt_forged"), ("amount_cents", 1), ("engine_code_digest", "0" * 64)],
+    "field", ["event_id", "amount_cents", "effect_delta", "engine_code_digest"]
 )
 def test_forged_capsule_is_rejected_before_source_materialization(
     hero: tuple[Path, CrashCheckResult],
     monkeypatch: pytest.MonkeyPatch,
     field: str,
-    value: object,
 ) -> None:
     root, result = hero
     capsule = ReproCapsule.model_validate_json(_artifact(root, result, "capsule").read_bytes())
     values = capsule.model_dump(mode="python", exclude={"digest"})
-    values[field] = value
+    if field == "event_id":
+        values["event"] = {**values["event"], "event_id": "evt_forged"}
+        values["event_id"] = "evt_forged"
+    elif field == "amount_cents":
+        values["event"] = {**values["event"], "amount_cents": 1}
+    elif field == "effect_delta":
+        values["effect_delta"] = 1
+    else:
+        values["engine_code_digest"] = "0" * 64
     if field in {"event_id", "amount_cents"}:
-        values["event_digest"] = sha256_json(
-            {
-                "account_id": values["account_id"],
-                "amount_cents": values["amount_cents"],
-                "event_id": values["event_id"],
-            }
-        )
+        values["event_digest"] = sha256_json(values["event"])
     forged = ReproCapsule.with_digest(**values)
 
     def materialize_must_not_run(*_args: object, **_kwargs: object) -> None:
