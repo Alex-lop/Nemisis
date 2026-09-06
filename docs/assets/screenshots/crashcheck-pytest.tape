@@ -16,6 +16,6 @@ Set WindowBarSize 36
 
 Type "uv run pytest -q"
 Enter
-Sleep 80s
+Sleep 300s
 Screenshot docs/assets/screenshots/terminal-pytest-green.png
 Sleep 1s
