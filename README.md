@@ -8,6 +8,11 @@
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB.svg)
 
+Nemisis is the command-line tool; CrashCheck is the check it runs. Your tests call the handler
+once, in one process, with nothing going wrong. CrashCheck runs the patch in a real worker
+process, kills it the moment a write becomes durable, restarts it, replays the same event, and
+reads what actually survived. One command, one verdict, an exit code CI can block on.
+
 A coding agent fixes "retries sometimes credit an order twice". Its patch passes the test suite.
 It passes an ordinary call-it-twice check. Then a worker is `SIGKILL`ed right after the `$25`
 credit hits disk, the retry runs in a fresh process, and the account holds `$50`.
