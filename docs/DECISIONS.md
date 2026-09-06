@@ -165,3 +165,23 @@ Pin `contree-client[httpx]==0.3.0`. When selected, the documented high-level SDK
 available in a published `contree-sdk` build, while the official low-level client exposed the image,
 operation, file, stream, and metrics receipts required by the verifier. Revisit this seam when the
 published high-level interface provides equivalent evidence.
+
+## The Scenario seam (2026-09-06)
+
+The hardcoded points listed above now read from one object, `nemisis.scenario.Scenario`, whose
+only instance is `nemisis.scenarios.sqlite_credit_v1.SCENARIO`. It supplies the catalog ids, the
+target, the packaged resources and their pinned digests, the SQLite schema and seed, the trusted
+store class the handler is handed, the delta each store operation may make (attribution), the
+event shape and its normalization, the checkpoint predicate, the effect delta the verdict rule
+uses, the repro directory name, and the words a summary prints. The kernel in `sqlite_credit.py`
+and `crashcheck.py` reads the scenario and special-cases nothing; the worker is told the scenario
+id on its command line and constructs the scenario's store. The scenario modules are trusted
+engine resources and enter the engine code digest.
+
+This refactor changed no behavior: every packaged tree keeps its verdict, exit code, and summary,
+and the capsule and hunt contents are identical apart from the engine and runner digests that
+cover the moved bytes. What it does not yet do is make the receipts generic: `CreditSnapshot`,
+`classify_final`, the capsule's `account_id` and `amount_cents`, and `money()` in the CLI and
+report are still credit-shaped. A second scenario has to rename those honestly (a generic
+four-field snapshot whose names do not lie) and regenerate the hero; that is the next seam, not
+this one.

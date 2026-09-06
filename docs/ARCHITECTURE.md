@@ -96,8 +96,11 @@ sweep (census and one kill world per commit) for the corrected tree.
 
 ## CrashCheck kernel
 
-The current adapter accepts one synchronous two-argument Python handler using the trusted
-`CreditStore` API:
+Everything scenario-specific (catalog ids, schema, seed, store class, attribution deltas, event
+shape, checkpoint predicate, display words) lives in one `nemisis.scenario.Scenario` object;
+`sqlite-credit-v1` is the registered instance (`nemisis.scenarios`). The kernel reads it and
+special-cases nothing. The current adapter accepts one synchronous two-argument Python handler
+using the trusted `CreditStore` API:
 
 1. Prepare a closed SQLite seed using integer cents, WAL, and `synchronous=FULL`.
 2. Spawn the handler in a controller-owned process group and IPC session.

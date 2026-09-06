@@ -40,6 +40,7 @@ from nemisis.crashcheck import (
 )
 from nemisis.hashing import canonical_json
 from nemisis.models import TruthLabel
+from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
 
 TARGET = "app.credits:apply_credit"
 
@@ -655,7 +656,7 @@ def test_replay_base_role_can_reproduce_but_never_prove_a_fix(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
-    capsule = _seal_capsule(_audited_contract())
+    capsule = _seal_capsule(_audited_contract(CREDIT))
 
     reproduced = replay(capsule, BUGGY_REF, role="base")
     assert reproduced.verdict is CrashVerdict.BUG_REPRODUCED
@@ -709,7 +710,7 @@ def test_exported_capsule_refuses_a_substituted_accepted_contract(
 ) -> None:
     monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
     monkeypatch.chdir(tmp_path)
-    audited = _audited_contract()
+    audited = _audited_contract(CREDIT)
     capsule = _seal_capsule(audited)
     other = RetryContract.with_digest(
         **audited.model_dump(mode="python", exclude={"digest", "accepted", "truth_label"})
@@ -739,7 +740,9 @@ def test_replay_live_mode_is_blocked_without_substitution(
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "empty-config"))
     monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
 
-    result = replay(_seal_capsule(_audited_contract()), ATOMIC_REF, role="corrected", mode="live")
+    result = replay(
+        _seal_capsule(_audited_contract(CREDIT)), ATOMIC_REF, role="corrected", mode="live"
+    )
 
     assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
     assert result.transport is TruthLabel.LIVE

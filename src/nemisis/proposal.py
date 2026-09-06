@@ -24,6 +24,7 @@ from nemisis.crashcheck import (
 )
 from nemisis.hashing import canonical_json, sha256_text
 from nemisis.nemotron import NemotronClient, NemotronContractGeneration
+from nemisis.scenarios import scenario_for
 from nemisis.sqlite_credit import AnchorResolutionError, bind_anchor
 
 PROPOSAL_NAME = "proposal.json"
@@ -57,9 +58,11 @@ def propose_contract(
     client: Proposer | None = None,
 ) -> ContractProposal:
     """Ask the model to bind the issue to the audited catalog; accept only an exact match."""
-    if scenario_id != SCENARIO_ID:
-        raise ProposalError(f"unsupported scenario: {scenario_id}")
-    audited = load_contract()
+    try:
+        scenario = scenario_for(scenario_id)
+    except ValueError as error:
+        raise ProposalError(str(error)) from error
+    audited = load_contract(scenario)
     if target != audited["target"]:
         raise ProposalError(
             f"Nemotron proposals support only the audited target {audited['target']} in this alpha"
@@ -76,7 +79,7 @@ def propose_contract(
         source = _materialize_source(base, Path(temporary) / "base")
         try:
             binding = bind_anchor(
-                _audited_contract(),
+                _audited_contract(scenario),
                 source.path,
                 source_ref=source.ref,
                 resolved_source_identity=source.resolved_identity,
@@ -100,7 +103,7 @@ def propose_contract(
     generation = proposer.generate_contract(
         issue_text, material, offered, {"amount_cents": AMOUNT_BOUNDS}
     )
-    event = load_event()
+    event = load_event(scenario)
     proposal = ContractProposal.with_digest(
         scenario_id=scenario_id,
         target=target,

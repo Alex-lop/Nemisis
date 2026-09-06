@@ -35,6 +35,7 @@ from nemisis.crashcheck import (
 )
 from nemisis.hashing import canonical_json, sha256_text, sha256_tree
 from nemisis.nemotron import NemotronClient, NemotronPatchGeneration
+from nemisis.scenarios import scenario_for
 from nemisis.sqlite_credit import AnchorResolutionError, bind_anchor
 
 RECEIPTS_DIR = Path(".nemisis/agent-patches")
@@ -80,8 +81,10 @@ def propose_patch(
     client: Patcher | None = None,
 ) -> PatchProposal:
     """Have the model fix the base handler; write the result as a candidate tree if it is safe."""
-    if scenario_id != SCENARIO_ID:
-        raise PatchError(f"unsupported scenario: {scenario_id}")
+    try:
+        scenario = scenario_for(scenario_id)
+    except ValueError as error:
+        raise PatchError(str(error)) from error
     output = Path(output)
     if output.exists():
         raise PatchError(f"output directory already exists: {output}")
@@ -97,7 +100,7 @@ def propose_patch(
         source = _materialize_source(base, Path(temporary) / "base")
         try:
             binding = bind_anchor(
-                _audited_contract(),
+                _audited_contract(scenario),
                 source.path,
                 source_ref=source.ref,
                 resolved_source_identity=source.resolved_identity,
@@ -111,7 +114,9 @@ def propose_patch(
             raise PatchError("base handler is not readable UTF-8") from error
 
         proposer = client if client is not None else NemotronClient()
-        generation = proposer.generate_patch(issue_text, module_source, _store_api(module_source))
+        generation = proposer.generate_patch(
+            issue_text, module_source, _store_api(module_source, scenario.store_api_fallback)
+        )
         _validate_module(generation.module_source, binding.handler_symbol)
 
         # Write the candidate tree: the exact base tree with only the handler module replaced.
@@ -144,7 +149,7 @@ def receipt_path(candidate_tree_digest: str) -> Path:
     return Path.cwd() / RECEIPTS_DIR / f"{candidate_tree_digest}.json"
 
 
-def _store_api(module_source: str) -> str:
+def _store_api(module_source: str, fallback: str) -> str:
     """The storage surface the model may use: the store Protocol as written in the base module."""
     try:
         tree = ast.parse(module_source)
@@ -160,11 +165,7 @@ def _store_api(module_source: str) -> str:
         None,
     )
     if protocol is None:
-        return (
-            "store.processed(event_id) -> bool; store.credit(account_id, event_id, amount_cents); "
-            "store.mark_processed(event_id); store.credit_and_mark(account_id, event_id, "
-            "amount_cents). Every call is one durable SQLite commit."
-        )
+        return fallback
     return ast.unparse(protocol) + "\nEvery store call is one durable SQLite commit."
 
 

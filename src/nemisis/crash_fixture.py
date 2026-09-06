@@ -1,4 +1,4 @@
-"""Audited, package-relative SQLite credit hero fixture."""
+"""Audited, package-relative fixture trees for every registered scenario."""
 
 from __future__ import annotations
 
@@ -10,57 +10,34 @@ from typing import Literal, TypedDict, cast
 
 from nemisis.hashing import canonical_json, sha256_bytes, sha256_json, sha256_tree
 from nemisis.safety import safe_destination, safe_relative_path
+from nemisis.scenario import Event, Scenario
+from nemisis.scenarios import SCENARIOS
+from nemisis.scenarios.sqlite_credit_v1 import (
+    AUDITED_CONTRACT_DIGEST,
+    CONTRACT_RESOURCE_DIGEST,
+    EVENT_DIGEST,
+    EVENT_RESOURCE_DIGEST,
+    ISSUE_DIGEST,
+)
+from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
 
-SCENARIO_ID = "sqlite-credit-v1"
-BUGGY_REF = f"fixture:{SCENARIO_ID}/buggy"
-MISLEADING_GREEN_REF = f"fixture:{SCENARIO_ID}/misleading-green"
-ATOMIC_REF = f"fixture:{SCENARIO_ID}/atomic"
-MARK_FIRST_REF = f"fixture:{SCENARIO_ID}/mark-first"
-LEFTOVER_CREDIT_REF = f"fixture:{SCENARIO_ID}/leftover-credit"
-NEVER_MARKS_REF = f"fixture:{SCENARIO_ID}/never-marks"
-RAW_SQL_REF = f"fixture:{SCENARIO_ID}/raw-sql"
+# The hero scenario's refs, by name, for the code and tests that tell its story.
+SCENARIO_ID = CREDIT.scenario_id
+BUGGY_REF = CREDIT.ref("buggy")
+MISLEADING_GREEN_REF = CREDIT.ref("misleading-green")
+ATOMIC_REF = CREDIT.ref("atomic")
+MARK_FIRST_REF = CREDIT.ref("mark-first")
+LEFTOVER_CREDIT_REF = CREDIT.ref("leftover-credit")
+NEVER_MARKS_REF = CREDIT.ref("never-marks")
+RAW_SQL_REF = CREDIT.ref("raw-sql")
 # The three-tree hero the benchmark measures, in canonical order.
-HERO_REFS = (BUGGY_REF, MISLEADING_GREEN_REF, ATOMIC_REF)
-# Every packaged tree: the hero plus the candidate zoo found by red-teaming the checker. Each zoo
-# member fooled or nearly fooled an earlier engine, except raw-sql, which is the textbook fix a
-# judge writes as one SQL transaction and which earns a remedy instead of a verdict; each is one
-# flag away for anyone to rerun.
-FIXTURE_REFS = (*HERO_REFS, MARK_FIRST_REF, LEFTOVER_CREDIT_REF, NEVER_MARKS_REF, RAW_SQL_REF)
-
-ISSUE_DIGEST = "dca9933dc39177cd391972f8ec6945b01a27d3559990566788cabb12c51c0f77"
-EVENT_DIGEST = "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293"
-EVENT_RESOURCE_DIGEST = "95db3d29c50d2c2bbb0058e4e82d8705c77e51a98e25887defc8366e96bd0e33"
-AUDITED_CONTRACT_DIGEST = "3b121eed2abbb011d5e769600690c5502bca561233007b0df5787cd49fb67e10"
-CONTRACT_RESOURCE_DIGEST = "e364533418ea5060fb6abb17b0aa84ab633315d51b7f02646acb7a0dc5fa7249"
+HERO_REFS = tuple(CREDIT.ref(variant) for variant in CREDIT.hero_variants)
+# Every packaged tree of every registered scenario; each is one flag away for anyone to rerun.
+FIXTURE_REFS = tuple(
+    scenario.ref(variant) for scenario in SCENARIOS.values() for variant in scenario.variants
+)
 
 HeroVariant = Literal["buggy", "misleading-green", "atomic"]
-FixtureVariant = Literal[
-    "buggy", "misleading-green", "atomic", "mark-first", "leftover-credit", "never-marks", "raw-sql"
-]
-
-_RESOURCE_ROOT = ("fixtures", "sqlite_credit_v1")
-_REF_TO_VARIANT: dict[str, FixtureVariant] = {
-    BUGGY_REF: "buggy",
-    MISLEADING_GREEN_REF: "misleading-green",
-    ATOMIC_REF: "atomic",
-    MARK_FIRST_REF: "mark-first",
-    LEFTOVER_CREDIT_REF: "leftover-credit",
-    NEVER_MARKS_REF: "never-marks",
-    RAW_SQL_REF: "raw-sql",
-}
-_TREE_DIGESTS: dict[FixtureVariant, str] = {
-    "buggy": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
-    "misleading-green": ("3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f"),
-    "atomic": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de",
-    "mark-first": "6dc1d31beec8c34ecc7369654cd6d47146af7ee7e1f15d762e33cb8b036b5f97",
-    "leftover-credit": "af991a61516c1d1b4cfbc2119dd8d937a8a92936cf82d90086bba4fdb40da807",
-    "never-marks": "7a9fda4e62e304c3aaa604b97ee1ea4f68c92edbe3fc1e90228b01af6dcd862d",
-    "raw-sql": "09e6dc5d9abafa8736c934516a30a9811b53f710b07fe19bff6882cfdc88bc67",
-}
-_COMMON_FILES = (
-    ("common/app/__init__.py", "app/__init__.py"),
-    ("common/tests/test_credits.py", "tests/test_credits.py"),
-)
 
 
 class FixtureEvent(TypedDict):
@@ -87,84 +64,82 @@ class AuditedContract(TypedDict):
 @dataclass(frozen=True)
 class MaterializedFixture:
     ref: str
-    variant: FixtureVariant
+    variant: str
     path: Path
     tree_digest: str
 
 
-def load_issue() -> str:
-    raw = _resource_bytes("issue.md")
-    if sha256_bytes(raw) != ISSUE_DIGEST:
+def parse_ref(ref: str) -> tuple[Scenario, str]:
+    """``fixture:<scenario id>/<variant>`` -> the registered scenario and one of its variants."""
+    scenario_id, _, variant = ref.removeprefix("fixture:").partition("/")
+    scenario = SCENARIOS.get(scenario_id) if ref.startswith("fixture:") else None
+    if scenario is None or variant not in scenario.variants:
+        raise ValueError(f"unknown fixture ref: {ref}")
+    return scenario, variant
+
+
+def load_issue(scenario: Scenario = CREDIT) -> str:
+    raw = _resource_bytes(scenario, "issue.md")
+    if sha256_bytes(raw) != scenario.issue_digest:
         raise ValueError("audited fixture issue digest mismatch")
     return raw.decode("utf-8")
 
 
-def load_event() -> FixtureEvent:
-    raw = _resource_bytes("event.json")
-    if sha256_bytes(raw) != EVENT_RESOURCE_DIGEST:
+def load_event(scenario: Scenario = CREDIT) -> Event:
+    raw = _resource_bytes(scenario, "event.json")
+    if sha256_bytes(raw) != scenario.event_resource_digest:
         raise ValueError("audited fixture event bytes changed")
-    value = _json_object(raw, "event")
-    account_id = value.get("account_id")
-    amount_cents = value.get("amount_cents")
-    event_id = value.get("event_id")
-    if (
-        set(value) != {"account_id", "amount_cents", "event_id"}
-        or not isinstance(account_id, str)
-        or type(amount_cents) is not int
-        or not isinstance(event_id, str)
-    ):
-        raise ValueError("audited fixture event has an invalid shape")
-    event = FixtureEvent(
-        account_id=account_id,
-        amount_cents=amount_cents,
-        event_id=event_id,
-    )
-    if sha256_json(event) != EVENT_DIGEST:
+    try:
+        event = scenario.normalize_event(_json_object(raw, "event"))
+    except ValueError as error:
+        raise ValueError("audited fixture event has an invalid shape") from error
+    if sha256_json(event) != scenario.event_digest:
         raise ValueError("audited fixture event digest mismatch")
     return event
 
 
-def load_event_bytes() -> bytes:
+def load_event_bytes(scenario: Scenario = CREDIT) -> bytes:
     """Return the canonical bytes replayed identically by every worker."""
-    return canonical_json(load_event())
+    return canonical_json(load_event(scenario))
 
 
-def load_contract() -> AuditedContract:
-    raw = _resource_bytes("contract.json")
-    if sha256_bytes(raw) != CONTRACT_RESOURCE_DIGEST:
+def load_contract(scenario: Scenario = CREDIT) -> AuditedContract:
+    raw = _resource_bytes(scenario, "contract.json")
+    if sha256_bytes(raw) != scenario.contract_resource_digest:
         raise ValueError("audited fixture contract bytes changed")
     value = _json_object(raw, "contract")
-    if sha256_json(value) != AUDITED_CONTRACT_DIGEST:
+    if sha256_json(value) != scenario.audited_contract_digest:
         raise ValueError("audited fixture contract digest mismatch")
     contract = cast(AuditedContract, value)
     if (
-        contract["scenario_id"] != SCENARIO_ID
-        or contract["originating_base_ref"] != BUGGY_REF
-        or contract["originating_base_tree_digest"] != _TREE_DIGESTS["buggy"]
-        or contract["issue_digest"] != ISSUE_DIGEST
-        or contract["event_digest"] != EVENT_DIGEST
+        contract["scenario_id"] != scenario.scenario_id
+        or contract["originating_base_ref"] != scenario.buggy_ref
+        or contract["originating_base_tree_digest"]
+        != scenario.tree_digests[scenario.hero_variants[0]]
+        or contract["issue_digest"] != scenario.issue_digest
+        or contract["event_digest"] != scenario.event_digest
     ):
         raise ValueError("audited fixture contract bindings changed")
-    load_issue()
-    load_event()
+    load_issue(scenario)
+    load_event(scenario)
     return contract
 
 
 def materialize_fixture(ref: str, destination: Path) -> MaterializedFixture:
     """Materialize one exact packaged source tree into a new directory."""
-    try:
-        variant = _REF_TO_VARIANT[ref]
-    except KeyError:
-        raise ValueError(f"unknown fixture ref: {ref}") from None
-    load_contract()
+    scenario, variant = parse_ref(ref)
+    load_contract(scenario)
     destination.mkdir(parents=True, exist_ok=False)
-    files = (*_COMMON_FILES, (f"trees/{variant}/app/credits.py", "app/credits.py"))
+    files = (
+        *scenario.common_files,
+        (f"trees/{variant}/{scenario.handler_relative}", scenario.handler_relative),
+    )
     for source, relative in files:
         output = safe_destination(destination, safe_relative_path(relative))
         output.parent.mkdir(parents=True, exist_ok=True)
-        output.write_bytes(_resource_bytes(source))
+        output.write_bytes(_resource_bytes(scenario, source))
     tree_digest = sha256_tree(destination)
-    if tree_digest != _TREE_DIGESTS[variant]:
+    if tree_digest != scenario.tree_digests[variant]:
         raise ValueError(f"audited fixture {variant} tree digest mismatch")
     return MaterializedFixture(
         ref=ref,
@@ -174,10 +149,10 @@ def materialize_fixture(ref: str, destination: Path) -> MaterializedFixture:
     )
 
 
-def _resource_bytes(relative: str) -> bytes:
+def _resource_bytes(scenario: Scenario, relative: str) -> bytes:
     path = safe_relative_path(relative)
     resource = resources.files("nemisis")
-    for part in (*_RESOURCE_ROOT, *path.parts):
+    for part in ("fixtures", scenario.fixture_package, *path.parts):
         resource = resource.joinpath(part)
     if not resource.is_file():
         raise ValueError(f"missing audited fixture resource: {relative}")
@@ -192,3 +167,32 @@ def _json_object(raw: bytes, label: str) -> dict[str, object]:
     if not isinstance(value, dict) or not all(isinstance(key, str) for key in value):
         raise ValueError(f"audited fixture {label} must be a JSON object")
     return cast(dict[str, object], value)
+
+
+__all__ = [
+    "ATOMIC_REF",
+    "AUDITED_CONTRACT_DIGEST",
+    "BUGGY_REF",
+    "CONTRACT_RESOURCE_DIGEST",
+    "EVENT_DIGEST",
+    "EVENT_RESOURCE_DIGEST",
+    "FIXTURE_REFS",
+    "HERO_REFS",
+    "ISSUE_DIGEST",
+    "LEFTOVER_CREDIT_REF",
+    "MARK_FIRST_REF",
+    "MISLEADING_GREEN_REF",
+    "NEVER_MARKS_REF",
+    "RAW_SQL_REF",
+    "SCENARIO_ID",
+    "AuditedContract",
+    "FixtureEvent",
+    "HeroVariant",
+    "MaterializedFixture",
+    "load_contract",
+    "load_event",
+    "load_event_bytes",
+    "load_issue",
+    "materialize_fixture",
+    "parse_ref",
+]
