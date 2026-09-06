@@ -8,6 +8,7 @@ from pathlib import Path
 from nemisis.crashcheck import engine_code_digest
 
 ROOT = Path(__file__).parents[1]
+EXAMPLE_WORKFLOW = ROOT / ".github/examples/crashcheck.yml"
 
 
 def _quoted_current_digest(document: Path, marker: str) -> str:
@@ -26,4 +27,18 @@ def test_status_and_proof_quote_the_installed_engine_digest() -> None:
     assert (
         _quoted_current_digest(ROOT / "docs/PROOF.md", r"the current engine\ncode digest is ")
         == current
+    )
+
+
+def test_example_workflow_pins_the_reviewed_action_commit_named_in_status() -> None:
+    """Anyone who copies the example gets the engine at this SHA, so it must not rot silently."""
+    pinned = re.findall(
+        r"uses: Alex-lop/Nemisis@([0-9a-f]{40})\n", EXAMPLE_WORKFLOW.read_text(encoding="utf-8")
+    )
+    assert len(pinned) == 1, "the example must pin the Nemisis action to exactly one full commit"
+    status = (ROOT / "docs/STATUS.md").read_text(encoding="utf-8")
+    match = re.search(r"reviewed action pin: `([0-9a-f]{40})`", status)
+    assert match is not None, "docs/STATUS.md no longer names a reviewed action pin"
+    assert pinned[0] == match.group(1), (
+        "the example workflow and docs/STATUS.md disagree about the reviewed action pin"
     )
