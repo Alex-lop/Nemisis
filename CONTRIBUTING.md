@@ -24,6 +24,14 @@ installed-wheel smoke test.
 - `docs/STATUS.md` and `docs/PROOF.md` quote the test count. `tests/test_readme_truth.py` fails
   when it drifts from `pytest --collect-only`.
 
+## Red-teaming the checker
+
+`uv run nemisis redteam --cases 100 --seed 1 --out ./redteam` renders a hundred handlers from a
+grammar over store operations, runs `check` on each, and compares the verdict with an oracle
+computed from the operation sequence alone. It exits `1` on any disagreement and leaves every
+handler and its evidence under `./redteam`. A disagreement is either a checker false pass or false
+fail or an oracle bug; either is worth an issue with the case's ops and summary.
+
 ## Adding a candidate to the zoo
 
 Drop a tree under `src/nemisis/fixtures/sqlite_credit_v1/trees/<name>/app/credits.py`, register the

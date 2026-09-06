@@ -52,6 +52,8 @@ New since 2026-09-05 (overnight hardening, branch `overnight/hardening`):
 - `nemisis propose-patch`: Nemotron plays the coding agent, checker-blind; its module is shape
   checked, becomes an ordinary candidate, and is named as the author in the report. `MOCKED` in
   tests; `LIVE` needs `NEBIUS_API_KEY`, absent here.
+- `nemisis redteam` generates handlers from a grammar over store operations and compares every
+  verdict with an oracle; ten cases run in the normal suite, three hundred nightly.
 - Three red-team handlers ship as `fixture:sqlite-credit-v1/{mark-first,leftover-credit,never-marks}`,
   and `fixture:sqlite-credit-v1/raw-sql` is the textbook fix written as one raw SQL transaction:
   it gets no verdict and a one-line remedy, because a write the store did not make has no kill
@@ -78,7 +80,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 386 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 412 tests, and package build: pass locally on
   Python 3.12.13 (the suite also passed on 3.13 during development);
 - exact engine CI for the committed hero: [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355);
 - exact measured-source CI: [successful run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096);

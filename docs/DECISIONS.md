@@ -202,3 +202,17 @@ fixture leaves `UNRESOLVED`, so the row the old product could not decide is the 
 new product proves. It ships with buggy, misleading-green, atomic, and mark-first trees, its issue
 text, a README row, and a wheel smoke in CI. The CLI infers the scenario from a fixture base ref;
 an explicit mismatch is refused with the flag to pass.
+
+## CI red-teams the checker every run (2026-09-06)
+
+The hardening night red-teamed the checker by hand with fifty-five agent-written handlers and
+packaged three. `nemisis redteam` turns that into a generator: a grammar over store operations
+(guard, credit, mark, the atomic call, a raw file beside the database, a raw SQL write) renders
+handler modules, `check` judges each, and an oracle that only knows the operation sequence (what
+each store call does to the durable state, where a kill can land, that a write around the store
+forfeits the verdict, that a second marker raises) names the verdict the checker must return. The
+oracle is pinned on every packaged tree and on the hardening night's shapes; ten fixed-seed cases
+run in the normal suite and a nightly workflow runs three hundred. A disagreement fails the run
+and is either a checker false pass or false fail, the most valuable bug this repository can find,
+or an oracle bug. The generator is deliberately outside the trusted engine: it writes candidates
+and reads verdicts.
