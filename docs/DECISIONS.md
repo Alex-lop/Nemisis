@@ -216,3 +216,20 @@ run in the normal suite and a nightly workflow runs three hundred. A disagreemen
 and is either a checker false pass or false fail, the most valuable bug this repository can find,
 or an oracle bug. The generator is deliberately outside the trusted engine: it writes candidates
 and reads verdicts.
+
+## Attribution is the whole database and the whole world (2026-09-06)
+
+A hostile review of the night's engine found five handlers that earned
+`FIX_PROVEN_FOR_THIS_CAPSULE` while a crash in a window no store commit can reach lost or moved
+the money: dedup state in a table the handler created inside the store's own file, a flag in
+`PRAGMA user_version`, a dedup file one directory above the worker's cwd, an empty directory as
+the flag, and a ledger row re-pointed at another account after the atomic commit (plus a renamed
+and replaced `accounts` table). One root cause: attribution watched four numbers in three tables
+and the file guard watched one directory. Now the scenario predicts the entire database after each
+reported store operation (every row of every seeded table, plus the schema and the header pragmas
+the kernel adds), the controller reads the entire database and refuses any difference, and each
+world runs in its own directory with the worker's cwd two levels inside it and `HOME` and
+`TMPDIR` inside it too; after the run that directory may hold nothing but the database and its
+WAL sidecars. Durable state by absolute path elsewhere on the machine remains a documented
+boundary. The table handler ships as `fixture:sqlite-credit-v1/shadow-table`; the others are
+pinned as tests. The generator's oracle was unaffected: its grammar has no such op yet.

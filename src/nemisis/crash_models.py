@@ -171,7 +171,7 @@ class ContractProposal(_DigestedModel):
     required_catalog_id: SafeId
     proposed_catalog_ids: tuple[SafeId, ...] = Field(min_length=1, max_length=16)
     scalar_name: SafeId
-    audited_scalar: int = Field(ge=-1_000_000, le=1_000_000)
+    audited_scalar: int = Field(gt=0, le=1_000_000)
     proposed_scalar: int = Field(ge=-1_000_000_000, le=1_000_000_000)
     accepted: bool
     model_call: ModelCallReceipt

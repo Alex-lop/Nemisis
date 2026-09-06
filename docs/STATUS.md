@@ -16,7 +16,7 @@ Committed hero evidence (regenerated 2026-09-05 at the current engine):
 
 Current tree:
 
-- engine code digest: `4edf3eda1a1d675cf6291b3ba9b8a4efcfa314592b32b14efc386362fa8b203f`
+- engine code digest: `39833a5640c9053727c7832d6b72ddb14b4684d21b04daa6043c4e32c182e53b`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
@@ -54,6 +54,12 @@ New since 2026-09-05 (overnight hardening, branch `overnight/hardening`):
   tests; `LIVE` needs `NEBIUS_API_KEY`, absent here.
 - `nemisis redteam` generates handlers from a grammar over store operations and compares every
   verdict with an oracle; ten cases run in the normal suite, three hundred nightly.
+- Attribution covers the whole database (schema, header pragmas, every row of every table) and
+  the whole per-world directory the worker runs in (cwd, its two parents, `HOME`, `TMPDIR`), after
+  a hostile review on 2026-09-06 found five handlers that earned `FIX_PROVEN_FOR_THIS_CAPSULE`
+  while losing or moving the money through a table, a pragma, a re-pointed row, a renamed table,
+  a parent-directory file, or an empty directory; each is pinned in `tests/test_verdict_paths.py`
+  and the table one ships as `fixture:sqlite-credit-v1/shadow-table`.
 - Three red-team handlers ship as `fixture:sqlite-credit-v1/{mark-first,leftover-credit,never-marks}`,
   and `fixture:sqlite-credit-v1/raw-sql` is the textbook fix written as one raw SQL transaction:
   it gets no verdict and a one-line remedy, because a write the store did not make has no kill

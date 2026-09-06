@@ -73,10 +73,11 @@ land between the credit and its marker. The three-step form (`processed` guard, 
 the duplicate.
 
 A write the store did not make has no kill point. A handler that opens its own SQLite connection
-(the same fix written as a raw `BEGIN … COMMIT` transaction, for instance) is not judged: the
-controller sees a durable change that no reported commit explains, names the write, and prints the
-store call that expresses the same fix. That is `EVIDENCE_INCOMPLETE` (exit `2`), never a pass and
-never a fail, because the kill could not be placed where the money moved.
+(the same fix written as a raw `BEGIN … COMMIT` transaction, a dedup table it creates, a flag in
+`PRAGMA user_version`, a re-pointed row) is not judged: the controller compares the whole database
+with what the reported store operations predict, names the difference, and prints the store call
+that expresses the same fix. That is `EVIDENCE_INCOMPLETE` (exit `2`), never a pass and never a
+fail, because the kill could not be placed where the money moved.
 `fixture:sqlite-credit-v1/raw-sql` is exactly that handler, one flag away.
 
 The inventory scenario's store has the same shape with its own names: `reserved(event_id)`,

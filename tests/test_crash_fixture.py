@@ -20,6 +20,7 @@ from nemisis.crash_fixture import (
     MISLEADING_GREEN_REF,
     NEVER_MARKS_REF,
     RAW_SQL_REF,
+    SHADOW_TABLE_REF,
     FixtureEvent,
     load_contract,
     load_event,
@@ -107,7 +108,14 @@ def test_rejects_unknown_refs_before_creating_a_destination(tmp_path: Path) -> N
         materialize_fixture("fixture:sqlite-credit-v1/unknown", destination)
     assert not destination.exists()
     assert HERO_REFS == (BUGGY_REF, MISLEADING_GREEN_REF, ATOMIC_REF)
-    credit_refs = (*HERO_REFS, MARK_FIRST_REF, LEFTOVER_CREDIT_REF, NEVER_MARKS_REF, RAW_SQL_REF)
+    credit_refs = (
+        *HERO_REFS,
+        MARK_FIRST_REF,
+        LEFTOVER_CREDIT_REF,
+        NEVER_MARKS_REF,
+        RAW_SQL_REF,
+        SHADOW_TABLE_REF,
+    )
     assert FIXTURE_REFS[: len(credit_refs)] == credit_refs
     assert all(
         ref.startswith("fixture:sqlite-inventory-v1/") for ref in FIXTURE_REFS[len(credit_refs) :]

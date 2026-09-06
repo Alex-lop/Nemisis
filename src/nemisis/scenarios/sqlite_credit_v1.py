@@ -4,12 +4,10 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Mapping
-from typing import Any
 
 from nemisis.crash_models import CrashVerdict, FaultBoundary, StateSnapshot
 from nemisis.display import money
-from nemisis.hashing import sha256_json
-from nemisis.scenario import Event, Scenario, StoreBase, connect
+from nemisis.scenario import Event, Scenario, StoreBase, Tables, connect
 
 SCENARIO_ID = "sqlite-credit-v1"
 SCHEMA = """
@@ -32,10 +30,12 @@ EVENT_RESOURCE_DIGEST = "95db3d29c50d2c2bbb0058e4e82d8705c77e51a98e25887defc8366
 AUDITED_CONTRACT_DIGEST = "3b121eed2abbb011d5e769600690c5502bca561233007b0df5787cd49fb67e10"
 CONTRACT_RESOURCE_DIGEST = "e364533418ea5060fb6abb17b0aa84ab633315d51b7f02646acb7a0dc5fa7249"
 # The three-tree hero, in canonical order, then the candidate zoo found by red-teaming the
-# checker. Each zoo member fooled or nearly fooled an earlier engine, except raw-sql, which is
-# the textbook fix a judge writes as one SQL transaction and which earns a remedy, not a verdict.
+# checker. Each zoo member fooled or nearly fooled an earlier engine (shadow-table fooled the
+# engine of 2026-09-06 by keeping dedup state in a table inside the store's own database), except
+# raw-sql, which is the textbook fix a judge writes as one SQL transaction and which earns a
+# remedy, not a verdict.
 HERO_VARIANTS = ("buggy", "misleading-green", "atomic")
-ZOO_VARIANTS = ("mark-first", "leftover-credit", "never-marks", "raw-sql")
+ZOO_VARIANTS = ("mark-first", "leftover-credit", "never-marks", "raw-sql", "shadow-table")
 TREE_DIGESTS: Mapping[str, str] = {
     "buggy": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
     "misleading-green": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f",
@@ -44,6 +44,7 @@ TREE_DIGESTS: Mapping[str, str] = {
     "leftover-credit": "af991a61516c1d1b4cfbc2119dd8d937a8a92936cf82d90086bba4fdb40da807",
     "never-marks": "7a9fda4e62e304c3aaa604b97ee1ea4f68c92edbe3fc1e90228b01af6dcd862d",
     "raw-sql": "09e6dc5d9abafa8736c934516a30a9811b53f710b07fe19bff6882cfdc88bc67",
+    "shadow-table": "b24b45be51d7380e9ffe582f6d3cdd4e5a92acca1ab15d9b62cd231aa0a8abdf",
 }
 
 # What a handler that wrote around the store is told, on the first run, in the summary and report.
@@ -117,12 +118,12 @@ class CreditStore(StoreBase):
         self._pause("credit_and_mark")
 
 
-# What each trusted store operation may change: (balance, ledger rows, ledger total, marker).
-STORE_OPERATIONS: Mapping[str, Any] = {
-    "credit": lambda event: (event["amount_cents"], 1, event["amount_cents"], 0),
-    "mark_processed": lambda event: (0, 0, 0, 1),
-    "credit_and_mark": lambda event: (event["amount_cents"], 1, event["amount_cents"], 1),
-}
+STORE_OPERATIONS = ("credit", "mark_processed", "credit_and_mark")
+
+
+def _next_rowid(rows: list[list[object]]) -> int:
+    """SQLite's next rowid for a table nothing ever deletes from: one past the largest."""
+    return max((row[0] for row in rows if isinstance(row[0], int)), default=0) + 1
 
 
 def normalize_event(value: object) -> Event:
@@ -159,51 +160,65 @@ def seed(connection: sqlite3.Connection, event: Event) -> None:
     )
 
 
-def probe(connection: sqlite3.Connection, event: Event) -> StateSnapshot:
-    account = connection.execute(
-        "SELECT balance_cents FROM accounts WHERE account_id = ?", (event["account_id"],)
-    ).fetchone()
-    ledger = connection.execute(
-        "SELECT COUNT(*), COALESCE(SUM(amount_cents), 0) FROM credit_ledger WHERE event_id = ?",
-        (event["event_id"],),
-    ).fetchone()
-    marker = connection.execute(
-        "SELECT COUNT(*) FROM processed_events WHERE event_id = ?", (event["event_id"],)
-    ).fetchone()
-    if account is None or ledger is None or marker is None:
-        raise sqlite3.OperationalError("read-only state probe was incomplete")
+def tables(connection: sqlite3.Connection) -> Tables:
+    """Every row of every seeded table, in canonical order; the ledger keeps insertion order."""
+    return {
+        "accounts": [
+            list(row)
+            for row in connection.execute(
+                "SELECT rowid, account_id, balance_cents FROM accounts ORDER BY account_id"
+            )
+        ],
+        "credit_ledger": [
+            list(row)
+            for row in connection.execute(
+                "SELECT id, event_id, account_id, amount_cents FROM credit_ledger ORDER BY id"
+            )
+        ],
+        "processed_events": [
+            list(row)
+            for row in connection.execute(
+                "SELECT rowid, event_id FROM processed_events ORDER BY event_id"
+            )
+        ],
+    }
+
+
+def snapshot(rows: Tables, event: Event) -> StateSnapshot:
+    """The four numbers a receipt carries, projected from the whole-database content."""
+    balance = next((row[2] for row in rows["accounts"] if row[1] == event["account_id"]), None)
+    if not isinstance(balance, int):
+        raise ValueError("the event's account row is missing")
+    ledger = [row for row in rows["credit_ledger"] if row[1] == event["event_id"]]
+    total = sum(row[3] for row in ledger if isinstance(row[3], int))
+    marker = sum(1 for row in rows["processed_events"] if row[1] == event["event_id"])
     return StateSnapshot.with_digest(
-        subject_total=int(account[0]),
-        event_effect_count=int(ledger[0]),
-        event_effect_total=int(ledger[1]),
-        event_marker_count=int(marker[0]),
+        subject_total=balance,
+        event_effect_count=len(ledger),
+        event_effect_total=total,
+        event_marker_count=marker,
     )
 
 
-def others(connection: sqlite3.Connection, event: Event) -> dict[str, list[list[object]]]:
-    """Every row that is not this event's: they must never change during a run."""
-    rows = {
-        "accounts": connection.execute(
-            "SELECT account_id, balance_cents FROM accounts WHERE account_id IS NOT ? "
-            "ORDER BY account_id",
-            (event["account_id"],),
-        ).fetchall(),
-        "credit_ledger": connection.execute(
-            "SELECT id, event_id, account_id, amount_cents FROM credit_ledger "
-            "WHERE event_id IS NOT ? ORDER BY id",
-            (event["event_id"],),
-        ).fetchall(),
-        "processed_events": connection.execute(
-            "SELECT event_id FROM processed_events WHERE event_id IS NOT ? ORDER BY event_id",
-            (event["event_id"],),
-        ).fetchall(),
-    }
-    return {name: [list(row) for row in table] for name, table in rows.items()}
-
-
-# The seed has exactly one account (this event's) and nothing else, so every other row set is
-# empty. Any later difference means something wrote around the trusted store.
-SEEDED_OTHERS_DIGEST = sha256_json({"accounts": [], "credit_ledger": [], "processed_events": []})
+def apply(rows: Tables, operation: str, event: Event) -> Tables:
+    """What the database must hold after the named store commit, and nothing else."""
+    account_id, event_id, amount = event["account_id"], event["event_id"], event["amount_cents"]
+    after: Tables = {name: [list(row) for row in table] for name, table in rows.items()}
+    if operation in {"credit", "credit_and_mark"}:
+        for row in after["accounts"]:
+            if row[1] == account_id and isinstance(row[2], int) and isinstance(amount, int):
+                row[2] = row[2] + amount
+        after["credit_ledger"].append(
+            [_next_rowid(after["credit_ledger"]), event_id, account_id, amount]
+        )
+    if operation in {"mark_processed", "credit_and_mark"}:
+        after["processed_events"] = sorted(
+            [*after["processed_events"], [_next_rowid(after["processed_events"]), event_id]],
+            key=lambda row: str(row[1]),
+        )
+    if operation not in STORE_OPERATIONS:
+        raise ValueError(f"unknown store operation {operation!r}")
+    return after
 
 
 def effect_delta(event: Event) -> int:
@@ -238,6 +253,11 @@ def describe_final(final: StateSnapshot, event: Event) -> str:
     marker = f"{final.event_marker_count} marker"
     if final.event_effect_count == 0 and final.event_marker_count == 1:
         cause = f"{event_id} was marked processed but never credited, so the credit is lost"
+    elif final.event_effect_count == 1 and final.event_marker_count == 0:
+        cause = (
+            f"{event_id} was credited but never marked processed, so the next retry credits it "
+            "again"
+        )
     elif final.event_effect_count == 2:
         cause = f"{event_id} was credited twice"
     elif final.event_effect_count > 2:
@@ -296,11 +316,11 @@ SCENARIO = Scenario(
     schema=SCHEMA,
     seed_identity=seed_identity,
     seed=seed,
-    probe=probe,
-    others=others,
-    seeded_others_digest=SEEDED_OTHERS_DIGEST,
-    store_class=CreditStore,
+    tables=tables,
+    snapshot=snapshot,
+    apply=apply,
     store_operations=STORE_OPERATIONS,
+    store_class=CreditStore,
     store_remedy=STORE_REMEDY,
     store_api_fallback=STORE_API_FALLBACK,
     normalize_event=normalize_event,

@@ -23,8 +23,11 @@ from nemisis.hashing import canonical_json
 MAX_MESSAGE_BYTES = 8_192
 
 Event = dict[str, str | int]
-# What one trusted store operation may change: (subject total, effect rows, effect total, marker).
-StoreDelta = tuple[int, int, int, int]
+# Every row of every seeded table, in canonical JSON-able form: {"table": [[col, ...], ...]}.
+# The kernel wraps it with the schema and header and attributes the whole database, so a table,
+# a pragma, or a row the scenario did not seed and no store operation predicts is a write around
+# the store.
+Tables = dict[str, list[list[object]]]
 
 
 @dataclass(frozen=True)
@@ -53,16 +56,17 @@ class Scenario:
     contract_resource_digest: str
     # Artifacts.
     repro_dir: str
-    # The database.
+    # The database: how to seed it, how to read every row of it, how to project the four numbers
+    # a receipt carries from those rows, and what each store operation does to them.
     schema: str
     seed_identity: Callable[[Event], dict[str, object]]
     seed: Callable[[sqlite3.Connection, Event], None]
-    probe: Callable[[sqlite3.Connection, Event], StateSnapshot]
-    others: Callable[[sqlite3.Connection, Event], dict[str, list[list[object]]]]
-    seeded_others_digest: str
-    # The store the handler is handed, and what each of its commits may change.
+    tables: Callable[[sqlite3.Connection], Tables]
+    snapshot: Callable[[Tables, Event], StateSnapshot]
+    apply: Callable[[Tables, str, Event], Tables]
+    store_operations: tuple[str, ...]
+    # The store the handler is handed.
     store_class: type[Any]
-    store_operations: Mapping[str, Callable[[Event], StoreDelta]]
     store_remedy: str
     store_api_fallback: str
     # The event and the rule. ``effect_delta`` is the signed change one delivery makes to the
@@ -107,7 +111,8 @@ class StoreBase:
     def __init__(self, database: Path, channel: socket.socket, event: Event) -> None:
         self._database = database
         self._channel = channel
-        self._event = event
+        # A private copy: the handler holds the same event dict and may mutate its own.
+        self._event = {name: value for name, value in event.items()}
         self._sequence = 0
 
     def _require(self, **supplied: object) -> None:
@@ -118,6 +123,8 @@ class StoreBase:
         smuggle a different row or a NULL into the trusted store's own SQL.
         """
         for name, value in supplied.items():
+            if name not in self._event:
+                raise ValueError("handler attempted an event outside the accepted contract")
             expected = self._event[name]
             if type(value) is not type(expected) or value != expected:
                 raise ValueError("handler attempted an event outside the accepted contract")
@@ -165,7 +172,7 @@ __all__ = [
     "Event",
     "Scenario",
     "StoreBase",
-    "StoreDelta",
+    "Tables",
     "connect",
     "worker_receive",
     "worker_send",
