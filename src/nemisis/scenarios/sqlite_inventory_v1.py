@@ -11,11 +11,9 @@ from __future__ import annotations
 
 import sqlite3
 from collections.abc import Mapping
-from typing import Any
 
 from nemisis.crash_models import CrashVerdict, FaultBoundary, StateSnapshot
-from nemisis.hashing import sha256_json
-from nemisis.scenario import Event, Scenario, StoreBase, connect
+from nemisis.scenario import Event, Scenario, StoreBase, Tables, connect
 
 SCENARIO_ID = "sqlite-inventory-v1"
 INITIAL_ON_HAND = 10
@@ -115,12 +113,7 @@ class InventoryStore(StoreBase):
         self._pause("reserve_and_mark")
 
 
-# What each trusted store operation may change: (on hand, reservation rows, signed change, marker).
-STORE_OPERATIONS: Mapping[str, Any] = {
-    "reserve": lambda event: (-event["quantity"], 1, -event["quantity"], 0),
-    "mark_reserved": lambda event: (0, 0, 0, 1),
-    "reserve_and_mark": lambda event: (-event["quantity"], 1, -event["quantity"], 1),
-}
+STORE_OPERATIONS = ("reserve", "mark_reserved", "reserve_and_mark")
 
 
 def normalize_event(value: object) -> Event:
@@ -157,46 +150,57 @@ def seed(connection: sqlite3.Connection, event: Event) -> None:
     )
 
 
-def probe(connection: sqlite3.Connection, event: Event) -> StateSnapshot:
-    stock = connection.execute(
-        "SELECT on_hand FROM stock WHERE sku = ?", (event["sku"],)
-    ).fetchone()
-    rows = connection.execute(
-        "SELECT COUNT(*), COALESCE(SUM(quantity), 0) FROM reservations WHERE event_id = ?",
-        (event["event_id"],),
-    ).fetchone()
-    marker = connection.execute(
-        "SELECT COUNT(*) FROM reserved_orders WHERE event_id = ?", (event["event_id"],)
-    ).fetchone()
-    if stock is None or rows is None or marker is None:
-        raise sqlite3.OperationalError("read-only state probe was incomplete")
+def tables(connection: sqlite3.Connection) -> Tables:
+    """Every row of every seeded table, in canonical order; reservations keep insertion order."""
+    return {
+        "stock": [
+            list(row) for row in connection.execute("SELECT sku, on_hand FROM stock ORDER BY sku")
+        ],
+        "reservations": [
+            list(row)
+            for row in connection.execute(
+                "SELECT event_id, sku, quantity FROM reservations ORDER BY id"
+            )
+        ],
+        "reserved_orders": [
+            list(row)
+            for row in connection.execute("SELECT event_id FROM reserved_orders ORDER BY event_id")
+        ],
+    }
+
+
+def snapshot(rows: Tables, event: Event) -> StateSnapshot:
+    """The four numbers a receipt carries; the effect total is the signed stock change."""
+    on_hand = next((row[1] for row in rows["stock"] if row[0] == event["sku"]), None)
+    if not isinstance(on_hand, int):
+        raise ValueError("the event's stock row is missing")
+    reservations = [row for row in rows["reservations"] if row[0] == event["event_id"]]
+    total = sum(row[2] for row in reservations if isinstance(row[2], int))
+    marker = sum(1 for row in rows["reserved_orders"] if row[0] == event["event_id"])
     return StateSnapshot.with_digest(
-        subject_total=int(stock[0]),
-        event_effect_count=int(rows[0]),
-        event_effect_total=-int(rows[1]),
-        event_marker_count=int(marker[0]),
+        subject_total=on_hand,
+        event_effect_count=len(reservations),
+        event_effect_total=-total,
+        event_marker_count=marker,
     )
 
 
-def others(connection: sqlite3.Connection, event: Event) -> dict[str, list[list[object]]]:
-    rows = {
-        "stock": connection.execute(
-            "SELECT sku, on_hand FROM stock WHERE sku IS NOT ? ORDER BY sku", (event["sku"],)
-        ).fetchall(),
-        "reservations": connection.execute(
-            "SELECT id, event_id, sku, quantity FROM reservations WHERE event_id IS NOT ? "
-            "ORDER BY id",
-            (event["event_id"],),
-        ).fetchall(),
-        "reserved_orders": connection.execute(
-            "SELECT event_id FROM reserved_orders WHERE event_id IS NOT ? ORDER BY event_id",
-            (event["event_id"],),
-        ).fetchall(),
-    }
-    return {name: [list(row) for row in table] for name, table in rows.items()}
-
-
-SEEDED_OTHERS_DIGEST = sha256_json({"reservations": [], "reserved_orders": [], "stock": []})
+def apply(rows: Tables, operation: str, event: Event) -> Tables:
+    """What the database must hold after the named store commit, and nothing else."""
+    sku, event_id, quantity = event["sku"], event["event_id"], event["quantity"]
+    after: Tables = {name: [list(row) for row in table] for name, table in rows.items()}
+    if operation in {"reserve", "reserve_and_mark"}:
+        for row in after["stock"]:
+            if row[0] == sku and isinstance(row[1], int) and isinstance(quantity, int):
+                row[1] = row[1] - quantity
+        after["reservations"].append([event_id, sku, quantity])
+    if operation in {"mark_reserved", "reserve_and_mark"}:
+        after["reserved_orders"] = sorted(
+            [*after["reserved_orders"], [event_id]], key=lambda row: str(row[0])
+        )
+    if operation not in STORE_OPERATIONS:
+        raise ValueError(f"unknown store operation {operation!r}")
+    return after
 
 
 def effect_delta(event: Event) -> int:
@@ -297,11 +301,11 @@ SCENARIO = Scenario(
     schema=SCHEMA,
     seed_identity=seed_identity,
     seed=seed,
-    probe=probe,
-    others=others,
-    seeded_others_digest=SEEDED_OTHERS_DIGEST,
-    store_class=InventoryStore,
+    tables=tables,
+    snapshot=snapshot,
+    apply=apply,
     store_operations=STORE_OPERATIONS,
+    store_class=InventoryStore,
     store_remedy=STORE_REMEDY,
     store_api_fallback=STORE_API_FALLBACK,
     normalize_event=normalize_event,

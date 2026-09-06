@@ -55,7 +55,7 @@ from nemisis.crash_models import (
 from nemisis.hashing import canonical_json, sha256_bytes, sha256_json, sha256_tree
 from nemisis.models import TruthLabel
 from nemisis.safety import safe_relative_path
-from nemisis.scenario import MAX_MESSAGE_BYTES, Event, Scenario, StoreBase, worker_send
+from nemisis.scenario import MAX_MESSAGE_BYTES, Event, Scenario, StoreBase, Tables, worker_send
 from nemisis.scenarios import scenario_for
 from nemisis.scenarios.sqlite_credit_v1 import STORE_REMEDY, CreditStore
 
@@ -303,17 +303,18 @@ def execute_attempt(
     database_id = f"db-{uuid.uuid4().hex}"
     tree_after: str | None = None
     root = source_tree.resolve()
-    database = work_dir.resolve() / f"{database_id}.sqlite3"
+    database = _sandbox_cwd(work_dir) / f"{database_id}.sqlite3"
     try:
         scenario = _scenario(capsule)
         event = capsule_event(capsule)
         _preflight(
             scenario, capsule, binding, root, work_dir.resolve(), execution_nonce, timeout_seconds
         )
-        work_dir.mkdir(parents=True, exist_ok=False)
+        _make_sandbox(work_dir)
         initial_file_digest = _seed_database(scenario, database, event)
         timeline.append(_entry(TimelineState.DATABASE_SEEDED, database_id))
-        pre = _probe(scenario, database, event)
+        ledger = _ledger(scenario, database, event)
+        pre = ledger.snapshot
         timeline.append(_entry(TimelineState.PRE_CRASH_PROBED))
 
         first = _spawn_worker(
@@ -329,29 +330,25 @@ def execute_attempt(
         spawns.append(first)
         timeline.append(_entry(TimelineState.FIRST_WORKER_STARTED, str(first.process.pid)))
         _expect_hello(first, capsule, execution_nonce, timeout_seconds)
-        checkpoint = _wait_for_checkpoint(
+        ledger = _wait_for_checkpoint(
             scenario,
             first,
             database,
             event,
             capsule.fault_boundary,
             timeout_seconds,
-            previous=pre,
+            ledger=ledger,
             kill_after_commit=kill_after_commit,
         )
+        checkpoint = ledger.snapshot
         checkpoint_reached = True
         timeline.append(_entry(TimelineState.CHECKPOINT_REACHED, checkpoint.digest))
         _kill_and_wait(first, timeout_seconds)
         kill_signal = signal.SIGKILL
         timeline.append(_entry(TimelineState.WORKER_KILLED, str(first.process.returncode)))
-        post_kill = _probe(scenario, database, event)
-        _require_others_untouched(scenario, database, event)
-        if post_kill.digest != checkpoint.digest:
-            raise _AttemptFailure(
-                ExecutionStatus.INTEGRITY_ERROR,
-                "durable checkpoint changed after worker death",
-                integrity=IntegrityStatus.INVALID,
-            )
+        post_kill = _require_unchanged(
+            scenario, database, event, ledger, "durable checkpoint changed after worker death"
+        )
         timeline.append(_entry(TimelineState.POST_KILL_PROBED, post_kill.digest))
 
         replay_worker = _spawn_worker(
@@ -375,7 +372,7 @@ def execute_attempt(
             timeout_seconds,
             database=database,
             event=event,
-            previous=post_kill,
+            ledger=ledger,
         )
         replay_acknowledged = True
         timeline.append(_entry(TimelineState.EVENT_REPLAYED, capsule.event_digest))
@@ -387,7 +384,7 @@ def execute_attempt(
                 "source tree changed during trusted execution",
                 integrity=IntegrityStatus.INVALID,
             )
-        _require_only_the_store_wrote(work_dir.resolve(), database)
+        _require_only_the_store_wrote(work_dir, database)
         observation = classify_final(
             final, scenario.effect_delta(event), scenario.initial_total(event)
         )
@@ -472,16 +469,17 @@ def execute_no_fault_replay(
     failure_detail: str | None = None
     database_id = f"db-{uuid.uuid4().hex}"
     root = source_tree.resolve()
-    database = work_dir.resolve() / f"{database_id}.sqlite3"
+    database = _sandbox_cwd(work_dir) / f"{database_id}.sqlite3"
     try:
         scenario = _scenario(capsule)
         event = capsule_event(capsule)
         _preflight(
             scenario, capsule, binding, root, work_dir.resolve(), execution_nonce, timeout_seconds
         )
-        work_dir.mkdir(parents=True, exist_ok=False)
+        _make_sandbox(work_dir)
         initial_file_digest = _seed_database(scenario, database, event)
-        initial = _probe(scenario, database, event)
+        ledger = _ledger(scenario, database, event)
+        initial = ledger.snapshot
 
         first = _spawn_worker(
             scenario=scenario,
@@ -503,7 +501,7 @@ def execute_no_fault_replay(
             timeout_seconds,
             database=database,
             event=event,
-            previous=initial,
+            ledger=ledger,
         )
 
         replay_worker = _spawn_worker(
@@ -526,7 +524,7 @@ def execute_no_fault_replay(
             timeout_seconds,
             database=database,
             event=event,
-            previous=first_delivery,
+            ledger=ledger,
         )
         tree_after = sha256_tree(root, ignored_names=frozenset({"__pycache__"}))
         if tree_after != binding.tree_digest:
@@ -535,7 +533,7 @@ def execute_no_fault_replay(
                 "source tree changed during no-fault replay",
                 integrity=IntegrityStatus.INVALID,
             )
-        _require_only_the_store_wrote(work_dir.resolve(), database)
+        _require_only_the_store_wrote(work_dir, database)
         observation = classify_delivery(
             first_delivery, final, scenario.effect_delta(event), scenario.initial_total(event)
         )
@@ -592,26 +590,49 @@ def _scenario(capsule: ReproCapsule) -> Scenario:
         raise _AttemptFailure(ExecutionStatus.UNSUPPORTED, str(error)) from error
 
 
-def _require_only_the_store_wrote(work_dir: Path, database: Path) -> None:
-    """Refuse handlers that keep durable state beside the database.
+def _sandbox_cwd(work_dir: Path) -> Path:
+    """The worker's cwd sits two levels inside its world so ``..`` and ``../..`` stay inside it."""
+    return work_dir.resolve() / "sandbox" / "cwd"
 
-    Kill points are store commits. A dedup file or journal written in the worker's directory has
-    crash windows the sweep cannot reach, so such a handler cannot earn a verdict. Writes elsewhere
-    on the machine are outside what local mode can see and are a documented boundary.
+
+def _make_sandbox(work_dir: Path) -> None:
+    """One directory per world: the worker's cwd, its HOME, and its TMPDIR, all inside it."""
+    root = work_dir.resolve()
+    root.mkdir(parents=True, exist_ok=False)
+    for relative in ("sandbox/cwd", "home", "tmp"):
+        (root / relative).mkdir(parents=True, exist_ok=False)
+
+
+def _require_only_the_store_wrote(work_dir: Path, database: Path) -> None:
+    """Refuse handlers that keep durable state anywhere in their world but the store.
+
+    Kill points are store commits. A dedup file, a journal, or an empty directory written in the
+    worker's cwd, its parents inside the world, its HOME, or its TMPDIR has crash windows the sweep
+    cannot reach, so such a handler cannot earn a verdict. Writes elsewhere on the machine are
+    outside what local mode can see and are a documented boundary.
     """
-    expected = {database.name, f"{database.name}-wal", f"{database.name}-shm"}
+    root = work_dir.resolve()
+    expected = {
+        root / "sandbox",
+        root / "sandbox" / "cwd",
+        root / "home",
+        root / "tmp",
+        database,
+        database.with_name(f"{database.name}-wal"),
+        database.with_name(f"{database.name}-shm"),
+    }
     extra = sorted(
-        path.relative_to(work_dir).as_posix()
-        for path in work_dir.rglob("*")
-        if path.name not in expected and not path.is_dir()
+        path.relative_to(root).as_posix() + ("/" if path.is_dir() else "")
+        for path in root.rglob("*")
+        if path not in expected
     )
     if extra:
         shown = ", ".join(extra[:5]) + (", …" if len(extra) > 5 else "")
         raise _AttemptFailure(
             ExecutionStatus.UNSUPPORTED,
-            f"the handler wrote durable files outside the store ({shown}); kill points are store "
-            "commits, so crash windows around that state cannot be reached and no verdict is "
-            "issued",
+            f"the handler wrote durable entries outside the store ({shown}); kill points are "
+            "store commits, so crash windows around that state cannot be reached and no verdict "
+            "is issued",
         )
 
 
@@ -705,35 +726,101 @@ def _read_only(path: Path) -> sqlite3.Connection:
     return connection
 
 
-def _probe_others(scenario: Scenario, path: Path, event: Mapping[str, object]) -> str:
-    """Digest every row that is not this event's: they must never change during a run."""
-    normalized = scenario.normalize_event(event)
-    with _read_only(path) as connection:
-        return sha256_json(scenario.others(connection, normalized))
+@dataclass
+class _Ledger:
+    """What the database must hold right now: the whole content, and the four numbers it projects.
+
+    Attribution predicts the next content from the reported store operation and refuses any
+    observed content that differs, so a table, a pragma, an index, a row in another account, or a
+    re-pointed row of this event's is a write around the store, not a verdict.
+    """
+
+    content: dict[str, object]
+    snapshot: StateSnapshot
+
+    def take(self, other: _Ledger) -> None:
+        """Advance this world's ledger in place, so every caller sees the same truth."""
+        self.content, self.snapshot = other.content, other.snapshot
 
 
-def _require_others_untouched(
-    scenario: Scenario, database: Path, event: Mapping[str, object]
-) -> None:
-    """Every row that is not this event's must still be exactly as seeded."""
-    if _probe_others(scenario, database, event) != scenario.seeded_others_digest:
+def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -> dict[str, object]:
+    """Everything durable in the file: the schema, the header pragmas, every row of every table."""
+    try:
+        with _read_only(path) as connection:
+            schema = [
+                list(row)
+                for row in connection.execute(
+                    "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name"
+                )
+            ]
+            header = {
+                "application_id": connection.execute("PRAGMA application_id").fetchone()[0],
+                "user_version": connection.execute("PRAGMA user_version").fetchone()[0],
+            }
+            tables = scenario.tables(connection)
+    except sqlite3.Error as error:
         raise _AttemptFailure(
-            ExecutionStatus.INTEGRITY_ERROR,
-            f"rows that belong to {scenario.others_noun} changed during the run; something "
-            "wrote around the trusted store",
-            integrity=IntegrityStatus.INVALID,
-        )
+            ExecutionStatus.PROBE_ERROR, f"read-only state probe failed ({error})"
+        ) from error
+    return {"header": header, "schema": schema, "tables": tables}
+
+
+def _ledger(scenario: Scenario, path: Path, event: Mapping[str, object]) -> _Ledger:
+    normalized = scenario.normalize_event(event)
+    content = _read_content(scenario, path, normalized)
+    try:
+        snapshot = scenario.snapshot(cast(Tables, content["tables"]), normalized)
+    except (ValueError, KeyError, TypeError) as error:
+        raise _AttemptFailure(
+            ExecutionStatus.PROBE_ERROR, f"read-only state probe was incomplete ({error})"
+        ) from error
+    return _Ledger(content=content, snapshot=snapshot)
 
 
 def _probe(scenario: Scenario, path: Path, event: Mapping[str, object]) -> StateSnapshot:
-    normalized = scenario.normalize_event(event)
-    try:
-        with _read_only(path) as connection:
-            return scenario.probe(connection, normalized)
-    except sqlite3.OperationalError as error:
+    return _ledger(scenario, path, event).snapshot
+
+
+def _content_difference(
+    expected: dict[str, object], observed: dict[str, object], scenario: Scenario
+) -> str:
+    """Name what differs between two whole-database contents, in order of how alarming it is."""
+    parts: list[str] = []
+    if observed["schema"] != expected["schema"]:
+        parts.append("the schema changed (a table, index, or trigger this scenario did not seed)")
+    if observed["header"] != expected["header"]:
+        parts.append("the database header changed (PRAGMA user_version or application_id)")
+    expected_tables = cast(Tables, expected["tables"])
+    observed_tables = cast(Tables, observed["tables"])
+    differing = sorted(
+        name
+        for name in set(expected_tables) | set(observed_tables)
+        if expected_tables.get(name) != observed_tables.get(name)
+    )
+    if differing:
+        parts.append(
+            f"rows that belong to {scenario.others_noun} changed (or this event's own rows did) "
+            f"in {', '.join(differing)}"
+        )
+    return "; ".join(parts) or "the database differs"
+
+
+def _require_unchanged(
+    scenario: Scenario,
+    path: Path,
+    event: Mapping[str, object],
+    ledger: _Ledger,
+    what: str,
+) -> StateSnapshot:
+    """The database must still be exactly what the ledger says; return its snapshot."""
+    observed = _ledger(scenario, path, event)
+    if sha256_json(observed.content) != sha256_json(ledger.content):
         raise _AttemptFailure(
-            ExecutionStatus.PROBE_ERROR, "read-only state probe was incomplete"
-        ) from error
+            ExecutionStatus.INTEGRITY_ERROR,
+            f"{what}: {_content_difference(ledger.content, observed.content, scenario)}",
+            integrity=IntegrityStatus.INVALID,
+        )
+    return observed.snapshot
 
 
 def _spawn_worker(
@@ -768,14 +855,18 @@ def _spawn_worker(
         str(child.fileno()),
     ]
     try:
+        world = database.parent.parent.parent
         process = subprocess.Popen(
             argv,
             cwd=database.parent,
             env={
+                "HOME": str(world / "home"),
                 "PATH": os.environ.get("PATH", ""),
                 "PYTHONDONTWRITEBYTECODE": "1",
                 "PYTHONHASHSEED": "0",
                 "PYTHONNOUSERSITE": "1",
+                "TMP": str(world / "tmp"),
+                "TMPDIR": str(world / "tmp"),
             },
             pass_fds=(child.fileno(),),
             start_new_session=True,
@@ -838,29 +929,28 @@ def _wait_for_checkpoint(
     fault_boundary: FaultBoundary,
     timeout_seconds: float,
     *,
-    previous: StateSnapshot,
+    ledger: _Ledger,
     kill_after_commit: int | None = None,
-) -> StateSnapshot:
+) -> _Ledger:
     normalized = scenario.normalize_event(event)
     deadline = monotonic() + timeout_seconds
     while True:
         message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
         kind = message.get("type")
         if kind == "commit":
-            snapshot = _attributed_probe(scenario, database, event, previous, message, spawn=spawn)
+            ledger.take(_attributed_probe(scenario, database, event, ledger, message))
             spawn.operations.append(str(message.get("operation")))
-            previous = snapshot
             if kill_after_commit is not None:
                 if len(spawn.operations) == kill_after_commit:
-                    return snapshot
+                    return ledger
                 _send(spawn.channel, {"type": "continue"})
                 continue
-            if scenario.checkpoint_reached(snapshot, normalized, fault_boundary):
-                return snapshot
+            if scenario.checkpoint_reached(ledger.snapshot, normalized, fault_boundary):
+                return ledger
             _send(spawn.channel, {"type": "continue"})
         elif kind in {"done", "error"}:
             if kind == "done" and not spawn.operations:
-                detail = _no_commit_detail(scenario, database, event, previous)
+                detail = _no_commit_detail(scenario, database, event, ledger)
             elif kind == "done":
                 detail = (
                     f"the handler finished without ever committing the {scenario.effect_noun} "
@@ -878,7 +968,7 @@ def _wait_for_checkpoint(
 
 
 def _no_commit_detail(
-    scenario: Scenario, database: Path, event: Mapping[str, object], seeded: StateSnapshot
+    scenario: Scenario, database: Path, event: Mapping[str, object], seeded: _Ledger
 ) -> str:
     """The worker finished without one store commit: say whether it wrote around the store.
 
@@ -887,21 +977,25 @@ def _no_commit_detail(
     who wrote it is told the store call that expresses the same fix.
     """
     store = scenario.store_class.__name__
-    after = _probe(scenario, database, event)
-    if (
-        after.digest == seeded.digest
-        and _probe_others(scenario, database, event) == scenario.seeded_others_digest
-    ):
+    observed = _ledger(scenario, database, event)
+    if sha256_json(observed.content) == sha256_json(seeded.content):
         return (
             f"the handler finished without a single {store} commit and left the database as "
             f"seeded, so there is no durable {scenario.effect_noun} to crash-test"
         )
+    after = observed.snapshot
+    if after.digest != seeded.snapshot.digest:
+        what = (
+            f"this event now shows {scenario.subject_noun} "
+            f"{scenario.format_subject(after.subject_total)}, {after.event_effect_count} "
+            f"{scenario.effect_noun} row(s), {after.event_marker_count} marker"
+        )
+    else:
+        what = _content_difference(seeded.content, observed.content, scenario)
     return (
-        f"the handler changed the database without a single {store} commit (this event now "
-        f"shows {scenario.subject_noun} {scenario.format_subject(after.subject_total)}, "
-        f"{after.event_effect_count} {scenario.effect_noun} row(s), {after.event_marker_count} "
-        f"marker), so the {scenario.effect_noun} moved through a connection CrashCheck does not "
-        f"own and no kill point exists inside that write. {scenario.store_remedy}"
+        f"the handler changed the database without a single {store} commit ({what}), so that "
+        "write went through a connection CrashCheck does not own and no kill point exists inside "
+        f"that write. {scenario.store_remedy}"
     )
 
 
@@ -928,7 +1022,7 @@ def _finish_replay(
     *,
     database: Path,
     event: Mapping[str, object],
-    previous: StateSnapshot,
+    ledger: _Ledger,
 ) -> StateSnapshot:
     """Drive one worker to completion; every durable change must be a store commit it reported."""
     deadline = monotonic() + timeout_seconds
@@ -936,7 +1030,7 @@ def _finish_replay(
         message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
         kind = message.get("type")
         if kind == "commit":
-            previous = _attributed_probe(scenario, database, event, previous, message, spawn=spawn)
+            ledger.take(_attributed_probe(scenario, database, event, ledger, message))
             spawn.operations.append(str(message.get("operation")))
             _send(spawn.channel, {"type": "continue"})
             continue
@@ -965,63 +1059,75 @@ def _finish_replay(
     _collect(spawn)
     if return_code != 0:
         raise _AttemptFailure(ExecutionStatus.REPLAY_ERROR, "replay worker returned nonzero")
-    final = _probe(scenario, database, event)
-    _require_others_untouched(scenario, database, event)
-    if final.digest != previous.digest:
+    observed = _ledger(scenario, database, event)
+    if sha256_json(observed.content) != sha256_json(ledger.content):
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
             "the database changed after the worker's last reported store commit; something wrote "
-            "around the trusted store (an exit hook, a thread, a child, or a direct connection). "
+            "around the trusted store (an exit hook, a thread, a child, or a direct connection): "
+            f"{_content_difference(ledger.content, observed.content, scenario)}. "
             + scenario.store_remedy,
             integrity=IntegrityStatus.INVALID,
         )
-    return final
+    ledger.take(observed)
+    return observed.snapshot
 
 
 def _attributed_probe(
     scenario: Scenario,
     database: Path,
     event: Mapping[str, object],
-    previous: StateSnapshot,
+    ledger: _Ledger,
     message: Mapping[str, object],
-    *,
-    spawn: _Spawn | None = None,
-) -> StateSnapshot:
+) -> _Ledger:
     """Probe after a reported commit and refuse any change the named operation cannot explain.
 
-    A handler that writes to the database through its own connection never pauses the
-    controller, so its effect would surface here as an unattributed delta. That is an integrity
+    The scenario predicts the whole database after the operation; the probe reads the whole
+    database. A handler that writes through its own connection never pauses the controller, so
+    its effect surfaces here as content the operation did not predict, whether it is this event's
+    four numbers, a row of another account, a table it created, or a pragma. That is an integrity
     failure, not a verdict: the kill point can no longer be trusted to sit where the money moved.
     """
     normalized = scenario.normalize_event(event)
-    operation = message.get("operation")
-    snapshot = _probe(scenario, database, event)
-    _require_others_untouched(scenario, database, event)
-    expected = scenario.store_operations.get(str(operation))
-    if expected is None:
+    operation = str(message.get("operation"))
+    if operation not in scenario.store_operations:
         raise _AttemptFailure(
             ExecutionStatus.PROTOCOL_ERROR,
             f"worker reported an unknown store operation {operation!r}",
         )
-    observed = (
-        snapshot.subject_total - previous.subject_total,
-        snapshot.event_effect_count - previous.event_effect_count,
-        snapshot.event_effect_total - previous.event_effect_total,
-        snapshot.event_marker_count - previous.event_marker_count,
-    )
-    wanted = expected(normalized)
-    if observed != wanted:
-        subject, rows = scenario.subject_noun, f"{scenario.effect_noun} rows"
-        raise _AttemptFailure(
-            ExecutionStatus.INTEGRITY_ERROR,
+    predicted_tables = scenario.apply(cast(Tables, ledger.content["tables"]), operation, normalized)
+    predicted = {
+        "header": ledger.content["header"],
+        "schema": ledger.content["schema"],
+        "tables": predicted_tables,
+    }
+    observed = _ledger(scenario, database, event)
+    if sha256_json(observed.content) == sha256_json(predicted):
+        return observed
+    wanted = scenario.snapshot(predicted_tables, normalized)
+    previous, seen = ledger.snapshot, observed.snapshot
+    subject, rows = scenario.subject_noun, f"{scenario.effect_noun} rows"
+    if seen.digest != wanted.digest:
+        detail = (
             f"the durable change after {operation} was not the one {operation} makes: the probe "
-            f"saw {subject} {observed[0]:+d}, {rows} {observed[1]:+d}, marker {observed[3]:+d} "
-            f"for this event, not {subject} {wanted[0]:+d}, {rows} {wanted[1]:+d}, marker "
-            f"{wanted[3]:+d}; either something wrote around the trusted store or a store call "
-            f"was made with values that are not this event's. {scenario.store_remedy}",
-            integrity=IntegrityStatus.INVALID,
+            f"saw {subject} {seen.subject_total - previous.subject_total:+d}, {rows} "
+            f"{seen.event_effect_count - previous.event_effect_count:+d}, marker "
+            f"{seen.event_marker_count - previous.event_marker_count:+d} for this event, not "
+            f"{subject} {wanted.subject_total - previous.subject_total:+d}, {rows} "
+            f"{wanted.event_effect_count - previous.event_effect_count:+d}, marker "
+            f"{wanted.event_marker_count - previous.event_marker_count:+d}; either something wrote "
+            "around the trusted store or a store call was made with values that are not this "
+            f"event's. {scenario.store_remedy}"
         )
-    return snapshot
+    else:
+        detail = (
+            f"the durable change after {operation} was not only the one {operation} makes: "
+            f"{_content_difference(predicted, observed.content, scenario)}; something wrote "
+            f"around the trusted store. {scenario.store_remedy}"
+        )
+    raise _AttemptFailure(
+        ExecutionStatus.INTEGRITY_ERROR, detail, integrity=IntegrityStatus.INVALID
+    )
 
 
 def _receive(

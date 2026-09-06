@@ -14,7 +14,7 @@ from nemisis.crashcheck import _ENGINE_RESOURCES
 from nemisis.scenario import Scenario, StoreBase
 from nemisis.scenarios import SCENARIOS, scenario_for
 from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
-from nemisis.sqlite_runner import _probe, _seed_database
+from nemisis.sqlite_runner import _ledger, _probe, _seed_database
 
 
 def test_registry_holds_the_credit_scenario_and_refuses_the_rest() -> None:
@@ -54,20 +54,27 @@ def test_every_packaged_tree_digest_is_pinned_by_its_scenario(tmp_path: Path) ->
 
 
 def test_store_operations_are_exactly_the_committing_store_methods() -> None:
-    """Attribution can only explain deltas it knows; every committing method must be listed, and
-    nothing that does not commit may be."""
+    """Attribution can only explain operations it can model; every committing method must be
+    listed, and nothing that does not commit may be. A committing method is one whose source
+    reports its commit to the controller."""
+    import inspect
+
     public = {
         name
         for name in vars(CREDIT.store_class)
         if not name.startswith("_") and callable(getattr(CREDIT.store_class, name))
     }
-    committing = set(CREDIT.store_operations)
-    assert committing == {"credit", "mark_processed", "credit_and_mark"}
+    committing = {
+        name for name in public if "_pause(" in inspect.getsource(getattr(CREDIT.store_class, name))
+    }
+    assert (
+        set(CREDIT.store_operations)
+        == committing
+        == {"credit", "mark_processed", "credit_and_mark"}
+    )
     assert public - committing == {"processed"}
     assert issubclass(CREDIT.store_class, StoreBase)
-    for name in committing:
-        assert name in CREDIT.store_remedy or name == "credit"
-    assert "credit_and_mark(account_id, event_id, amount_cents)" in CREDIT.store_remedy
+    assert "store.credit_and_mark(account_id, event_id, amount_cents)" in CREDIT.store_remedy
 
 
 def test_seed_probe_and_checkpoint_predicate_describe_the_same_database(tmp_path: Path) -> None:
@@ -82,9 +89,15 @@ def test_seed_probe_and_checkpoint_predicate_describe_the_same_database(tmp_path
         seeded.event_marker_count,
     ) == (0, 0, 0, 0)
     assert not CREDIT.checkpoint_reached(seeded, event, FaultBoundary.EFFECT_COMMIT)
+    ledger = _ledger(CREDIT, database, event)
+    for operation in CREDIT.store_operations:
+        after = CREDIT.apply(ledger.content["tables"], operation, event)  # type: ignore[arg-type]
+        predicted = CREDIT.snapshot(after, event)
+        assert predicted.event_marker_count == (0 if operation == "credit" else 1)
+        assert predicted.subject_total == (0 if operation == "mark_processed" else 2500)
+    with pytest.raises(ValueError, match="unknown store operation"):
+        CREDIT.apply(ledger.content["tables"], "transfer", event)  # type: ignore[arg-type]
     with sqlite3.connect(database) as connection:
-        for name, delta in CREDIT.store_operations.items():
-            assert len(delta(event)) == 4, name
         assert connection.execute("SELECT COUNT(*) FROM accounts").fetchone() == (1,)
 
 
@@ -93,7 +106,13 @@ def test_store_base_requires_exact_types_and_reports_commits(tmp_path: Path) -> 
     try:
         store = StoreBase(tmp_path / "unused.sqlite3", worker, {"event_id": "evt", "amount": 5})
         store._require(event_id="evt", amount=5)
-        for bad in ({"event_id": b"evt"}, {"amount": True}, {"amount": 5.0}, {"event_id": "other"}):
+        for bad in (
+            {"event_id": b"evt"},
+            {"amount": True},
+            {"amount": 5.0},
+            {"event_id": "other"},
+            {"sku": "evt"},
+        ):
             with pytest.raises(ValueError, match="outside the accepted contract"):
                 store._require(**bad)
         controller.sendall(b'{"type":"continue"}\n')

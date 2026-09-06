@@ -94,7 +94,8 @@ the claim above is one flag away for anyone:
 | `leftover-credit` | green | `$50` | `$50` | `PATCH_FAILED_STILL_REPRODUCES` |
 | `never-marks` | green | `$50` | `$50`, no marker | `PATCH_FAILED_STILL_REPRODUCES` |
 | `atomic` | green | `$25` | `$25` | `FIX_PROVEN_FOR_THIS_CAPSULE` |
-| `raw-sql` | red (needs SQLite) | `$25` | no kill point | `EVIDENCE_INCOMPLETE`, names the one-line change |
+| `raw-sql` | red (needs SQLite) | n/a | no kill point | `EVIDENCE_INCOMPLETE`, names the one-line change |
+| `shadow-table` | red (needs SQLite) | n/a | `$0`, in-flight forever | `EVIDENCE_INCOMPLETE`, the schema changed |
 
 ```bash
 uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/mark-first
@@ -115,11 +116,15 @@ $EDITOR ./my-candidate/app/credits.py
 uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate ./my-candidate
 ```
 
-The handler may only touch the store. The last row is the textbook fix written as one raw SQL
+The handler may only touch the store. `raw-sql` is the textbook fix written as one raw SQL
 transaction on the store's database: correct, and unjudgeable, because a write the store did not
 make has no kill point. CrashCheck names the write and the store call that expresses the same fix
 (`store.credit_and_mark(...)`, see [the store API](docs/PRODUCT.md#the-store-api)) instead of
-guessing a verdict.
+guessing a verdict. `shadow-table` keeps its dedup flag in a table it creates inside the store's
+own database: an earlier engine blessed it while a crash between that write and the credit left
+the customer unpaid forever. Attribution now covers the whole database (schema, header pragmas,
+every row of every table) and the whole world the worker runs in (its working directory, the two
+directories above it, `HOME`, and `TMPDIR`); anything the store did not write forfeits the verdict.
 
 ## Let Nemotron write the patch
 

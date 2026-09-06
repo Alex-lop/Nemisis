@@ -19,6 +19,7 @@ from nemisis.crash_fixture import (
     NEVER_MARKS_REF,
     RAW_SQL_REF,
     SCENARIO_ID,
+    SHADOW_TABLE_REF,
     load_issue,
 )
 from nemisis.crash_models import (
@@ -297,7 +298,7 @@ def test_durable_files_beside_the_database_forfeit_the_verdict(
     result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
 
     assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
-    assert "wrote durable files outside the store" in result.summary
+    assert "wrote durable entries outside the store" in result.summary
     assert "cannot be reached" in result.summary
     boundary = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
     assert {a.execution_status for a in boundary} == {ExecutionStatus.UNSUPPORTED}
@@ -845,3 +846,203 @@ def test_symlinked_output_dir_still_publishes_the_finished_run(
     out = capsys.readouterr().out
     assert "verdict: PATCH_FAILED_STILL_REPRODUCES" in out
     assert list((real / "out" / "runs").glob("*/manifest.json"))
+
+
+USER_VERSION_FLAG = """import sqlite3
+
+
+def apply_credit(store, event):
+    connection = sqlite3.connect(store._database, isolation_level=None)
+    try:
+        if connection.execute("PRAGMA user_version").fetchone()[0] == 1042:
+            return
+        connection.execute("PRAGMA user_version = 1042")
+    finally:
+        connection.close()
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+PARENT_DIR_FILE = """import glob
+import os
+
+
+def apply_credit(store, event):
+    world = os.path.basename(glob.glob("*.sqlite3")[0])
+    guard = os.path.join("..", world + ".inflight")
+    if os.path.exists(guard):
+        return
+    with open(guard, "w", encoding="utf-8") as handle:
+        handle.write(event["event_id"])
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+EMPTY_DIR_FLAG = """import os
+
+
+def apply_credit(store, event):
+    try:
+        os.mkdir("seen-" + event["event_id"])
+    except FileExistsError:
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+HOME_FILE_FLAG = """import os
+
+
+def apply_credit(store, event):
+    guard = os.path.expanduser("~/.seen-" + event["event_id"])
+    if os.path.exists(guard):
+        return
+    open(guard, "w").close()
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+TMPDIR_FILE_FLAG = """import os
+import tempfile
+
+
+def apply_credit(store, event):
+    guard = os.path.join(tempfile.gettempdir(), "seen-" + event["event_id"])
+    if os.path.exists(guard):
+        return
+    open(guard, "w").close()
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+REPOINTED_LEDGER = """import sqlite3
+
+
+def apply_credit(store, event):
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    connection = sqlite3.connect(store._database, timeout=5, isolation_level=None)
+    try:
+        connection.execute(
+            "UPDATE credit_ledger SET account_id = 'acct_9000' WHERE event_id = ?",
+            (event["event_id"],),
+        )
+    finally:
+        connection.close()
+"""
+
+SCHEMA_SWAP = """import sqlite3
+
+
+def apply_credit(store, event):
+    connection = sqlite3.connect(store._database, timeout=5, isolation_level=None)
+    try:
+        archived = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='accounts_archived'"
+        ).fetchone()
+        if archived is None:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute("ALTER TABLE accounts RENAME TO accounts_archived")
+            connection.execute(
+                "CREATE TABLE accounts("
+                "account_id TEXT PRIMARY KEY, balance_cents INTEGER NOT NULL)"
+            )
+            connection.execute(
+                "INSERT INTO accounts SELECT account_id, balance_cents FROM accounts_archived"
+            )
+            connection.commit()
+    finally:
+        connection.close()
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+OTHER_ACCOUNT_NO_COMMIT = """import sqlite3
+
+
+def apply_credit(store, event):
+    with sqlite3.connect(store._database, isolation_level=None) as connection:
+        connection.execute(
+            "INSERT INTO accounts(account_id, balance_cents) VALUES ('acct_sweep', 2500)"
+        )
+        connection.commit()
+"""
+
+
+@pytest.mark.parametrize(
+    ("name", "source", "status", "fragment"),
+    [
+        (
+            "user-version",
+            USER_VERSION_FLAG,
+            ExecutionStatus.INTEGRITY_ERROR,
+            "the database header changed (PRAGMA user_version",
+        ),
+        (
+            "parent-dir-file",
+            PARENT_DIR_FILE,
+            ExecutionStatus.UNSUPPORTED,
+            "wrote durable entries outside the store",
+        ),
+        ("empty-dir", EMPTY_DIR_FLAG, ExecutionStatus.UNSUPPORTED, "seen-evt_1042/"),
+        ("home-file", HOME_FILE_FLAG, ExecutionStatus.UNSUPPORTED, "home/.seen-evt_1042"),
+        ("tmpdir-file", TMPDIR_FILE_FLAG, ExecutionStatus.UNSUPPORTED, "tmp/seen-evt_1042"),
+        (
+            "repointed-ledger",
+            REPOINTED_LEDGER,
+            ExecutionStatus.INTEGRITY_ERROR,
+            "after the worker's last reported store commit",
+        ),
+        ("schema-swap", SCHEMA_SWAP, ExecutionStatus.INTEGRITY_ERROR, "the schema changed"),
+    ],
+)
+def test_dedup_state_hidden_from_the_probes_forfeits_the_verdict(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    name: str,
+    source: str,
+    status: ExecutionStatus,
+    fragment: str,
+) -> None:
+    """Hostile review of 2026-09-06: each of these earned FIX_PROVEN_FOR_THIS_CAPSULE while a
+    crash between its own durable write and the store's commit lost the credit (or, for the
+    re-pointed ledger row and the schema swap, moved it). Attribution now covers the whole
+    database (schema, header pragmas, every row of every table) and the whole world the worker
+    runs in (its cwd, the two directories above it, HOME, and TMPDIR)."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, name, source)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert fragment in result.summary, result.summary
+    worlds = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
+    assert {a.execution_status for a in worlds} == {status}, result.summary
+    assert cli._exit_code(result.verdict) == 2
+
+
+def test_shadow_table_is_a_packaged_zoo_tree_pinned_to_no_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The best handler the hostile review found ships as fixture:sqlite-credit-v1/shadow-table."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+
+    result = check(BUGGY_REF, SHADOW_TABLE_REF, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert result.integrity_status.value == "INVALID"
+    assert "the schema changed (a table, index, or trigger this scenario did not seed)" in (
+        result.summary
+    )
+    assert "store.credit_and_mark(account_id, event_id, amount_cents)" in result.summary
+    assert cli._exit_code(result.verdict) == 2
+
+
+def test_a_raw_write_to_another_account_with_no_commit_is_named_not_called_seeded(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hostile review: this used to be told it 'left the database as seeded' with the money
+    'moved' and every number zero. The whole-database comparison names the row that changed."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "other-account", OTHER_ACCOUNT_NO_COMMIT)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert "left the database as seeded" not in result.summary
+    assert "rows that belong to other accounts or events changed" in result.summary
+    assert "in accounts" in result.summary
+    assert "store.credit_and_mark(account_id, event_id, amount_cents)" in result.summary

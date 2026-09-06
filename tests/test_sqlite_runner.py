@@ -32,6 +32,7 @@ from nemisis.sqlite_runner import (
     _attributed_probe,
     _cleanup,
     _collect,
+    _ledger,
     _probe,
     _receive,
     _seed_database,
@@ -110,7 +111,7 @@ def test_attributed_probe_accepts_only_the_delta_its_operation_explains(tmp_path
     event = {"account_id": "acct_7", "amount_cents": 2500, "event_id": "evt_1042"}
     database = tmp_path / "probe.sqlite3"
     _seed_database(CREDIT, database, event)
-    seeded = _probe(CREDIT, database, event)
+    seeded = _ledger(CREDIT, database, event)
 
     # Nothing changed, and mark_processed claims a marker: unattributed.
     with pytest.raises(
@@ -130,7 +131,22 @@ def test_attributed_probe_accepts_only_the_delta_its_operation_explains(tmp_path
         connection.execute("INSERT INTO processed_events(event_id) VALUES ('evt_1042')")
         connection.commit()
     marked = _attributed_probe(CREDIT, database, event, seeded, {"operation": "mark_processed"})
-    assert marked.event_marker_count == 1
+    assert marked.snapshot.event_marker_count == 1
+
+    # The four numbers match the operation, but a table appeared: still unattributed.
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE inflight(event_id TEXT PRIMARY KEY)")
+        connection.execute(
+            "UPDATE accounts SET balance_cents = balance_cents + 2500 WHERE account_id = 'acct_7'"
+        )
+        connection.execute(
+            "INSERT INTO credit_ledger(event_id, account_id, amount_cents) "
+            "VALUES ('evt_1042', 'acct_7', 2500)"
+        )
+        connection.commit()
+    with pytest.raises(_AttemptFailure, match="the schema changed") as shadow:
+        _attributed_probe(CREDIT, database, event, marked, {"operation": "credit"})
+    assert shadow.value.integrity is IntegrityStatus.INVALID
 
 
 def test_store_requires_exact_types_and_values(tmp_path: Path) -> None:

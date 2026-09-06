@@ -59,18 +59,25 @@ integer cents, WAL and `synchronous=FULL`, and is observed through fresh read-on
 Failure to launch, checkpoint, kill, wait, probe, restart, replay, parse, or clean up makes evidence
 incomplete.
 
-Every durable change is attributed. The worker reports each trusted store commit by operation
-name; the controller probes the database at that instant and refuses any delta the named operation
-cannot explain, and again after the worker's final message. A handler that moves money through its
-own SQLite connection therefore cannot earn a verdict: its run is `INTEGRITY_ERROR` / `INVALID`,
-because the kill point could no longer be trusted to sit where the money moved. A handler that also
-forges the IPC message on the store's private channel is hostile code, which local mode does not
-claim to contain.
+Every durable change is attributed, at the level of the whole database. The worker reports each
+trusted store commit by operation name; the scenario predicts the entire database content after
+that operation (every row of every seeded table, the schema, the header pragmas), the controller
+reads the entire database through a read-only connection at that instant and refuses anything
+that differs, and does so again after the worker's final message and after the kill. A handler
+that moves money through its own SQLite connection, creates a table for its own dedup flag,
+stores a flag in `PRAGMA user_version`, re-points a ledger row at another account, or renames
+and replaces a table therefore cannot earn a verdict: its run is `INTEGRITY_ERROR` / `INVALID`,
+because the kill point could no longer be trusted to sit where the money moved. A handler that
+also forges the IPC message on the store's private channel is hostile code, which local mode does
+not claim to contain.
 
-Kill points are store commits, and only store commits. A handler that keeps its own durable
-state (a dedup file, a second database, a journal written before the credit) has crash windows the
-commit sweep cannot reach, because nothing tells the controller those writes happened. CrashCheck
-does not claim to find them; it proves exactly-once across every store commit the handler makes.
+Kill points are store commits, and only store commits. Each world runs in its own directory: the
+worker's cwd sits two levels inside it, and `HOME` and `TMPDIR` point inside it too; after the
+run, that directory may hold nothing but the database and its WAL sidecars. A file, an empty
+directory, or a journal written anywhere in it (beside the database, one or two directories up,
+under `~`, or under the temp directory) forfeits the verdict, because a crash window around that
+state is one no store commit can reach. Durable state kept elsewhere on the machine, by absolute
+path, is outside what local mode can see and is a documented boundary, not a claim.
 Every world the handler runs in is named by an opaque identifier, so a handler cannot tell a census
 delivery from a kill world. It can still tell that it is inside CrashCheck (the store object is in
 its hands), which is the boundary of in-process instrumentation: a handler that is correct only
