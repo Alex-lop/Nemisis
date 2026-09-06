@@ -4,6 +4,7 @@
 .nemisis/*
 !.nemisis/config.json
 !.nemisis/proposal.json
+!.nemisis/agent-patches/
 .pytest_cache/
 .ruff_cache/
 .venv/
@@ -12,3 +13,4 @@ build/
 dist/
 *.egg-info/
 *.py[cod]
+.claude/worktrees/

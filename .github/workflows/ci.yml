@@ -87,3 +87,16 @@ jobs:
             --role corrected \
             --mode local \
             --output-dir "$smoke_root/artifacts"
+          # The red-team zoo: a patch that passes the base's kill point must still fail the sweep.
+          set +e
+          uv tool run --from "${wheels[0]}" nemisis check \
+            --base fixture:sqlite-credit-v1/buggy \
+            --candidate fixture:sqlite-credit-v1/mark-first \
+            --mode local \
+            --output-dir "$smoke_root/zoo" | tee "$smoke_root/zoo.txt"
+          zoo_status=$?
+          set -e
+          if [[ "$zoo_status" -ne 1 ]] || ! grep -q "PATCH_FAILED_INVARIANT_BROKEN" "$smoke_root/zoo.txt"; then
+            echo "Expected mark-first to exit 1 with PATCH_FAILED_INVARIANT_BROKEN, got $zoo_status." >&2
+            exit 2
+          fi

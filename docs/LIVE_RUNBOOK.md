@@ -27,9 +27,18 @@ changing that seam; do not infer it from mocked tests. See [`pyproject.toml`](..
 
 ## What Nemisis can run live today
 
-CrashCheck's own live call is the candidate-blind contract proposal. It needs only
-`NEBIUS_API_KEY`; the resulting receipt is labelled `LIVE`, stored beside the contract, and carried
-into the next `check` manifest and report:
+CrashCheck has two live model calls, and both need only `NEBIUS_API_KEY`. The load-bearing one has
+Nemotron write the patch that CrashCheck then crash-tests (the receipt lands inside the candidate
+tree and in the check report as its author):
+
+```bash
+uv run nemisis propose-patch --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
+  --base fixture:sqlite-credit-v1/buggy --out ./nemotron-candidate
+uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate ./nemotron-candidate
+```
+
+The other is the candidate-blind contract proposal; its receipt is labelled `LIVE`, stored beside
+the contract, and carried into the next `check` manifest and report:
 
 ```bash
 uv run nemisis init --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \

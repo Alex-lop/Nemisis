@@ -14,7 +14,7 @@ from nemisis.crash_fixture import (
     ATOMIC_REF,
     BUGGY_REF,
     EVENT_DIGEST,
-    FIXTURE_REFS,
+    HERO_REFS,
     MISLEADING_GREEN_REF,
 )
 from nemisis.crash_models import (
@@ -60,12 +60,12 @@ def test_measures_the_audited_three_tree_outcome_matrix(
     result = benchmark_runs[0][0]
     cases = {case.ref: case for case in result.cases}
 
-    assert tuple(case.ref for case in result.cases) == FIXTURE_REFS
+    assert tuple(case.ref for case in result.cases) == HERO_REFS
     assert {ref: case.tree_digest for ref, case in cases.items()} == TREE_DIGESTS
     assert all(case.pytest.outcome is CheckOutcome.PASS for case in result.cases)
     assert all(case.pytest.test_count == case.pytest.passed_count == 1 for case in result.cases)
 
-    for ref in FIXTURE_REFS:
+    for ref in HERO_REFS:
         assert cases[ref].sequential.outcome is CheckOutcome.PASS
         assert cases[ref].sequential.observation is CrashObservation.EXACTLY_ONCE
         assert cases[ref].sequential.state.model_dump() == {

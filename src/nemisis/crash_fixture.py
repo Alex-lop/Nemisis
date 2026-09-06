@@ -15,7 +15,14 @@ SCENARIO_ID = "sqlite-credit-v1"
 BUGGY_REF = f"fixture:{SCENARIO_ID}/buggy"
 MISLEADING_GREEN_REF = f"fixture:{SCENARIO_ID}/misleading-green"
 ATOMIC_REF = f"fixture:{SCENARIO_ID}/atomic"
-FIXTURE_REFS = (BUGGY_REF, MISLEADING_GREEN_REF, ATOMIC_REF)
+MARK_FIRST_REF = f"fixture:{SCENARIO_ID}/mark-first"
+LEFTOVER_CREDIT_REF = f"fixture:{SCENARIO_ID}/leftover-credit"
+NEVER_MARKS_REF = f"fixture:{SCENARIO_ID}/never-marks"
+# The three-tree hero the benchmark measures, in canonical order.
+HERO_REFS = (BUGGY_REF, MISLEADING_GREEN_REF, ATOMIC_REF)
+# Every packaged tree: the hero plus the candidate zoo found by red-teaming the checker. Each zoo
+# member fooled or nearly fooled an earlier engine; each is one flag away for anyone to rerun.
+FIXTURE_REFS = (*HERO_REFS, MARK_FIRST_REF, LEFTOVER_CREDIT_REF, NEVER_MARKS_REF)
 
 ISSUE_DIGEST = "dca9933dc39177cd391972f8ec6945b01a27d3559990566788cabb12c51c0f77"
 EVENT_DIGEST = "4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293"
@@ -23,18 +30,27 @@ EVENT_RESOURCE_DIGEST = "95db3d29c50d2c2bbb0058e4e82d8705c77e51a98e25887defc8366
 AUDITED_CONTRACT_DIGEST = "3b121eed2abbb011d5e769600690c5502bca561233007b0df5787cd49fb67e10"
 CONTRACT_RESOURCE_DIGEST = "e364533418ea5060fb6abb17b0aa84ab633315d51b7f02646acb7a0dc5fa7249"
 
-FixtureVariant = Literal["buggy", "misleading-green", "atomic"]
+HeroVariant = Literal["buggy", "misleading-green", "atomic"]
+FixtureVariant = Literal[
+    "buggy", "misleading-green", "atomic", "mark-first", "leftover-credit", "never-marks"
+]
 
 _RESOURCE_ROOT = ("fixtures", "sqlite_credit_v1")
 _REF_TO_VARIANT: dict[str, FixtureVariant] = {
     BUGGY_REF: "buggy",
     MISLEADING_GREEN_REF: "misleading-green",
     ATOMIC_REF: "atomic",
+    MARK_FIRST_REF: "mark-first",
+    LEFTOVER_CREDIT_REF: "leftover-credit",
+    NEVER_MARKS_REF: "never-marks",
 }
 _TREE_DIGESTS: dict[FixtureVariant, str] = {
     "buggy": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
     "misleading-green": ("3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f"),
     "atomic": "ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de",
+    "mark-first": "6dc1d31beec8c34ecc7369654cd6d47146af7ee7e1f15d762e33cb8b036b5f97",
+    "leftover-credit": "af991a61516c1d1b4cfbc2119dd8d937a8a92936cf82d90086bba4fdb40da807",
+    "never-marks": "7a9fda4e62e304c3aaa604b97ee1ea4f68c92edbe3fc1e90228b01af6dcd862d",
 }
 _COMMON_FILES = (
     ("common/app/__init__.py", "app/__init__.py"),

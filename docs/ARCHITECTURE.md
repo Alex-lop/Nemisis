@@ -30,6 +30,7 @@ the claim matrix. Its Python surface is:
 ```python
 initialize(issue, target, base, scenario_id) -> Path
 propose_contract(issue, target, base, scenario_id, client=None) -> ContractProposal
+propose_patch(issue, base, output, scenario_id, client=None) -> PatchProposal
 check(base, candidate, scenario, corrected=None, mode="local") -> CrashCheckResult
 replay(capsule, source, role="candidate", mode="local") -> CrashCheckResult
 ```
@@ -41,16 +42,24 @@ The core records are:
 - `ContractProposal`: the candidate-blind Nemotron receipt for a draft: offered and proposed catalog
   IDs, audited and proposed `amount_cents`, the fixed accept/refuse decision, and the sanitized
   `ModelCallReceipt`. Provenance only; it is outside the capsule address.
+- `PatchProposal`: the receipt for a candidate tree whose handler Nemotron wrote (`propose-patch`):
+  base and candidate tree digests, module digest, rationale, and the sanitized `ModelCallReceipt`.
+  It lives in the operator's `.nemisis/agent-patches/<candidate tree digest>.json`, never inside
+  the candidate tree, and is attached to a `check` only when it binds that exact tree and the bound
+  handler's module digest.
+- `CommitSweepReceipt`: for a claimed fix, the census delivery's commit schedule plus one kill
+  world per commit; `FIX_PROVEN_FOR_THIS_CAPSULE` requires all of them to end exactly once.
 - `AnchorBinding`: handler mapping plus supplied source ref, resolved source identity, and exact tree
   digest.
 - `HypothesisReceipt`: one candidate-blind base attempt, its fixed crash boundary and canonical
   rank, exact contract/base/provisional-capsule bindings, observation, and selection decision.
-- `MinimizationReceipt`: one fixed deletion trial for the selected one-action schedule, including
-  two fresh empty-schedule base confirmations and the stable necessity decision.
+- `MinimizationReceipt`: the no-crash control. Two fresh base worlds deliver the event twice with
+  no kill; both must end exactly once for the capsule to claim a crash/retry bug. (The field names
+  still carry the older "deletion" vocabulary; the semantics are exactly this control.)
 - `AttemptReceipt`: transport, integrity, process-group kill, two worker spawns, nonces, IPC
   sessions, durable snapshots, logs, and optional provider identifiers.
 - `ReproCapsule`: stable contract, event, selected semantic fault boundary, predicates, environment,
-  trusted-engine code digest, and the single-action deletion trace; volatile PIDs, paths,
+  trusted-engine code digest, and the no-crash control digest; volatile PIDs, paths,
   timestamps, full hunt attempts, and per-tree anchors stay outside it.
 - `CrashCheckResult`: both hypothesis receipts, exact role bindings and confirmations, independent
   execution/integrity axes, scoped verdict, engine digest, and root-relative artifacts.
@@ -73,16 +82,17 @@ Each world produces a real `AttemptReceipt`, wrapped by a canonically ranked
 `HypothesisReceipt`. After filtering to completed, integrity-valid duplicate observations, the
 smallest fixed catalog rank wins; parallel completion order is irrelevant. In the packaged buggy base,
 `effect-commit-v1` reproduces and `marker-commit-v1` does not. Their stable projections are stored
-in `hunt.json`, not in the capsule trace. CrashCheck then deletes the selected schedule's sole fault
-action in two fresh base worlds. Both empty-schedule replays finish exactly once, so deletion is
-rejected and the capsule binds only that stable one-action necessity decision. Volatile hunt and
-deletion receipts remain outside the content address. Five new base worlds reconfirm the retained
-witness before the candidate is materialized.
+in `hunt.json`, not in the capsule trace. CrashCheck then runs the no-crash control: two fresh base
+worlds deliver the event twice with no kill. Both end exactly once, so the duplicate is attributed
+to the crash and the capsule binds that stable control decision. Volatile hunt and control receipts
+remain outside the content address. Five new base worlds reconfirm the witness before the candidate
+is materialized.
 
 The hunt receipts are discovery evidence, not confirmation runs. A conclusive verdict separately
 requires five fresh attempts for every claimed role, with globally unique database, execution,
-worker, and IPC identities. The three-tree hero therefore records two hunt attempts, two deletion
-confirmations, then five base, five candidate, and five corrected confirmations.
+worker, and IPC identities. The three-tree hero therefore records two hunt attempts, two no-crash
+control worlds, then five base, five candidate, and five corrected confirmations, plus a commit
+sweep (census and one kill world per commit) for the corrected tree.
 
 ## CrashCheck kernel
 
@@ -101,6 +111,21 @@ The current adapter accepts one synchronous two-argument Python handler using th
 At `effect-commit`, the buggy and misleading-green trees expose one effect with no marker and reach
 `$50` after replay. The atomic tree reaches the same semantic effect boundary with its marker
 already durable and remains at `$25` with one effect and marker.
+
+Every reported commit is attributed: the controller probes at that instant and refuses a delta the
+named store operation cannot explain, and again after the worker's last message. Effects written
+around the store are an integrity failure, never a verdict.
+
+## Commit sweep
+
+A candidate or corrected tree whose five boundary worlds end exactly once earns a
+`CommitSweepReceipt` before any verdict. A census delivery with no kill records the handler's store
+commits in order (`first_delivery_operations`); one fresh world per commit then kills the worker
+immediately after that commit (`kill_after_commit`) and replays. `FIX_PROVEN_FOR_THIS_CAPSULE`
+requires the census and every kill point to end exactly once. A kill point that loses or duplicates
+the effect yields `PATCH_FAILED_INVARIANT_BROKEN` or `PATCH_FAILED_STILL_REPRODUCES` with a summary
+naming the commit and operation. The sweep is the answer to "you only kill in one place": the
+capsule reproduces the base's crash, the sweep covers every crash window the patch itself created.
 
 ## Provider boundary
 

@@ -14,7 +14,7 @@ from typing import Literal, Protocol, cast
 from urllib.parse import urlparse
 
 from openai import OpenAI
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, field_validator
 
 from nemisis.hashing import sha256_bytes, sha256_json, sha256_text
 from nemisis.models import (
@@ -67,6 +67,17 @@ environment variables, markdown, or prose. Every scalar key must be supplied by 
 request and every scalar value must remain within its inclusive bounds.
 """
 CONTRACT_PROMPT_TEMPLATE_DIGEST = sha256_text(CONTRACT_PROMPT_TEMPLATE)
+
+PATCH_PROMPT_TEMPLATE = """You are a senior backend engineer fixing one bug in one Python module.
+You receive a bug report, the current module source, and the storage API the module may use.
+Return the complete replacement module as `module_source`, plus a one-paragraph `rationale`.
+Rules: keep the module's public function name and its exact (store, event) signature; use only
+the storage methods listed; import nothing except from `typing`; do not open files, sockets,
+databases, threads, or processes; do not read private attributes. Return only the JSON schema.
+"""
+PATCH_PROMPT_TEMPLATE_DIGEST = sha256_text(PATCH_PROMPT_TEMPLATE)
+MAX_PATCH_MODULE_BYTES = 20_000
+MAX_PATCH_RATIONALE_BYTES = 1_000
 
 _SAFE_PART = re.compile(r"^[A-Za-z0-9_.-]+$")
 _TOKEN_FACTORY_HOST = re.compile(r"^api\.tokenfactory(?:\.[a-z0-9-]+)?\.nebius\.com$")
@@ -143,6 +154,31 @@ class _ContractScalar(StrictModel):
 class _ContractPayload(StrictModel):
     catalog_ids: tuple[SafeId, ...] = Field(min_length=1, max_length=MAX_CONTRACT_CATALOG_IDS)
     scalars: tuple[_ContractScalar, ...] = Field(max_length=MAX_CONTRACT_SCALARS)
+
+
+class _PatchPayload(StrictModel):
+    module_source: str = Field(min_length=1, max_length=MAX_PATCH_MODULE_BYTES)
+    rationale: str = Field(min_length=1, max_length=MAX_PATCH_RATIONALE_BYTES)
+
+    @field_validator("rationale")
+    @classmethod
+    def rationale_is_plain_text(cls, value: str) -> str:
+        # Printed to a terminal and rendered in a report: no escapes, no carriage returns.
+        if any(not (character.isprintable() or character in "\n\t") for character in value):
+            raise ValueError("rationale contains control characters")
+        return " ".join(value.split())
+
+
+class NemotronPatchGeneration(StrictModel):
+    """A complete replacement module the model proposes, plus its sanitized call receipt.
+
+    Nothing here is trusted: the caller must validate the module before writing it anywhere,
+    and CrashCheck treats the result exactly like any other candidate tree.
+    """
+
+    module_source: str
+    rationale: str
+    receipt: ModelCallReceipt
 
 
 class NemotronGeneration(StrictModel):
@@ -291,6 +327,74 @@ class NemotronClient:
             catalog_ids=selected_ids,
             scalars=scalars,
             receipt=receipt,
+        )
+
+    def generate_patch(
+        self, issue: str, module_source: str, store_api: str
+    ) -> NemotronPatchGeneration:
+        """Ask the model to play the coding agent: fix the module, return it whole."""
+        if not issue.strip() or not module_source.strip() or not store_api.strip():
+            raise ValueError("issue, module source, and store API must not be empty")
+        _encode_bounded(issue, "issue", MAX_TICKET_BYTES)
+        _encode_bounded(module_source, "module source", MAX_PATCH_MODULE_BYTES)
+        _encode_bounded(store_api, "store API", MAX_PATCH_MODULE_BYTES)
+        self._validate_model()
+
+        started_at = datetime.now(UTC)
+        started = monotonic()
+        prompt = json.dumps(
+            {"bug_report": issue, "module_source": module_source, "storage_api": store_api},
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        request: dict[str, object] = {
+            "model": self.model_id,
+            "messages": [
+                {"role": "system", "content": PATCH_PROMPT_TEMPLATE},
+                {"role": "user", "content": prompt},
+            ],
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "nemisis_patch",
+                    "strict": True,
+                    "schema": _PatchPayload.model_json_schema(),
+                },
+            },
+            "max_tokens": MAX_OUTPUT_TOKENS,
+            "temperature": 0,
+            "timeout": TIMEOUT_SECONDS,
+        }
+        input_digest = sha256_json(
+            {"base_url": self.base_url, "max_retries": MAX_RETRIES, "request": request}
+        )
+        try:
+            completion = self._client.chat.completions.create(**request)
+        except Exception as exc:
+            raise _provider_error(exc, "patch generation") from exc
+        raw = _completion_content(completion)
+        encoded = _encode_bounded(raw, "model response", MAX_RESPONSE_BYTES)
+        try:
+            payload = _PatchPayload.model_validate_json(encoded)
+        except (ValidationError, ValueError) as exc:
+            raise NemotronResponseError("Nemotron patch failed the required schema") from exc
+        if "\x00" in payload.module_source:
+            raise NemotronResponseError("Nemotron patch contains a NUL byte")
+        receipt = ModelCallReceipt(
+            truth_label=self._truth_label,
+            timestamp=started_at,
+            endpoint_region=_endpoint_region(self.base_url),
+            model_id=self.model_id,
+            input_digest=input_digest,
+            prompt_template_digest=PATCH_PROMPT_TEMPLATE_DIGEST,
+            latency_ms=max(0, round((monotonic() - started) * 1_000)),
+            outcome="success",
+            schema_valid=True,
+            response_digest=sha256_bytes(encoded),
+        )
+        return NemotronPatchGeneration(
+            module_source=payload.module_source, rationale=payload.rationale, receipt=receipt
         )
 
     def generate(

@@ -24,11 +24,12 @@ from nemisis.crash_fixture import (
     ATOMIC_REF,
     BUGGY_REF,
     EVENT_DIGEST,
-    FIXTURE_REFS,
+    HERO_REFS,
     MISLEADING_GREEN_REF,
     SCENARIO_ID,
     FixtureEvent,
     FixtureVariant,
+    HeroVariant,
     load_event,
     materialize_fixture,
 )
@@ -193,7 +194,7 @@ class CrashMeasurement(StrictModel):
 
 class BenchmarkCase(StrictModel):
     ref: str = Field(min_length=1, max_length=200)
-    variant: Literal["buggy", "misleading-green", "atomic"]
+    variant: HeroVariant
     tree_digest: Sha256
     pytest: PytestMeasurement
     sequential: SequentialMeasurement
@@ -229,7 +230,7 @@ class BenchmarkResult(StrictModel):
 
     @model_validator(mode="after")
     def benchmark_is_canonical_and_bound(self) -> Self:
-        if tuple(case.ref for case in self.cases) != FIXTURE_REFS:
+        if tuple(case.ref for case in self.cases) != HERO_REFS:
             raise ValueError("benchmark cases are not in canonical fixture order")
         if any(case.crashcheck.role is not _EXPECTED_ROLES[case.ref] for case in self.cases):
             raise ValueError("benchmark case role differs from the audited matrix")
@@ -300,7 +301,7 @@ def run_benchmark(output: Path) -> BenchmarkResult:
         measured: dict[
             str, tuple[FixtureVariant, str, PytestMeasurement, SequentialMeasurement]
         ] = {}
-        for ref in FIXTURE_REFS:
+        for ref in HERO_REFS:
             fixture = materialize_fixture(ref, root / "trees" / fixture_name(ref))
             pytest_result = _measure_pytest(fixture.path, root / "pytest" / fixture.variant)
             if sha256_tree(fixture.path) != fixture.tree_digest:
@@ -356,13 +357,13 @@ def run_benchmark(output: Path) -> BenchmarkResult:
         cases = tuple(
             BenchmarkCase(
                 ref=ref,
-                variant=measured[ref][0],
+                variant=cast(HeroVariant, measured[ref][0]),
                 tree_digest=measured[ref][1],
                 pytest=measured[ref][2],
                 sequential=measured[ref][3],
                 crashcheck=crash_by_ref[ref],
             )
-            for ref in FIXTURE_REFS
+            for ref in HERO_REFS
         )
 
     environment = BenchmarkEnvironment(
@@ -553,14 +554,14 @@ def _measure_crashcheck(
         or capsule.environment_digest != runner_environment_digest()
     ):
         raise BenchmarkError("CrashCheck did not return complete valid local evidence")
-    if len(result.bindings) != len(FIXTURE_REFS):
+    if len(result.bindings) != len(HERO_REFS):
         raise BenchmarkError("CrashCheck did not bind all three benchmark trees")
     bindings = {binding.source_ref: binding for binding in result.bindings}
-    if set(bindings) != set(FIXTURE_REFS):
+    if set(bindings) != set(HERO_REFS):
         raise BenchmarkError("CrashCheck bindings differ from the benchmark fixtures")
 
     measurements: dict[str, CrashMeasurement] = {}
-    for ref in FIXTURE_REFS:
+    for ref in HERO_REFS:
         binding = bindings[ref]
         expected_tree = measured[ref][1]
         role = _EXPECTED_ROLES[ref]

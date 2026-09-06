@@ -66,6 +66,7 @@ def test_live_mode_lists_blockers_and_never_falls_back(
         (CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE, 0),
         (CrashVerdict.BUG_REPRODUCED, 1),
         (CrashVerdict.PATCH_FAILED_STILL_REPRODUCES, 1),
+        (CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN, 1),
         (CrashVerdict.EVIDENCE_INCOMPLETE, 2),
         (CrashVerdict.UNSUPPORTED_TARGET, 2),
     ],
@@ -170,9 +171,8 @@ def test_check_routes_arguments_artifacts_and_failure_exit(
     assert f"engine source commit: {'a' * 40}" in output.out
     assert "hypotheses: 2 run -> selected effect-commit (effect-commit-v1)" in output.out
     assert (
-        "necessity: deleted effect-commit; empty schedule was EXACTLY_ONCE in 2/2 fresh "
-        "base worlds; deletion rejected; final fault actions 1/1 (fixture-only necessity proof)"
-        in output.out
+        "control: base delivered the event twice with no kill in 2/2 fresh worlds and ended "
+        "exactly once; the duplicate needs the crash" in output.out
     )
     assert f"manifest: {tmp_path / 'runs/manifest.json'}" in output.out
     assert "CrashCheck check started (LOCAL)" in output.err
@@ -209,8 +209,8 @@ def test_crash_result_makes_no_minimization_claim_for_incomplete_evidence(
     cli._print_crash_result(result, as_json=False)
 
     output = capsys.readouterr().out
-    assert "necessity: empty-schedule evidence incomplete; no necessity claim" in output
-    assert "final fault actions" not in output
+    assert "control: the no-kill base delivery did not complete" in output
+    assert "needs the crash" not in output
 
 
 def test_json_error_preserves_the_unsupported_target_verdict(
@@ -257,6 +257,37 @@ def test_doctor_json_is_the_only_stdout_document(
     assert output.err == ""
     assert '"mode":"LOCAL"' in output.out
     assert '"status":"READY"' in output.out
+
+
+def test_export_materializes_an_editable_tree_that_check_accepts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out = tmp_path / "my-candidate"
+    monkeypatch.setattr(
+        sys, "argv", ["nemisis", "export", "fixture:sqlite-credit-v1/misleading-green", str(out)]
+    )
+
+    cli.main()
+
+    lines = capsys.readouterr().out.splitlines()
+    assert lines[0] == f"exported: {out.resolve()}"
+    assert lines[1].startswith("tree: ")
+    assert lines[2] == f"edit: {out.resolve() / 'app' / 'credits.py'}"
+    assert lines[3].startswith("next: nemisis check --base fixture:sqlite-credit-v1/buggy")
+    assert (out / "app" / "credits.py").is_file()
+
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    from nemisis.crashcheck import check
+
+    result = check("fixture:sqlite-credit-v1/buggy", out, "sqlite-credit-v1", mode="local")
+    assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
+
+    with pytest.raises(SystemExit) as error:
+        monkeypatch.setattr(
+            sys, "argv", ["nemisis", "export", "fixture:sqlite-credit-v1/nope", str(tmp_path / "x")]
+        )
+        cli.main()
+    assert error.value.code == 2
 
 
 def test_generated_regression_public_imports_exist() -> None:

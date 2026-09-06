@@ -1,24 +1,25 @@
 # Status
 
-Updated 2026-09-04 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
+Updated 2026-09-05 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
 
 ## Exact identities
 
-Committed hero evidence (unchanged, bound to its own exact source and engine):
+Committed hero evidence (regenerated 2026-09-05 at the current engine):
 
-- measured clean source: `ddaf186aa81b8a7ebd442da1f2dfeee6878e7dce`
-- evidence/viewer publication: `3d66ccd4499fae5f1d6fbe5beee4b097d3ce3949`
-- engine code digest at that source: `47d78405ca59dee877328e16face03b15af484e3d65811e8caf213f00d8ec912`
-- capsule digest: `1025d9c6e014394cf80629d180e7cb4fb1a77a4b7b26934980b5f5ea975069a8`
-- benchmark result digest: `11016ce964b88961c246c91eb1ae437cf0ff9e9547a794ad845776af52af864a`
+- measured clean source: `305667621ef62b49523d35a65491dafbf1e779ef`
+- evidence/viewer publication: the commit that follows it on `overnight/hardening`
+- engine code digest at that source: `99ef8ade38b4616013c2d68ca9b1e8179041bf6b03aae0a58ef54928a59e1c22`
+- capsule digest: `41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c`
+- benchmark result digest: `fe98afd23f5a5bf3b5cf72a52a42558f2fb6d32ef848392fbc7f6dd26b51f8ef`
 - the capsule and benchmark digests are bound to CPython 3.12.13 / SQLite 3.53.1 / Darwin arm64
   through the runner environment digest; only the engine code digest is environment-independent
 
 Current tree:
 
-- engine code digest: `4832df8eae3c6001cc07eaf86c737845326d6e35f5a5ac0fc8e47d17907a9aed`
-  (changed by the contract-proposal and review commits; `tests/test_docs_identity.py` pins this value, so it cannot rot; a fresh `check` prints a new capsule digest bound to
-  this engine, and the committed hero is not relabelled)
+- engine code digest: `99ef8ade38b4616013c2d68ca9b1e8179041bf6b03aae0a58ef54928a59e1c22`
+  (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
+  engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
+  is not relabelled)
 - interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence
 
 ## Product state
@@ -33,6 +34,25 @@ CrashCheck's supported Python/SQLite alpha is locally demonstrated:
 - 5/5 atomic worlds end at `$25`, one effect, and one marker; and
 - the exported capsule/regression fails on misleading-green and passes on atomic from an installed
   wheel outside the checkout.
+
+New since 2026-09-05 (overnight hardening, branch `overnight/hardening`):
+
+- The checker was red-teamed with thirty adversarial handlers. Two false passes were found and
+  fixed: a handler that marks first and credits second (lost credit) and a handler that writes the
+  credit around the store (invisible kill window). Every claimed fix is now killed once after each
+  of its store commits (`CommitSweepReceipt`), and every durable change must be attributable to a
+  reported store commit.
+- Complete-but-wrong candidates are failed patches, not missing evidence:
+  `PATCH_FAILED_INVARIANT_BROKEN` (exit `1`) joins the verdict table; receipts validate through one
+  shared final-state rule so real evidence is never rejected as an "orchestration ValidationError".
+- `nemisis propose-patch`: Nemotron plays the coding agent, checker-blind; its module is shape
+  checked, becomes an ordinary candidate, and is named as the author in the report. `MOCKED` in
+  tests; `LIVE` needs `NEBIUS_API_KEY`, absent here.
+- Three red-team handlers ship as `fixture:sqlite-credit-v1/{mark-first,leftover-credit,never-marks}`.
+- Worker output is drained (chatty handlers no longer time out), the worker runs outside the bound
+  tree (relative file writes no longer dirty it), cleanup errors no longer mask primary failures,
+  and split worlds are named ("3 DUPLICATE_EFFECT, 2 EXACTLY_ONCE") instead of averaged.
+- The "single-action necessity proof" is called what it is, a no-crash control.
 
 New since 2026-08-30: `nemisis init --nemotron` asks Nemotron on Token Factory for a candidate-blind
 contract proposal (audited catalog IDs plus the expected single effect), accepts it only when fixed
@@ -51,7 +71,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 312 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 364 tests, and package build: pass locally on
   Python 3.12.13 (the suite also passed on 3.13 during development);
 - exact engine CI for the committed hero: [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355);
 - exact measured-source CI: [successful run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096);
@@ -104,5 +124,8 @@ Option A is retained: one excellent SQLite slice, made undeniable. In order:
    `check --mode live` `BLOCKED` until a real receipt exists.
 4. Publish the static viewer at a public URL.
 
-A second scenario or backend is deliberately deferred; it would add adapter surface without closing
-any submission gate.
+A second scenario or backend is still deferred. The overnight work chose depth over width: the
+kernel now proves a patch survives every kill point of its own, not only the base's, and thirty
+adversarial handlers were run against it. The seam a second scenario needs (schema, store class,
+seed, probe, and final-state rule are the hardcoded points in `sqlite_credit.py` and
+`crash_models.py`) is listed in `MORNING.md`.
