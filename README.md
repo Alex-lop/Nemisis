@@ -1,3 +1,5 @@
+![Nemisis: a crash timeline whose last mark is an open red square, the write that never happened](docs/assets/nemisis-banner.png)
+
 # Nemisis
 
 **CrashCheck proves an AI patch survives a real crash, not just that its tests pass.**
