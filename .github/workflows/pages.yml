@@ -1,0 +1,91 @@
+# Publishes the committed evidence viewer (docs/assets/crashcheck-hero/) to GitHub Pages.
+#
+# The viewer is static and fail-closed: it renders no claim unless the committed manifest and
+# benchmark validate in the browser, exactly as when served locally with `python -m http.server`.
+# The staging step keeps the same relative layout the page was recorded against, so the paths it
+# fetches (`runs/<id>/manifest.json`, `../../../benchmarks/results/crashcheck-v1.json`) resolve.
+#
+# Nothing deploys until GitHub Pages is enabled for the repository with "Source: GitHub Actions"
+# (Settings -> Pages). Until then the workflow reports that and exits green without publishing.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docs/assets/crashcheck-hero/**
+      - benchmarks/results/**
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    outputs:
+      enabled: ${{ steps.pages.outputs.enabled }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check whether GitHub Pages is enabled
+        id: pages
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/pages" >/dev/null 2>&1; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Pages"
+              echo
+              echo "GitHub Pages is not enabled for this repository, so nothing was published."
+              echo "Enable it under Settings -> Pages -> Build and deployment -> Source: GitHub Actions,"
+              echo "then re-run this workflow."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Stage the viewer with the relative layout it was recorded against
+        if: steps.pages.outputs.enabled == 'true'
+        shell: bash
+        run: |
+          mkdir -p _site/docs/assets _site/benchmarks
+          cp -R docs/assets/crashcheck-hero _site/docs/assets/crashcheck-hero
+          cp -R benchmarks/results _site/benchmarks/results
+          cat > _site/index.html <<'HTML'
+          <!doctype html>
+          <meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=docs/assets/crashcheck-hero/">
+          <title>Nemisis CrashCheck evidence</title>
+          <a href="docs/assets/crashcheck-hero/">Nemisis CrashCheck evidence viewer</a>
+          HTML
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+        if: steps.pages.outputs.enabled == 'true'
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        if: steps.pages.outputs.enabled == 'true'
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    if: needs.build.outputs.enabled == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
