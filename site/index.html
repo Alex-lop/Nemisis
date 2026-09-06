@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nemisis — CrashCheck for AI patches</title>
+<meta name="description" content="CrashCheck runs an AI patch in a real worker, kills it the moment a write becomes durable, redelivers the same event to a fresh process, and reads what survived. One command, one verdict, an exit code CI can block on.">
+<meta name="theme-color" content="#0d1117">
+<link rel="canonical" href="https://alex-lop.github.io/Nemisis/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://alex-lop.github.io/Nemisis/">
+<meta property="og:title" content="Nemisis — CrashCheck for AI patches">
+<meta property="og:description" content="Kill it mid-write. Read what survived. One command, one verdict, an exit code CI can block on.">
+<meta property="og:image" content="https://alex-lop.github.io/Nemisis/assets/nemisis-banner-dark.png">
+<meta property="og:image:alt" content="A crash timeline whose last mark is an open red square, the write that never happened.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="site.css">
+<script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<nav class="nav" aria-label="Primary">
+  <div class="wrap">
+    <a class="wordmark" href="#top" aria-label="Nemisis, home">Nemisis</a>
+    <ul>
+      <li><a href="#command">Command</a></li>
+      <li><a href="#proof">Proof</a></li>
+      <li><a href="docs/assets/crashcheck-hero/">Evidence</a></li>
+      <li><a href="https://github.com/Alex-lop/Nemisis">GitHub</a></li>
+    </ul>
+  </div>
+</nav>
+
+<main id="main">
+  <header class="hero" id="top">
+    <canvas class="kill-field" data-kill-field aria-hidden="true"></canvas>
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">CrashCheck · for AI patches</p>
+        <h1>Kill it mid-write.<br>Read what survived.</h1>
+        <p class="lede">Tests call the handler once and nothing goes wrong. CrashCheck kills the worker after every store commit, redelivers the same event to a fresh process, and reads what survived.</p>
+        <p class="actions">
+          <a class="btn btn-go" href="#command">Run the check</a>
+          <a class="btn" href="docs/assets/crashcheck-hero/">Open the evidence</a>
+        </p>
+      </div>
+      <figure class="hero-legend" data-legend>
+        <figcaption class="mono">
+          <span data-legend-line>move the kill</span>
+        </figcaption>
+      </figure>
+    </div>
+  </header>
+
+  <section id="command" class="command">
+    <div class="wrap">
+      <p class="eyebrow">One command</p>
+      <h2>One verdict. An exit code CI can block on.</h2>
+      <div class="command-grid">
+        <pre class="terminal" aria-label="Terminal output of nemisis check"><code><span class="prompt">$</span> uv run nemisis check --base fixture:sqlite-credit-v1/buggy \
+    --candidate fixture:sqlite-credit-v1/misleading-green
+<span class="dim">NEMISIS CRASHCHECK — LOCAL</span>
+execution: COMPLETED
+integrity: VALID
+verdict:   <span class="red">PATCH_FAILED_STILL_REPRODUCES</span>
+summary:   The candidate replayed evt_1042 to a durable +$50 duplicate effect.
+sweep:     killed after each store commit: #1 → $50.00 DUPLICATE_EFFECT
+timeline:  $25.00 durable → SIGKILL → fresh worker → <span class="red">$50.00</span>
+<span class="dim">exit code 1</span></code></pre>
+        <div class="verdicts">
+          <div><b>0</b><span class="mono">FIX_PROVEN_FOR_THIS_CAPSULE</span><p>Every kill point replayed to exactly once.</p></div>
+          <div><b>1</b><span class="mono red">PATCH_FAILED</span><p>A crash window still duplicates the effect.</p></div>
+          <div><b>2</b><span class="mono">EVIDENCE_INCOMPLETE</span><p>A write CrashCheck could not attribute. No verdict, the reason named.</p></div>
+        </div>
+      </div>
+      <p class="install mono">uv tool install "git+https://github.com/Alex-lop/Nemisis@main"</p>
+    </div>
+  </section>
+
+  <section id="proof" class="proof">
+    <div class="wrap">
+      <p class="eyebrow">Proof, labelled</p>
+      <h2>What is proven. What is refused. What is not.</h2>
+      <dl class="proof-strip">
+        <div><dt>Proven locally</dt><dd>The double-credit hero, five kill worlds per role, 453 tests on CPython 3.12 and 3.13, a committed benchmark.</dd></div>
+        <div><dt>Refused, by design</dt><dd>A write around the store, in a table, a header field, a rowid, or a file: fifteen hidden-flag shapes forfeit the verdict and are named.</dd></div>
+        <div><dt>Red-teamed nightly</dt><dd>Generated handlers against an oracle: 300 of 300 agreed at the current engine.</dd></div>
+        <div><dt>Not proven</dt><dd>A live model-written patch. <code>LIVE</code> stays <code>BLOCKED</code> until a receipt exists.</dd></div>
+      </dl>
+      <p class="proof-links">Read <a href="https://github.com/Alex-lop/Nemisis/blob/main/docs/PROOF.md">the proof ledger</a>, <a href="https://github.com/Alex-lop/Nemisis/blob/main/docs/SECURITY.md">the boundary</a>, and <a href="docs/assets/crashcheck-hero/">the evidence viewer</a>.</p>
+    </div>
+  </section>
+
+  <section class="closing">
+    <div class="wrap">
+      <img class="banner" src="assets/nemisis-banner-dark.png" width="2000" height="833" alt="Nemisis: a crash timeline whose last mark is an open red square, the write that never happened.">
+      <p class="closing-line">The open square is the write that never happened. CrashCheck is how you know.</p>
+      <p class="actions">
+        <a class="btn btn-go" href="https://github.com/Alex-lop/Nemisis">View on GitHub</a>
+        <a class="btn" href="https://github.com/Alex-lop/Nemisis/blob/main/README.md">Read the README</a>
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Nemisis · CrashCheck</p>
+    <ul>
+      <li><a href="https://github.com/Alex-lop/Nemisis">Source</a></li>
+      <li><a href="https://github.com/Alex-lop/Nemisis/blob/main/LICENSE">Apache 2.0</a></li>
+      <li><a href="docs/assets/crashcheck-hero/">Evidence</a></li>
+    </ul>
+  </div>
+</footer>
+
+<script src="kill-field.js" defer></script>
+</body>
+</html>

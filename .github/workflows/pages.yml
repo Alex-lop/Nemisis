@@ -1,9 +1,11 @@
-# Publishes the committed evidence viewer (docs/assets/crashcheck-hero/) to GitHub Pages.
+# Publishes the site (site/) and the committed evidence viewer (docs/assets/crashcheck-hero/) to
+# GitHub Pages.
 #
 # The viewer is static and fail-closed: it renders no claim unless the committed manifest and
 # benchmark validate in the browser, exactly as when served locally with `python -m http.server`.
 # The staging step keeps the same relative layout the page was recorded against, so the paths it
 # fetches (`runs/<id>/manifest.json`, `../../../benchmarks/results/crashcheck-v1.json`) resolve.
+# The site links to it at docs/assets/crashcheck-hero/.
 #
 # Nothing deploys until GitHub Pages is enabled for the repository with "Source: GitHub Actions"
 # (Settings -> Pages). Until then the workflow reports that and exits green without publishing.
@@ -13,7 +15,9 @@ on:
   push:
     branches: [main]
     paths:
+      - site/**
       - docs/assets/crashcheck-hero/**
+      - docs/assets/nemisis-banner-dark.png
       - benchmarks/results/**
       - .github/workflows/pages.yml
   workflow_dispatch:
@@ -55,20 +59,10 @@ jobs:
               echo "then re-run this workflow."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
-      - name: Stage the viewer with the relative layout it was recorded against
+      - name: Stage the site and the viewer with the relative layout it was recorded against
         if: steps.pages.outputs.enabled == 'true'
         shell: bash
-        run: |
-          mkdir -p _site/docs/assets _site/benchmarks
-          cp -R docs/assets/crashcheck-hero _site/docs/assets/crashcheck-hero
-          cp -R benchmarks/results _site/benchmarks/results
-          cat > _site/index.html <<'HTML'
-          <!doctype html>
-          <meta charset="utf-8">
-          <meta http-equiv="refresh" content="0; url=docs/assets/crashcheck-hero/">
-          <title>Nemisis CrashCheck evidence</title>
-          <a href="docs/assets/crashcheck-hero/">Nemisis CrashCheck evidence viewer</a>
-          HTML
+        run: bash site/stage.sh _site
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
         if: steps.pages.outputs.enabled == 'true'
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
