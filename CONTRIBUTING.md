@@ -13,8 +13,8 @@ uv run mypy src tests
 uv run pytest
 ```
 
-Run all five before every commit. CI runs the same commands plus the composite action and an
-installed-wheel smoke test.
+Run all four before every commit. CI runs the same commands on CPython 3.12 and 3.13, plus the
+composite action and an installed-wheel smoke test.
 
 ## Two files the tests keep honest
 
