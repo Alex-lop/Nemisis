@@ -19,6 +19,7 @@ from nemisis.crash_fixture import (
     MARK_FIRST_REF,
     MISLEADING_GREEN_REF,
     NEVER_MARKS_REF,
+    RAW_SQL_REF,
     FixtureEvent,
     load_contract,
     load_event,
@@ -106,7 +107,26 @@ def test_rejects_unknown_refs_before_creating_a_destination(tmp_path: Path) -> N
         materialize_fixture("fixture:sqlite-credit-v1/unknown", destination)
     assert not destination.exists()
     assert HERO_REFS == (BUGGY_REF, MISLEADING_GREEN_REF, ATOMIC_REF)
-    assert (*HERO_REFS, MARK_FIRST_REF, LEFTOVER_CREDIT_REF, NEVER_MARKS_REF) == FIXTURE_REFS
+    assert (
+        *HERO_REFS,
+        MARK_FIRST_REF,
+        LEFTOVER_CREDIT_REF,
+        NEVER_MARKS_REF,
+        RAW_SQL_REF,
+    ) == FIXTURE_REFS
+
+
+def test_raw_sql_tree_cannot_run_the_in_memory_unit_test(tmp_path: Path) -> None:
+    """The judge's raw-SQL fix reaches for the store's database, which the in-memory store the
+    repository's own test uses does not have: its unit test is red, not misleadingly green."""
+    result = materialize_fixture(RAW_SQL_REF, tmp_path / "tree")
+    handler = cast(
+        Callable[[MemoryStore, FixtureEvent], None],
+        runpy.run_path(str(result.path / "app/credits.py"))["apply_credit"],
+    )
+
+    with pytest.raises(AttributeError, match="_database"):
+        handler(MemoryStore(), load_event())
 
 
 def test_rejects_a_changed_packaged_contract(

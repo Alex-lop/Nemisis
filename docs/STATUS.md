@@ -16,7 +16,7 @@ Committed hero evidence (regenerated 2026-09-05 at the current engine):
 
 Current tree:
 
-- engine code digest: `99ef8ade38b4616013c2d68ca9b1e8179041bf6b03aae0a58ef54928a59e1c22`
+- engine code digest: `ad0d34ce585d7875684a7c54830e176062ce6ec14236bd65981ae301a860b728`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
@@ -52,7 +52,10 @@ New since 2026-09-05 (overnight hardening, branch `overnight/hardening`):
 - `nemisis propose-patch`: Nemotron plays the coding agent, checker-blind; its module is shape
   checked, becomes an ordinary candidate, and is named as the author in the report. `MOCKED` in
   tests; `LIVE` needs `NEBIUS_API_KEY`, absent here.
-- Three red-team handlers ship as `fixture:sqlite-credit-v1/{mark-first,leftover-credit,never-marks}`.
+- Three red-team handlers ship as `fixture:sqlite-credit-v1/{mark-first,leftover-credit,never-marks}`,
+  and `fixture:sqlite-credit-v1/raw-sql` is the textbook fix written as one raw SQL transaction:
+  it gets no verdict and a one-line remedy, because a write the store did not make has no kill
+  point (exit `2`, summary and report name `store.credit_and_mark(...)`).
 - Worker output is drained (chatty handlers no longer time out), the worker runs outside the bound
   tree (relative file writes no longer dirty it), cleanup errors no longer mask primary failures,
   and split worlds are named ("3 DUPLICATE_EFFECT, 2 EXACTLY_ONCE") instead of averaged.

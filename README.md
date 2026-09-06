@@ -89,6 +89,7 @@ earlier engine ship as fixture refs, so the claim above is one flag away for any
 | `leftover-credit` | green | `$50` | `$50` | `PATCH_FAILED_STILL_REPRODUCES` |
 | `never-marks` | green | `$50` | `$50`, no marker | `PATCH_FAILED_STILL_REPRODUCES` |
 | `atomic` | green | `$25` | `$25` | `FIX_PROVEN_FOR_THIS_CAPSULE` |
+| `raw-sql` | red (needs SQLite) | `$25` | no kill point | `EVIDENCE_INCOMPLETE`, names the one-line change |
 
 ```bash
 uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/mark-first
@@ -102,7 +103,11 @@ $EDITOR ./my-candidate/app/credits.py
 uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate ./my-candidate
 ```
 
-The handler may only touch the store; a write around it is an integrity failure, not a verdict.
+The handler may only touch the store. The last row is the textbook fix written as one raw SQL
+transaction on the store's database: correct, and unjudgeable, because a write the store did not
+make has no kill point. CrashCheck names the write and the store call that expresses the same fix
+(`store.credit_and_mark(...)`, see [the store API](docs/PRODUCT.md#the-store-api)) instead of
+guessing a verdict.
 
 ## Let Nemotron write the patch
 

@@ -17,6 +17,7 @@ from nemisis.crash_fixture import (
     MARK_FIRST_REF,
     MISLEADING_GREEN_REF,
     NEVER_MARKS_REF,
+    RAW_SQL_REF,
     SCENARIO_ID,
     load_issue,
 )
@@ -546,9 +547,59 @@ def test_effects_committed_outside_the_trusted_store_are_an_integrity_failure(
     assert result.integrity_status.value == "INVALID"
     assert "around the trusted store" in result.summary
     assert detail in result.summary
+    assert "store.credit_and_mark(account_id, event_id, amount_cents)" in result.summary
+    assert "docs/PRODUCT.md#the-store-api" in result.summary
     candidate_attempts = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
     assert len(candidate_attempts) == 5
     assert all(a.execution_status is ExecutionStatus.INTEGRITY_ERROR for a in candidate_attempts)
+    assert cli._exit_code(result.verdict) == 2
+
+
+NO_DURABLE_WRITE = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+"""
+
+
+def test_raw_sql_judge_handler_is_told_the_one_line_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The textbook atomic fix, written as one raw SQL transaction on the store's own database.
+    It is correct, and it is unjudgeable: no store commit means no kill point. The judge who
+    writes it in minute one is told, on the first run, the exact store call that earns a verdict,
+    in the summary, on the terminal, and in the report card."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+
+    result = check(BUGGY_REF, RAW_SQL_REF, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert cli._exit_code(result.verdict) == 2
+    assert "changed the database without a single CreditStore commit" in result.summary
+    assert "balance 2500 cents, 1 ledger row(s), 1 marker" in result.summary
+    assert "no kill point exists inside that write" in result.summary
+    assert "store.credit_and_mark(account_id, event_id, amount_cents)" in result.summary
+    assert "docs/PRODUCT.md#the-store-api" in result.summary
+    candidate = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
+    assert {a.execution_status for a in candidate} == {ExecutionStatus.CHECKPOINT_NOT_REACHED}
+    assert all(a.first_worker_operations == () for a in candidate)
+    report = (tmp_path / "artifacts" / result.artifacts["report"]).read_text(encoding="utf-8")
+    assert "store.credit_and_mark(account_id, event_id, amount_cents)" in report
+
+
+def test_a_handler_that_writes_nothing_durable_is_told_so_not_blamed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No store commit and no change either: the guard-only handler never credited. That is a
+    different sentence from a raw write, and it does not get the raw-SQL remedy."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "no-durable-write", NO_DURABLE_WRITE)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
+    assert "left the database as seeded" in result.summary
+    assert "no durable credit to crash-test" in result.summary
+    assert "credit_and_mark" not in result.summary
     assert cli._exit_code(result.verdict) == 2
 
 

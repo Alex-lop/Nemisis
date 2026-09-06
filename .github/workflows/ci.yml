@@ -106,3 +106,16 @@ jobs:
             echo "Expected mark-first to exit 1 with PATCH_FAILED_INVARIANT_BROKEN, got $zoo_status." >&2
             exit 2
           fi
+          # The raw-SQL judge handler: correct, unjudgeable, and told the one-line change.
+          set +e
+          uv tool run --from "${wheels[0]}" nemisis check \
+            --base fixture:sqlite-credit-v1/buggy \
+            --candidate fixture:sqlite-credit-v1/raw-sql \
+            --mode local \
+            --output-dir "$smoke_root/raw-sql" | tee "$smoke_root/raw-sql.txt"
+          raw_status=$?
+          set -e
+          if [[ "$raw_status" -ne 2 ]] || ! grep -q "store.credit_and_mark(account_id, event_id, amount_cents)" "$smoke_root/raw-sql.txt"; then
+            echo "Expected raw-sql to exit 2 and name the store call, got $raw_status." >&2
+            exit 2
+          fi
