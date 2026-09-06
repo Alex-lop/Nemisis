@@ -13,13 +13,14 @@ uv run mypy src tests
 uv run pytest
 ```
 
-Run all four before every commit. CI runs the same commands plus the composite action and an
+Run all five before every commit. CI runs the same commands plus the composite action and an
 installed-wheel smoke test.
 
 ## Two files the tests keep honest
 
-- `docs/STATUS.md` and `docs/PROOF.md` quote the current engine code digest. Any edit to a trusted
-  engine file changes it; `tests/test_docs_identity.py` fails until both docs are updated. Print the
+- `docs/STATUS.md` and `docs/PROOF.md` quote the current engine code digest. It hashes the files
+  listed in `_ENGINE_RESOURCES` in `src/nemisis/crashcheck.py`, so an edit to any of those files
+  changes it and `tests/test_docs_identity.py` fails until both docs are updated. Print the
   new value with `uv run python -c "from nemisis.crashcheck import engine_code_digest; print(engine_code_digest())"`.
 - `docs/STATUS.md` and `docs/PROOF.md` quote the test count. `tests/test_readme_truth.py` fails
   when it drifts from `pytest --collect-only`.
@@ -34,9 +35,14 @@ fail or an oracle bug; either is worth an issue with the case's ops and summary.
 
 ## Adding a candidate to the zoo
 
-Drop a tree under `src/nemisis/fixtures/sqlite_credit_v1/trees/<name>/app/credits.py`, register the
-variant and its tree digest in `src/nemisis/scenarios/sqlite_credit_v1.py`, and add its expected
-verdict to `tests/test_verdict_paths.py`. A candidate that earns `FIX_PROVEN_FOR_THIS_CAPSULE` while being
+Pick the scenario first. For `sqlite-credit-v1`, drop a tree under
+`src/nemisis/fixtures/sqlite_credit_v1/trees/<name>/app/credits.py`, add the variant to
+`ZOO_VARIANTS` and its tree digest to `TREE_DIGESTS` in `src/nemisis/scenarios/sqlite_credit_v1.py`,
+and assert the verdict it earns in `tests/test_verdict_paths.py`. For `sqlite-inventory-v1` the same
+three steps run through `src/nemisis/fixtures/sqlite_inventory_v1/trees/<name>/app/inventory.py`,
+`src/nemisis/scenarios/sqlite_inventory_v1.py`, and `tests/test_inventory_scenario.py`. Both
+scenario modules are trusted engine resources, so registering a variant moves the engine code digest
+and both ledgers have to be requoted. A candidate that earns `FIX_PROVEN_FOR_THIS_CAPSULE` while being
 wrong is the most valuable contribution possible; please open it as an issue even if you cannot
 fix the checker.
 

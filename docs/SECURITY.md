@@ -25,8 +25,10 @@ than a general hostile-code sandbox.
 
 The trusted verification bundle includes baseline/generated test bytes, a Nemisis-owned Pytest
 plugin, fixed runner argv, parser identity, dependency identity, and one digest. It is materialized
-outside candidate-controlled paths and checked before and after execution. Candidate changes to its
-own tests or Pytest configuration do not become acceptance evidence.
+outside candidate-controlled paths, and its digest is verified before the world runs. The ConTree
+runner re-hashes the bundle and the workspace after execution and fails closed if either changed;
+local `verify` re-hashes the candidate world, not the bundle. Candidate changes to its own tests or
+Pytest configuration do not become acceptance evidence.
 
 Generated tests are schema-, path-, count-, size-, syntax-, name-, and import-restricted. The model
 cannot return commands or runner configuration. Local `verify` accepts only the checked-in trusted
@@ -41,9 +43,9 @@ generated tests.
 
 ## CrashCheck trusted computing base
 
-The controller, fixed hypothesis catalog, the scenario object and its `CreditStore` adapter,
-socket protocol, read-only probe, contract/capsule validators, source binder, SQLite runner, verdict
-derivation, and report renderer are trusted. Their installed source/catalog bytes are hashed into `engine_code_digest`, which is
+The controller, fixed hypothesis catalog, the scenario objects and their stores (`CreditStore`,
+`InventoryStore`), socket protocol, read-only probe, contract/capsule validators, source binder,
+SQLite runner, verdict derivation, display formatting, and report renderer are trusted. Their installed source/catalog bytes are hashed into `engine_code_digest`, which is
 required by both the capsule and result and validated before replay execution. Issue text,
 repository content, refs, config imports, capsules, IPC messages, logs, and provider responses are
 untrusted inputs.
@@ -55,29 +57,48 @@ inherited stdout/stderr pipes staying open and are killed with the group; a hand
 calls `setsid`, and closes those pipes escapes that detection. That is inside the stated boundary
 (local mode is for a trusted checkout, not hostile code) and such a run still fails closed on its
 contradictory receipts rather than proving anything. SQLite state is outside the source tree, uses
-integer cents, WAL and `synchronous=FULL`, and is observed through fresh read-only connections.
+integers (cents, units), WAL and `synchronous=FULL`, and is observed through fresh read-only
+connections.
 Failure to launch, checkpoint, kill, wait, probe, restart, replay, parse, or clean up makes evidence
 incomplete.
 
-Every durable change is attributed, at the level of the whole database. The worker reports each
-trusted store commit by operation name; the scenario predicts the entire database content after
-that operation (every row of every seeded table, the schema, the header pragmas), the controller
-reads the entire database through a read-only connection at that instant and refuses anything
-that differs, and does so again after the worker's final message and after the kill. A handler
-that moves money through its own SQLite connection, creates a table for its own dedup flag,
-stores a flag in `PRAGMA user_version`, re-points a ledger row at another account, or renames
-and replaces a table therefore cannot earn a verdict: its run is `INTEGRITY_ERROR` / `INVALID`,
-because the kill point could no longer be trusted to sit where the money moved. A handler that
-also forges the IPC message on the store's private channel is hostile code, which local mode does
-not claim to contain.
+Every durable change the controller can read is attributed, at the level of the whole database
+file. The worker reports each trusted store commit by operation name; the scenario predicts the
+database content after that operation (every row of every seeded table, with its rowid); the kernel
+adds the schema (`sqlite_master`) and the header fields a commit never changes (journal mode, the
+schema cookie, the free-page count, page size, vacuum mode, encoding, `user_version`,
+`application_id`), reads all of it through a read-only connection at that instant, and refuses
+anything that differs; it reads again after the kill and after the worker's final message. The
+seed leaves the file in WAL mode so the journal bits are constant for the run. A handler that
+moves money through its own SQLite connection, creates a table for its dedup flag, stores a flag in
+a header field, a rowid, or the free-page count, re-points a ledger row, or renames and replaces a
+table therefore cannot earn a verdict. If it also makes a store commit, the unattributed content is
+caught at the next probe and the run is `INTEGRITY_ERROR` / `INVALID`, because the kill point could
+no longer be trusted to sit where the money moved. If it makes no store commit at all, which is
+what the textbook atomic fix written as one raw transaction does, there is no kill point to place:
+the run is `CHECKPOINT_NOT_REACHED`, the verdict is `EVIDENCE_INCOMPLETE`, and the summary names the
+write it saw and the store call that expresses the same fix. Two hostile reviews on 2026-09-06
+found eleven such channels that an earlier engine blessed; each is pinned in
+`tests/test_verdict_paths.py`. What the controller cannot read, it does not claim: a flag the
+store's own next commit overwrites (the file's modification time, the bytes of the WAL sidecar) and
+a flag written at the sidecar names the store owns (`<database>-wal`, `<database>-shm`) stay
+outside what local mode can see. A handler that also forges the IPC message on the store's private
+channel is hostile code, which local mode does not claim to contain.
 
 Kill points are store commits, and only store commits. Each world runs in its own directory: the
-worker's cwd sits two levels inside it, and `HOME` and `TMPDIR` point inside it too; after the
-run, that directory may hold nothing but the database and its WAL sidecars. A file, an empty
-directory, or a journal written anywhere in it (beside the database, one or two directories up,
-under `~`, or under the temp directory) forfeits the verdict, because a crash window around that
-state is one no store commit can reach. Durable state kept elsewhere on the machine, by absolute
-path, is outside what local mode can see and is a documented boundary, not a claim.
+worker's cwd sits two levels inside it, and `HOME` and `TMPDIR` point inside it too. That directory
+is scanned right after the kill (before a replay could tidy a flag away), between the census's two
+deliveries, and at the end; it may hold nothing but the database and its WAL sidecars, with the
+seed's permission bits and no extended attributes. A file, an empty directory, or a journal written
+anywhere in it (beside the database, one or two directories up, under `~`, or under the temp
+directory) forfeits the verdict, because a crash window around that state is one no store commit
+can reach. The bound source tree is compared entry by entry, bytecode caches and directories
+included, before and after every delivery. After every phase the run's scratch tree may hold
+nothing but the worlds CrashCheck made (`../../..` from the cwd lands there), or the run stops
+without a verdict and names the entry. Durable state kept elsewhere on the machine, by absolute
+path, is outside what local mode can see and is a documented boundary, not a claim; a handler
+whose commit schedule differs between the kill worlds and the census, which is what such state
+looks like from outside, is `EVIDENCE_INCOMPLETE`, never swept.
 Every world the handler runs in is named by an opaque identifier, so a handler cannot tell a census
 delivery from a kill world. It can still tell that it is inside CrashCheck (the store object is in
 its hands), which is the boundary of in-process instrumentation: a handler that is correct only
@@ -131,16 +152,19 @@ configuration is loaded from the exact base commit, not a candidate replacement.
 ## Provider and credential separation
 
 Token Factory credentials may be sent only to an official Nebius HTTPS `/v1` global or regional
-endpoint; ambiguous hosts, credentials in URLs, non-default ports, query strings, and redirects are
-rejected. ConTree authentication and service selection come from the standard `contree-client`
-profile rather than candidate input. Provider operation/image identities remain separate from guest
-tree, process, database, and test evidence.
+endpoint; ambiguous hosts, credentials in URLs, non-default ports, and query strings are rejected
+before any request is made. Nemisis does not itself refuse redirects: the provider SDK's HTTP client
+follows them, and only its cross-origin rule strips the credential header. ConTree authentication
+and service selection come from the standard `contree-client` profile rather than candidate input.
+Provider operation/image identities remain separate from guest tree, process, database, and test
+evidence.
 
-A result is `LIVE` only with genuine sanitized current-tree receipts. Prior genuine evidence is
-`RECORDED_LIVE`; injected clients remain `MOCKED`; audited checked-in content is `FIXTURE`.
-CrashCheck's provider transport is explicitly unimplemented, so live CrashCheck remains blocked
-even if credentials, profile, and immutable image are supplied. Its incomplete live receipt cannot
-be upgraded by local execution.
+A result is `LIVE` only with genuine sanitized current-tree receipts. `RECORDED_LIVE` is reserved
+for prior genuine evidence and is refused when a config file supplies it; no code path in the tree
+emits that label. Injected clients remain `MOCKED`; audited checked-in content is `FIXTURE`.
+CrashCheck's provider transport is explicitly unimplemented, so live CrashCheck remains blocked even
+if credentials, profile, and immutable image are supplied. Its incomplete live receipt cannot be
+upgraded by local execution.
 
 ## Supported claims
 

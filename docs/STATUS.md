@@ -36,16 +36,17 @@ CrashCheck's supported Python/SQLite alpha is locally demonstrated:
 - a fresh worker with a distinct nonce/session replays the byte-identical event;
 - 5/5 candidate worlds end at `$50`, two effects, and one marker;
 - 5/5 atomic worlds end at `$25`, one effect, and one marker; and
-- the exported capsule/regression fails on misleading-green and passes on atomic from an installed
-  wheel outside the checkout.
+- the exported capsule/regression fails on misleading-green and passes on atomic from a clean
+  directory outside the checkout; CI runs `check` (exit `1`) and `replay` from the built wheel in a
+  temporary directory outside the workspace.
 
-New since 2026-09-05 (overnight hardening, branch `overnight/hardening`):
+New since 2026-09-05, from `overnight/hardening` and the `overnight2/*` branches that followed it:
 
-- The checker was red-teamed with thirty adversarial handlers. Two false passes were found and
+- The checker was red-teamed by hand, then by the generator below. Two false passes were found and
   fixed: a handler that marks first and credits second (lost credit) and a handler that writes the
-  credit around the store (invisible kill window). Every claimed fix is now killed once after each
-  of its store commits (`CommitSweepReceipt`), and every durable change must be attributable to a
-  reported store commit.
+  credit around the store (invisible kill window). A claimed fix that survives the capsule's own
+  kill point is then killed once after each of its reported store commits (`CommitSweepReceipt`),
+  and every durable change must be attributable to a reported store commit.
 - Complete-but-wrong candidates are failed patches, not missing evidence:
   `PATCH_FAILED_INVARIANT_BROKEN` (exit `1`) joins the verdict table; receipts validate through one
   shared final-state rule so real evidence is never rejected as an "orchestration ValidationError".
@@ -54,12 +55,15 @@ New since 2026-09-05 (overnight hardening, branch `overnight/hardening`):
   tests; `LIVE` needs `NEBIUS_API_KEY`, absent here.
 - `nemisis redteam` generates handlers from a grammar over store operations and compares every
   verdict with an oracle; ten cases run in the normal suite, three hundred nightly.
-- Attribution covers the whole database (schema, header pragmas, every row of every table) and
-  the whole per-world directory the worker runs in (cwd, its two parents, `HOME`, `TMPDIR`), after
-  a hostile review on 2026-09-06 found five handlers that earned `FIX_PROVEN_FOR_THIS_CAPSULE`
-  while losing or moving the money through a table, a pragma, a re-pointed row, a renamed table,
-  a parent-directory file, or an empty directory; each is pinned in `tests/test_verdict_paths.py`
-  and the table one ships as `fixture:sqlite-credit-v1/shadow-table`.
+- Attribution reads the whole database file (schema, every durable header field a commit never
+  changes, every row with its rowid) and the whole per-world directory (cwd, its two parents,
+  `HOME`, `TMPDIR`, the bound tree entry by entry) after the kill, between the census deliveries,
+  and at the end, after two hostile reviews on 2026-09-06 found eleven handlers that earned
+  `FIX_PROVEN_FOR_THIS_CAPSULE` through hidden flags (a table, three header fields, a rowid, the
+  free-page count, a re-pointed row, a renamed table, files and directories beside, above, under
+  `~`, under `TMPDIR`, in the bound tree, deleted on exit). Each is pinned in
+  `tests/test_verdict_paths.py`; the table one ships as `fixture:sqlite-credit-v1/shadow-table`.
+  Two channels stay outside local mode's sight and are named in `docs/SECURITY.md`.
 - Three red-team handlers ship as `fixture:sqlite-credit-v1/{mark-first,leftover-credit,never-marks}`,
   and `fixture:sqlite-credit-v1/raw-sql` is the textbook fix written as one raw SQL transaction:
   it gets no verdict and a one-line remedy, because a write the store did not make has no kill
@@ -86,19 +90,23 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 435 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 453 tests, and package build: pass locally on
   Python 3.12.13 (the suite also passed on 3.13 during development);
-- exact engine CI for the committed hero: [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355);
-- exact measured-source CI: [successful run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096);
-- evidence/viewer CI: [successful run 33349903736](https://github.com/Alex-lop/Nemisis/actions/runs/33349903736);
+- CI passed on the older commits these links were written for, every one of them earlier than the
+  source measured above:
+  [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355),
+  [successful run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096), and
+  [successful run 33349903736](https://github.com/Alex-lop/Nemisis/actions/runs/33349903736); no CI
+  run at the measured source is cited here yet;
 - local doctor: `READY` for Python 3.12, POSIX `SIGKILL`, and SQLite WAL/`FULL`;
 - `init --nemotron` without `NEBIUS_API_KEY`: exit `2`, nothing written (verified);
 - `init --nemotron` with an injected client, then `check --scenario .nemisis/config.json`: receipt
   labelled `MOCKED` in the manifest and report, verdict unchanged (verified; this is a test path,
   not a live claim);
-- adversarial review on 2026-09-03 (seven lenses, two verifiers each) and the resulting fixes: a
-  config or exported contract can no longer stamp `LIVE`; `replay` refuses untrusted forks like
-  `check`; the viewer command binds loopback; every documented refusal path now has a test.
+- adversarial review on 2026-09-03 and the resulting fixes: a config or exported contract can no
+  longer stamp `LIVE`; `replay` refuses untrusted forks like `check`; the viewer command binds
+  loopback; every refusal path that review named now has a test in
+  `tests/test_trust_boundaries.py`.
 
 Visual evidence now exists and is committed under `docs/assets/screenshots/`: a 30-second `vhs`
 terminal recording (`crashcheck-demo.gif`: buggy reproduces, the agent's patch still reproduces, the

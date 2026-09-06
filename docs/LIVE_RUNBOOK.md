@@ -1,7 +1,7 @@
 # Nemotron + Nebius live runbook
 
-Verified against official documentation and the installed source on 2026-08-30. This runbook does
-not claim that a provider call or Sandbox run occurred.
+Verified against official documentation on 2026-08-30 and re-checked against the installed source
+on 2026-09-06. This runbook does not claim that a provider call or Sandbox run occurred.
 
 ## Current provider facts
 
@@ -10,9 +10,9 @@ not claim that a provider call or Sandbox run occurred.
 | Token Factory API | OpenAI-compatible API; the official quickstart uses `https://api.tokenfactory.nebius.com/v1/` and `NEBIUS_API_KEY`. [Quickstart](https://docs.tokenfactory.nebius.com/quickstart) | Default endpoint and credential in [`nemotron.py`](../src/nemisis/nemotron.py). Only official global or regional Nebius HTTPS `/v1` URLs are accepted. |
 | Nemotron | The official cookbook currently documents `nvidia/nemotron-3-super-120b-a12b` at the regional `https://api.tokenfactory.us-central1.nebius.com/v1/` endpoint and says it supports structured output. [Nemotron guide](https://github.com/nebius/token-factory-cookbook/blob/main/models/nemotron/nemotron3-super-120B.md) | Exact default model ID. A live run first requires that exact ID to be active, `text->text`, and JSON-schema capable in the authenticated catalog. |
 | Model availability | `GET /v1/models` is authenticated and returns the models currently available to the caller. [List models API](https://docs.tokenfactory.nebius.com/api-reference/models/list-models) | The adapter requests the verbose catalog before generation and fails closed if the configured model or capabilities are absent. The 2026-08-31 deprecation notice recommends this Nemotron ID as a replacement; it does not list it for removal. [August 2026 notice](https://docs.tokenfactory.nebius.com/august-2026-deprecation-notice) |
-| Structured output | Token Factory supports `response_format.type=json_schema`; support remains model-specific and should be checked in the model card/catalog. [Structured output](https://docs.tokenfactory.nebius.com/ai-models-inference/json) | Both Nemisis model calls send a strict Pydantic JSON schema, then validate the returned bytes again locally. |
+| Structured output | Token Factory supports `response_format.type=json_schema`; support remains model-specific and should be checked in the model card/catalog. [Structured output](https://docs.tokenfactory.nebius.com/ai-models-inference/json) | All three Nemisis model calls (the differential test author, the contract proposal, and the patch author) send a strict Pydantic JSON schema, then validate the returned bytes again locally. |
 | Sandbox auth | The documented SDK takes an already authenticated `contree_client`; profile resolution is explicit profile, `CONTREE_PROFILE`, then the active profile in `$CONTREE_HOME/auth.ini` (normally `~/.config/contree/auth.ini`). [SDK getting started](https://docs.tokenfactory.nebius.com/sandboxes/sdk/python_sdk/getting-started) | Token Factory and Sandbox credentials are separate. Candidate input cannot select either credential or endpoint. |
-| Sandbox state | Images are immutable UUID-addressed filesystem states; tags can move. A non-disposable run can create a new image, and several children can branch from one parent state. [Core concepts](https://docs.tokenfactory.nebius.com/sandboxes/mcp/concepts/core), [branching](https://docs.tokenfactory.nebius.com/sandboxes/sdk/python_sdk/branching) | Nemisis requires an input UUID, preserves the common/base/candidate lineage, and rejects changed source/result image identities. |
+| Sandbox state | Images are immutable UUID-addressed filesystem states; tags can move. A non-disposable run can create a new image, and several children can branch from one parent state. [Core concepts](https://docs.tokenfactory.nebius.com/sandboxes/mcp/concepts/core), [branching](https://docs.tokenfactory.nebius.com/sandboxes/sdk/python_sdk/branching) | Nemisis requires an input image UUID, preserves the common/base/candidate lineage, rejects a completed operation whose source image differs from the one requested, and requires a result image UUID to be reported. |
 | Concurrent operations | The documented async pattern launches independent operations, retains every operation ID, then waits for all of them. [Parallel tasks](https://docs.tokenfactory.nebius.com/sandboxes/mcp/prompts/parallel-tasks) | `ContreeBackend.execute_many` submits the complete validated batch before waiting for every started operation. No account concurrency limit has been measured here. |
 | Operation evidence | Operation status can include operation UUID/status, timestamps/duration, source/result image UUIDs, request metadata, process result, and resource measurements. [Operation status](https://docs.tokenfactory.nebius.com/api-reference/sandboxes/operations/get-an-operation-status) | The adapter verifies the fixed request metadata and records bounded, redacted stdout/stderr, exit code, operation/image identities, duration, and available CPU/memory/image-size metrics. |
 | Crash primitives | The Sandbox API documents spawning another process in a running instance, reading its terminal process result, and sending a signal to its process group; omitted signal means `SIGKILL`. [Subprocess result](https://docs.tokenfactory.nebius.com/api-reference/sandboxes/operation/result-of-one-subprocess-reconstructed-from-its-events), [kill subprocess](https://docs.tokenfactory.nebius.com/api-reference/sandboxes/operation/kill-one-subprocess) | Installed `contree-client==0.3.0` exposes these low-level methods, but CrashCheck has not wired them into a live transport. Provider capability is not product integration. |
@@ -28,14 +28,18 @@ changing that seam; do not infer it from mocked tests. See [`pyproject.toml`](..
 ## What Nemisis can run live today
 
 CrashCheck has two live model calls, and both need only `NEBIUS_API_KEY`. The load-bearing one has
-Nemotron write the patch that CrashCheck then crash-tests (the receipt lands inside the candidate
-tree and in the check report as its author):
+Nemotron write the patch that CrashCheck then crash-tests:
 
 ```bash
 uv run nemisis propose-patch --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
   --base fixture:sqlite-credit-v1/buggy --out ./nemotron-candidate
 uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate ./nemotron-candidate
 ```
+
+The sanitized authorship receipt is written to the operator's own
+`.nemisis/agent-patches/<candidate tree digest>.json`, never inside the candidate tree. `check`
+names Nemotron as the candidate's author only when it runs where that receipt lives and the
+receipt binds the scenario, the contract's base tree, and the bound handler's exact module digest.
 
 The other is the candidate-blind contract proposal; its receipt is labelled `LIVE`, stored beside
 the contract, and carried into the next `check` manifest and report:

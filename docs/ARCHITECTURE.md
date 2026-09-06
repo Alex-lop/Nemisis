@@ -19,8 +19,10 @@ and final artifacts.
 6. `RunManifest` binds the request, worlds, receipts, matrix, artifact decision, and source commit.
 
 Local verification uses real temporary filesystem copies and subprocesses but checked-in claims and
-tests, so its truth label is `FIXTURE`. The live adapter performs a Nemotron call and derives
-persistent common/base/candidate ConTree images for the same audited fixture.
+tests, so its truth label is `FIXTURE`. The live adapter is implemented but not currently observed:
+it would perform a Nemotron call and derive persistent common/base/candidate ConTree images for the
+same audited fixture. This tree has no provider credentials, so no provider receipt exists for that
+path. The tests cover the adapter's internals against hand-built execution objects.
 
 ## CrashCheck
 
@@ -99,18 +101,19 @@ sweep (census and one kill world per commit) for the corrected tree.
 
 Everything scenario-specific (catalog ids, schema, seed, store class, attribution deltas, event
 shape, checkpoint predicate, display words) lives in one `nemisis.scenario.Scenario` object;
-`sqlite-credit-v1` is the registered instance (`nemisis.scenarios`). The kernel reads it and
-special-cases nothing. The current adapter accepts one synchronous two-argument Python handler
-using the trusted `CreditStore` API:
+`sqlite-credit-v1` and `sqlite-inventory-v1` are the registered instances (`nemisis.scenarios`).
+The kernel reads them and special-cases nothing. The current adapter accepts one synchronous
+two-argument Python handler using the scenario's trusted store API (`CreditStore` for
+`sqlite-credit-v1`, `InventoryStore` for `sqlite-inventory-v1`):
 
-1. Prepare a closed SQLite seed using integer cents, WAL, and `synchronous=FULL`.
+1. Prepare a closed SQLite seed using the scenario's integer schema, WAL, and `synchronous=FULL`.
 2. Spawn the handler in a controller-owned process group and IPC session.
 3. Pause at the capsule's selected semantic boundary and independently probe the durable effect and
    marker state.
 4. Send `SIGKILL`, wait for `-SIGKILL`, and confirm durable state did not change.
 5. Spawn a fresh worker with a new nonce/session and replay identical event bytes.
-6. Probe the final balance, ledger count, and marker count. Any missing or contradictory evidence
-   makes the attempt incomplete.
+6. Probe the final subject total, effect count, and marker count. Any missing or contradictory
+   evidence makes the attempt incomplete.
 
 At `effect-commit`, the buggy and misleading-green trees expose one effect with no marker and reach
 `$50` after replay. The atomic tree reaches the same semantic effect boundary with its marker
@@ -145,11 +148,13 @@ written inside the guest and returned through bounded stdout; the parser and exa
 detect malformed or incomplete results, but this is not a provider-owned test attestation. That
 trust boundary is not advertised for arbitrary repositories.
 
-CrashCheck's single model call is `init --nemotron` (`proposal.py`): the issue and the base handler
-resolved by the same anchor binder go to Nemotron with a strict schema over the audited catalog and
-one scalar bound; the adapter validates the model catalog first, and fixed rules accept or refuse
-the proposal. `check` attaches the sidecar receipt to the manifest and report only when it binds the
-loaded contract's exact identity.
+CrashCheck has two model calls. `init --nemotron` (`proposal.py`) sends the issue and the base
+handler resolved by the same anchor binder to Nemotron, under a strict schema over the audited
+catalog with one scalar bound. The adapter validates the model catalog first, and fixed rules
+accept or refuse the proposal. `check` attaches the sidecar receipt to the manifest and report only
+when it binds the loaded contract's exact identity. `propose-patch` (`agent_patch.py`) is the other
+call: Nemotron writes a candidate handler, and that candidate is untrusted input, judged like any
+other tree.
 
 CrashCheck's local kernel is integrated; its ConTree provider transport is explicitly unimplemented.
 A requested CrashCheck live run returns `EVIDENCE_INCOMPLETE`/`UNSUPPORTED`, names the doctor
@@ -158,12 +163,14 @@ blockers, and never substitutes local execution—even if credentials are presen
 ## Artifacts and projections
 
 Differential manifests/reports live beneath `.nemisis/runs/`. CrashCheck stores root-relative
-artifact references and adds `.nemisis/repros/double-credit/<capsule-digest>/` for the immutable
-capsule, event, accepted contract, hunt metadata, and regression asset. The directory name is the
-capsule's canonical content digest, so the repro can be moved with its artifact root without
-embedding host paths. Every run has a manifest under `runs/`; attempt-bearing runs also have a
-report, while pre-execution anchor failures have `anchor-resolution.json`. The CLI, static reports,
-and composite action display stored evidence and do not derive independent verdicts.
+artifact references and adds `.nemisis/repros/<scenario repro directory>/<capsule-digest>/`
+(`double-credit` for `sqlite-credit-v1`, `double-reservation` for `sqlite-inventory-v1`) for the
+immutable capsule, event, accepted contract, hunt metadata, and regression asset. The directory
+name is the capsule's canonical content digest, so the repro can be moved with its artifact root
+without embedding host paths. Every run has a manifest under `runs/`; attempt-bearing runs also
+have a report, while pre-execution anchor failures have `anchor-resolution.json`. The CLI, static
+reports, and composite action display stored evidence and do not derive independent verdicts.
 
-There is no repair generator, plugin framework, arbitrary assertion language, executable config,
-web server, or provider fallback in the current tree.
+There is no automatic repair loop, plugin framework, arbitrary assertion language, executable
+config, web server, or provider fallback in the current tree. A model may author a candidate handler
+(`propose-patch`); that candidate is untrusted input, judged like any other tree.
