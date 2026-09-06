@@ -1,0 +1,3308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nemisis CrashCheck — PATCH_FAILED_STILL_REPRODUCES</title>
+<style>
+:root { color-scheme: dark; font-family: ui-sans-serif, system-ui, sans-serif; line-height: 1.5; }
+* { box-sizing: border-box; }
+body { margin: 0 auto; max-width: 1100px; padding: 1.5rem; background: #090d12; color: #edf2f7; }
+.verdict-pass { --accent: #70e5ad; --tint: #10241d; }
+.verdict-fail { --accent: #ff8a96; --tint: #2a1318; }
+.verdict-warn { --accent: #ffd166; --tint: #2a2211; }
+.skip-link { position: absolute; left: -9999px; } .skip-link:focus { left: 1rem; top: 1rem; }
+.hero { padding: clamp(1.2rem,4vw,2.5rem); background: var(--tint);
+border: 2px solid var(--accent); }
+.label,.verdict-code { color: var(--accent); letter-spacing: .1em; text-transform: uppercase; }
+h1 { margin: .25rem 0; font-size: clamp(2rem,6vw,4rem); line-height: 1.05; }
+.summary { max-width: 70ch; font-size: 1.1rem; }
+.comparison { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr);
+gap: 1rem; align-items: center; margin: 1.5rem 0; }
+.measure { padding: 1rem; background: #090d12; border: 1px solid #465364; }
+.measure span,.measure small { display: block; color: #b7c3d1; }
+.measure strong { display: block; color: var(--accent); font-size: clamp(2rem,6vw,3.5rem); }
+.versus { color: #b7c3d1; font-weight: 700; }
+.identity,.axes { display: grid; gap: .75rem;
+grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); }
+.identity { margin: 0; } .identity div { min-width: 0; }
+.identity dt,.axes dt { color: #b7c3d1; }
+.identity dd { margin: .25rem 0 0; }
+.card { margin: 1rem 0; padding: 1rem; background: #121923; border: 1px solid #2a3747; }
+.axes { margin: 1rem 0; } .axes div { min-width: 0; }
+.axes dd { margin: .35rem 0 0; font-size: 1.3rem; overflow-wrap: anywhere; }
+.timeline { display: grid; gap: .75rem; padding-left: 1.8rem; }
+.timeline li { padding: .8rem; border-left: 3px solid var(--accent); }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; } th,td { padding: .65rem; text-align: left;
+border-bottom: 1px solid #2a3747; } code,pre { overflow-wrap: anywhere; white-space: pre-wrap; }
+caption { padding: 0 0 .75rem; text-align: left; color: #a8b6c7; }
+@media (max-width: 640px) {
+body { padding: .75rem; } .comparison { grid-template-columns: 1fr; }
+.versus { display: none; }
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to evidence</a>
+<main id="main" class="verdict-fail">
+<header class="hero">
+<p class="label">LOCAL EXECUTION · AUDITED FIXTURE CAPSULE</p>
+<p class="verdict-code">CrashCheck verdict · <code>PATCH_FAILED_STILL_REPRODUCES</code></p>
+<h1>Patch still duplicates the effect</h1>
+<p class="summary">The candidate replayed evt_1042 to a durable +$50 duplicate effect.</p>
+<div class="comparison" aria-label="Expected and observed effects">
+<div class="measure"><span>Expected balance after one delivery</span>
+<strong>$25.00</strong>
+<small>event <code>evt_1042</code></small></div>
+<span class="versus" aria-hidden="true">vs</span>
+<div class="measure"><span>Observed final balance</span><strong>$50.00</strong>
+<small>DUPLICATE_EFFECT</small></div>
+</div>
+<dl class="identity" aria-label="Evidence identity">
+<div><dt>Capsule digest</dt><dd><code>800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572</code></dd></div>
+<div><dt>Engine code digest</dt><dd><code>39833a5640c9053727c7832d6b72ddb14b4684d21b04daa6043c4e32c182e53b</code></dd></div>
+<div><dt>Engine source commit</dt><dd><code>14cd428bc01d4da44bf05758afb1cb69188479f5</code></dd></div>
+</dl>
+</header>
+<dl class="axes" aria-label="Independent result axes">
+<div class="card"><dt>Transport</dt><dd>LOCAL</dd></div>
+<div class="card"><dt>Execution</dt><dd>COMPLETED</dd></div>
+<div class="card"><dt>Provenance</dt><dd>FIXTURE</dd></div>
+<div class="card"><dt>Integrity</dt><dd>VALID</dd></div>
+<div class="card"><dt>CrashCheck verdict</dt><dd>PATCH_FAILED_STILL_REPRODUCES</dd></div>
+</dl>
+
+<section class="card" aria-labelledby="attempt-story"><h2 id="attempt-story">Representative candidate attempt</h2>
+<p>Receipt <code>attempt-ce365e8f6014458587d4b0f2a74c2d63</code></p>
+<ol class="timeline">
+<li><strong>Checkpoint reached.</strong> $25.00 / credit rows 1 / marker 0</li>
+<li><strong>Kill recorded.</strong> Signal 9; first worker PID 77136, process group 77136, exit -9.</li>
+<li><strong>Fresh replay worker.</strong> Spawn 2; PID 77141, process group 77141; worker nonce <code>4faf79518e884eb8af3653cc56d178c6</code>; IPC session <code>9601ac71026c410586c9e40498bc6fb6</code>.</li>
+<li><strong>Replay acknowledged.</strong> Event <code>evt_1042</code>; receipt event digest <code>4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293</code>.</li>
+<li><strong>Final state observed.</strong> $50.00 / credit rows 2 / marker 1</li>
+</ol></section>
+<section class="card" aria-labelledby="sweep-corrected">
+<h2 id="sweep-corrected">Commit sweep · corrected · <span class="verdict-pass">EXACTLY_ONCE</span></h2>
+<p>A census delivery with no kill observed 1 store commit(s):
+<code>credit_and_mark</code>. CrashCheck then killed the worker once after
+each commit and replayed. The capsule boundary proves the patch beat the base's crash; the sweep
+proves it did not trade it for a new one.</p>
+<div class="table-wrap" role="region" aria-label="Commit sweep receipts" tabindex="0"><table>
+<caption>One fresh world per kill point.</caption>
+<thead><tr><th scope="col">Kill point</th><th scope="col">Operation</th>
+<th scope="col">Checkpoint</th><th scope="col">Final</th><th scope="col">Observation</th></tr>
+</thead><tbody><tr><th scope="row">after commit 1</th><td><code>credit_and_mark</code></td><td>$25.00 / credit rows 1 / marker 1</td><td>$25.00 / credit rows 1 / marker 1</td><td>EXACTLY_ONCE</td></tr></tbody></table></div></section>
+<section class="card" aria-labelledby="hypothesis-hunt">
+<h2 id="hypothesis-hunt">2-hypothesis candidate-blind hunt</h2>
+<p><strong>Selected outcome: REPRODUCED · 1 of 2 selected</strong> — <code>effect-commit-v1</code> at <code>effect-commit</code> with 1 trusted operation(s).</p>
+<div class="table-wrap" role="region" aria-label="Hypothesis hunt receipts" tabindex="0"><table>
+<caption>Stored candidate-blind hunt receipts; no hypotheses are reconstructed by this report.</caption>
+<thead><tr><th scope="col">Rank</th><th scope="col">Hypothesis</th>
+<th scope="col">Fault boundary</th><th scope="col">Trusted operations</th>
+<th scope="col">Outcome</th><th scope="col">Selection</th></tr></thead>
+<tbody><tr><th scope="row">1</th><td><code>effect-commit-v1</code></td><td><code>effect-commit</code></td><td>1</td><td>REPRODUCED</td><td>SELECTED</td></tr><tr><th scope="row">2</th><td><code>marker-commit-v1</code></td><td><code>marker-commit</code></td><td>2</td><td>NOT REPRODUCED</td><td>NOT SELECTED</td></tr></tbody></table></div></section>
+<section class="card" aria-labelledby="minimization">
+<h2 id="minimization">No-crash control</h2>
+<p>Delivered the event twice with no kill in 2 fresh base worlds
+and observed <code>EXACTLY_ONCE, EXACTLY_ONCE</code>: the base handler is correct without a crash, so the duplicate needs the kill. This separates a
+crash/retry bug from a handler that is simply wrong.</p>
+<p>Control receipt <code>3e8f8183df3a3d57c169f28732bc058b3708ebe1cad21904bda6ff5178aeae75</code></p></section>
+<section class="card" aria-labelledby="source-bindings">
+<h2 id="source-bindings">Source bindings</h2>
+<div class="table-wrap" role="region" aria-label="Source bindings" tabindex="0"><table>
+<caption>Exact source identities and trees evaluated by this result.</caption>
+<thead><tr><th scope="col">Source reference</th><th scope="col">Resolved identity</th>
+<th scope="col">Tree digest</th></tr></thead>
+<tbody><tr><th scope="row"><code>fixture:sqlite-credit-v1/buggy</code></th><td><code>fixture:sqlite-credit-v1/buggy</code></td><td><code>e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2</code></td></tr><tr><th scope="row"><code>fixture:sqlite-credit-v1/misleading-green</code></th><td><code>fixture:sqlite-credit-v1/misleading-green</code></td><td><code>3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f</code></td></tr><tr><th scope="row"><code>fixture:sqlite-credit-v1/atomic</code></th><td><code>fixture:sqlite-credit-v1/atomic</code></td><td><code>ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de</code></td></tr></tbody></table></div></section>
+<section class="card" aria-labelledby="attempt-receipts">
+<h2 id="attempt-receipts">Attempt receipts (15)</h2>
+<div class="table-wrap" role="region" aria-label="Attempt receipts" tabindex="0"><table>
+<caption>15 receipt(s) across 3 source-tree binding(s).</caption>
+<thead><tr><th scope="col">Attempt / role</th><th scope="col">Execution</th>
+<th scope="col">Observation</th><th scope="col">Checkpoint</th>
+<th scope="col">Final</th></tr></thead>
+<tbody><tr><th scope="row"><code>attempt-985ee17c921045deb2d683092045c830</code><br>base</th><td>COMPLETED</td><td>DUPLICATE_EFFECT</td><td>$25.00 / credit rows 1 / marker 0</td><td>$50.00 / credit rows 2 / marker 1</td></tr><tr><th scope="row"><code>attempt-431f3cb208554a379740d63e27a30a95</code><br>base</th><td>COMPLETED</td><td>DUPLICATE_EFFECT</td><td>$25.00 / credit rows 1 / marker 0</td><td>$50.00 / credit rows 2 / marker 1</td></tr><tr><th scope="row"><code>attempt-32ba482d902645afa0011e507b33f2bc</code><br>base</th><td>COMPLETED</td><td>DUPLICATE_EFFECT</td><td>$25.00 / credit rows 1 / marker 0</td><td>$50.00 / credit rows 2 / marker 1</td></tr><tr><th scope="row"><code>attempt-8ce961dbe08d4777a19b406e4689faec</code><br>base</th><td>COMPLETED</td><td>DUPLICATE_EFFECT</td><td>$25.00 / credit rows 1 / marker 0</td><td>$50.00 / credit rows 2 / marker 1</td></tr><tr><th scope="row"><code>attempt-cfbabaad64c74e39b9a5870d5a149717</code><br>base</th><td>COMPLETED</td><td>DUPLICATE_EFFECT</td><td>$25.00 / credit rows 1 / marker 0</td><td>$50.00 / credit rows 2 / marker 1</td></tr><tr><th scope="row"><code>attempt-ce365e8f6014458587d4b0f2a74c2d63</code><br>candidate</th><td>COMPLETED</td><td>DUPLICATE_EFFECT</td><td>$25.00 / credit rows 1 / marker 0</td><td>$50.00 / credit rows 2 / marker 1</td></tr><tr><th scope="row"><code>attempt-2ae370ec96a541e08e36f968aff9df46</code><br>candidate</th><td>COMPLETED</td><td>DUPLICATE_EFFECT</td><td>$25.00 / credit rows 1 / marker 0</td><td>$50.00 / credit rows 2 / marker 1</td></tr><tr><th scope="row"><code>attempt-be6713a8db4b42d9a80ced5daa910e2a</code><br>candidate</th><td>COMPLETED</td><td>DUPLICATE_EFFECT</td><td>$25.00 / credit rows 1 / marker 0</td><td>$50.00 / credit rows 2 / marker 1</td></tr><tr><th scope="row"><code>attempt-ed2f4a83d1de4157ab61752d65741ce0</code><br>candidate</th><td>COMPLETED</td><td>DUPLICATE_EFFECT</td><td>$25.00 / credit rows 1 / marker 0</td><td>$50.00 / credit rows 2 / marker 1</td></tr><tr><th scope="row"><code>attempt-e9053985ee564511b085b25668e7076a</code><br>candidate</th><td>COMPLETED</td><td>DUPLICATE_EFFECT</td><td>$25.00 / credit rows 1 / marker 0</td><td>$50.00 / credit rows 2 / marker 1</td></tr><tr><th scope="row"><code>attempt-e9d0e8b42e304e8e8351e2c6d221aec6</code><br>corrected</th><td>COMPLETED</td><td>EXACTLY_ONCE</td><td>$25.00 / credit rows 1 / marker 1</td><td>$25.00 / credit rows 1 / marker 1</td></tr><tr><th scope="row"><code>attempt-8be122ec118040129ff72f35fa1e162a</code><br>corrected</th><td>COMPLETED</td><td>EXACTLY_ONCE</td><td>$25.00 / credit rows 1 / marker 1</td><td>$25.00 / credit rows 1 / marker 1</td></tr><tr><th scope="row"><code>attempt-83ce8ee4c5d044d687d7d25a1d8da452</code><br>corrected</th><td>COMPLETED</td><td>EXACTLY_ONCE</td><td>$25.00 / credit rows 1 / marker 1</td><td>$25.00 / credit rows 1 / marker 1</td></tr><tr><th scope="row"><code>attempt-c9b414a018ac48d98e38dd2951ef2bf3</code><br>corrected</th><td>COMPLETED</td><td>EXACTLY_ONCE</td><td>$25.00 / credit rows 1 / marker 1</td><td>$25.00 / credit rows 1 / marker 1</td></tr><tr><th scope="row"><code>attempt-f873c9180cd3452aa2baab245d97cdfe</code><br>corrected</th><td>COMPLETED</td><td>EXACTLY_ONCE</td><td>$25.00 / credit rows 1 / marker 1</td><td>$25.00 / credit rows 1 / marker 1</td></tr></tbody></table></div></section>
+<details class="card"><summary>Full evidence</summary>
+<pre>{
+  &quot;capsule&quot;: {
+    &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+    &quot;digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+    &quot;effect_delta&quot;: 2500,
+    &quot;engine_code_digest&quot;: &quot;39833a5640c9053727c7832d6b72ddb14b4684d21b04daa6043c4e32c182e53b&quot;,
+    &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+    &quot;event&quot;: {
+      &quot;account_id&quot;: &quot;acct_7&quot;,
+      &quot;amount_cents&quot;: 2500,
+      &quot;event_id&quot;: &quot;evt_1042&quot;
+    },
+    &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+    &quot;event_id&quot;: &quot;evt_1042&quot;,
+    &quot;fault_boundary&quot;: &quot;effect-commit&quot;,
+    &quot;fault_intent_id&quot;: &quot;first-credit-effect-commit-v1&quot;,
+    &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+    &quot;minimization_trace&quot;: [
+      &quot;3e8f8183df3a3d57c169f28732bc058b3708ebe1cad21904bda6ff5178aeae75&quot;
+    ],
+    &quot;originating_base_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+    &quot;predicate_ids&quot;: [
+      &quot;single-credit-and-marker-v1&quot;
+    ],
+    &quot;probe_id&quot;: &quot;credit-state-v1&quot;,
+    &quot;runner_id&quot;: &quot;sqlite-runner-v2&quot;,
+    &quot;runner_version&quot;: &quot;2&quot;,
+    &quot;scenario_id&quot;: &quot;sqlite-credit-v1&quot;,
+    &quot;scenario_version&quot;: &quot;1&quot;,
+    &quot;schema_version&quot;: &quot;1&quot;,
+    &quot;truth_label&quot;: &quot;FIXTURE&quot;
+  },
+  &quot;result&quot;: {
+    &quot;anchor_resolutions&quot;: [],
+    &quot;artifacts&quot;: {
+      &quot;capsule&quot;: &quot;repros/double-credit/800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572/capsule.json&quot;,
+      &quot;contract&quot;: &quot;repros/double-credit/800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572/contract.json&quot;,
+      &quot;event&quot;: &quot;repros/double-credit/800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572/event.json&quot;,
+      &quot;hunt&quot;: &quot;repros/double-credit/800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572/hunt.json&quot;,
+      &quot;manifest&quot;: &quot;runs/local-20260906T155348-0b0883b5/manifest.json&quot;,
+      &quot;metadata&quot;: &quot;repros/double-credit/800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572/metadata.json&quot;,
+      &quot;minimization&quot;: &quot;runs/local-20260906T155348-0b0883b5/minimization.json&quot;,
+      &quot;regression_test&quot;: &quot;repros/double-credit/800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572/test_repro.py&quot;,
+      &quot;report&quot;: &quot;runs/local-20260906T155348-0b0883b5/report.html&quot;
+    },
+    &quot;attempts&quot;: [
+      {
+        &quot;binding_digest&quot;: &quot;2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-5ede12301cbd4c71b50c9bcf02044e73&quot;,
+        &quot;digest&quot;: &quot;8ac04cf392d02752b912a77051c67a1e79348a8e65c61c6701ce10b2aa4622a6&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.464546Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;cee750793ff34d3d9461d3e2780c5daa&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+          &quot;event_effect_count&quot;: 2,
+          &quot;event_effect_total&quot;: 5000,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 5000
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;DUPLICATE_EFFECT&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-985ee17c921045deb2d683092045c830&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;base&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.280236Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;706c08a9ecf04e1c8df3e71a30bb9a61&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77127,
+            &quot;process_group_id&quot;: 77127,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.134161Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;d3510a8c0b43438d8ee07077653a1e9d&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.458144Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;9cf0a2c86c74435da9518377ded9fe48&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77132,
+            &quot;process_group_id&quot;: 77132,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.289651Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;ceec5c891871403aa6aa47db2a117e66&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.113624Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.113624Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-5ede12301cbd4c71b50c9bcf02044e73&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.129811Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.131358Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77127&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.137872Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.276314Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.280237Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.287547Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77132&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.289840Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.459606Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.459611Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;DUPLICATE_EFFECT&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.464546Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-18e9499978f64ab9a38e3476b72a399d&quot;,
+        &quot;digest&quot;: &quot;56d1c7210381af37c30981930998776a1434597f2465ade7ebe36afb954975db&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.470765Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;51eebf54f1234727998785f920389271&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+          &quot;event_effect_count&quot;: 2,
+          &quot;event_effect_total&quot;: 5000,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 5000
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;DUPLICATE_EFFECT&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-431f3cb208554a379740d63e27a30a95&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;base&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.289359Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;a267d847782b41a3b85c5aa410d646f7&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77129,
+            &quot;process_group_id&quot;: 77129,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.138328Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;88e64d099f86424992bae6f3f0af9906&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.469098Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;997925c1c7154e45ba265c6caf35a926&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77134,
+            &quot;process_group_id&quot;: 77134,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.294129Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;d69c466edd2e4253945450a8738ae7e4&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.113530Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.113530Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-18e9499978f64ab9a38e3476b72a399d&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.130360Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.135952Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77129&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.138525Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.287228Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.289429Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.292482Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77134&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.294573Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.469749Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.469757Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;DUPLICATE_EFFECT&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.470765Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-378db8ce9d9d44d38a940883f9830dea&quot;,
+        &quot;digest&quot;: &quot;87c94a3785ae0562a5d04e56813e712d1f484889d373137a6b1431bf3bfe80ca&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.472880Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;6a244345f915410882fa763dc125f9d2&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+          &quot;event_effect_count&quot;: 2,
+          &quot;event_effect_total&quot;: 5000,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 5000
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;DUPLICATE_EFFECT&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-32ba482d902645afa0011e507b33f2bc&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;base&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.283356Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;fc53173b00bd484882f2719b864fa791&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77128,
+            &quot;process_group_id&quot;: 77128,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.136330Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;9b581de1cc264472974286bfdbabd0cc&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.471568Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;77693fc7e91a4ef6b84f17563cdecc90&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77133,
+            &quot;process_group_id&quot;: 77133,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.291517Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;37ea584d021a47548e68b629eac67a49&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.113806Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.113806Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-378db8ce9d9d44d38a940883f9830dea&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.128140Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.134512Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77128&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.137381Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.281531Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.283372Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.289939Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77133&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.291711Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.471953Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.471957Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;DUPLICATE_EFFECT&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.472880Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-e058898b11874eb7964aa63b55e159ea&quot;,
+        &quot;digest&quot;: &quot;23d5f8730f1e4c511e0b53dc3bbbfe9d56b311daef56921938f8d8e83dbe9749&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.463799Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;e376f27dbb2a4ea799b834f8344042f4&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+          &quot;event_effect_count&quot;: 2,
+          &quot;event_effect_total&quot;: 5000,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 5000
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;DUPLICATE_EFFECT&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-8ce961dbe08d4777a19b406e4689faec&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;base&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.279408Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;af644b3829104375b8241b884f3339e6&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77125,
+            &quot;process_group_id&quot;: 77125,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.129958Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;c2c184ea09114650aa5be52af6567be0&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.458193Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;ba03e0a92b6749ca91e6b139492356d9&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77131,
+            &quot;process_group_id&quot;: 77131,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.286370Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;f8b19733db104e81a485246e44901b37&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.113722Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.113722Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-e058898b11874eb7964aa63b55e159ea&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.125964Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.127635Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77125&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.130287Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.275540Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.279414Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.284109Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77131&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.286615Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.459436Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.459440Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;DUPLICATE_EFFECT&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.463799Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-52bc6c9d588e4c8fa3ba1c3575ff4854&quot;,
+        &quot;digest&quot;: &quot;e422cadc515a880fa2c07493e400f7ce34cfb9032402f9671695bd86fb36120b&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.462812Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;2027d244883e42d5aca0eee9e8eafc34&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+          &quot;event_effect_count&quot;: 2,
+          &quot;event_effect_total&quot;: 5000,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 5000
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;DUPLICATE_EFFECT&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-cfbabaad64c74e39b9a5870d5a149717&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;base&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.279452Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;eb14545e0bac41029144f75b15844a0b&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77126,
+            &quot;process_group_id&quot;: 77126,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.132704Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;b541f05c635340069e982ca24d4d5241&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.457961Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;d2d2fca4512a40a6bfbf67811386df09&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77130,
+            &quot;process_group_id&quot;: 77130,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.283426Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;a6edfd4449f8453eaf2381e6132ec50a&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.113786Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.113786Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-52bc6c9d588e4c8fa3ba1c3575ff4854&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.127816Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.131099Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77126&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.134043Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.275744Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.279453Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.281145Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77130&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.283649Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.458899Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.458911Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;DUPLICATE_EFFECT&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.462812Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-1b75183fc0a34d46baebae1307cd337c&quot;,
+        &quot;digest&quot;: &quot;79f20c6ef57d4880cafb695fadd87555e598d607b2ee98b5680baa9ebc642887&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.816357Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;a6a6547371c24d0bab624c7bbdefdb47&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+          &quot;event_effect_count&quot;: 2,
+          &quot;event_effect_total&quot;: 5000,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 5000
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;DUPLICATE_EFFECT&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-ce365e8f6014458587d4b0f2a74c2d63&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;candidate&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.646127Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;7a6f3989632d428f8919da639c7b895c&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77136,
+            &quot;process_group_id&quot;: 77136,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.493502Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;f88aee317d6145ffa2a6afa9e23c6168&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.815141Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;9601ac71026c410586c9e40498bc6fb6&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77141,
+            &quot;process_group_id&quot;: 77141,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.652813Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;4faf79518e884eb8af3653cc56d178c6&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.477003Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.477003Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-1b75183fc0a34d46baebae1307cd337c&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.488773Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.490475Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77136&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.493728Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.644557Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.646130Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.650514Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77141&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.653811Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.815490Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.815494Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;DUPLICATE_EFFECT&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.816357Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-e064d400120241138769e10631bca623&quot;,
+        &quot;digest&quot;: &quot;08a096546777f4294ae2cec10e701ba7cbfde205cfdbe55d32e0f51c61952ced&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.812744Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;0c3d902179af4462a570ed31138ea660&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+          &quot;event_effect_count&quot;: 2,
+          &quot;event_effect_total&quot;: 5000,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 5000
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;DUPLICATE_EFFECT&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-2ae370ec96a541e08e36f968aff9df46&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;candidate&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.645250Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;0c003baa5c1b4de8a182117a923368eb&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77137,
+            &quot;process_group_id&quot;: 77137,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.496657Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;80b94d3392184801a1a4d92d73e70b6b&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.809799Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;84870ed06afb4a53b4d6712ab6e76ac0&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77140,
+            &quot;process_group_id&quot;: 77140,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.650974Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;583cffddf1cf4613b8b3db702ca62069&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.476983Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.476983Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-e064d400120241138769e10631bca623&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.489494Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.493916Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77137&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.497316Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.641426Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.645252Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.648236Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77140&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.652321Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.810591Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.810596Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;DUPLICATE_EFFECT&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.812744Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-58e530eac3794455a2d8019c831e9e18&quot;,
+        &quot;digest&quot;: &quot;a381129bffe49c728d7800b0d2a8b497671791f1f0b809101112f9b1add94891&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.811797Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;a7200d9128e240a6a32d116b13ff93ae&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+          &quot;event_effect_count&quot;: 2,
+          &quot;event_effect_total&quot;: 5000,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 5000
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;DUPLICATE_EFFECT&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-be6713a8db4b42d9a80ced5daa910e2a&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;candidate&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.658279Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;e737bda577834593a0d53d9f890448e1&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77138,
+            &quot;process_group_id&quot;: 77138,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.497513Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;93028fc8f70e48b1a76812f3e7cc90ed&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.809139Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;16f40b9da97d4dc1a76bad3db567cc27&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77143,
+            &quot;process_group_id&quot;: 77143,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.662147Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;90f57ac803544a0b829d45be7ff2a08d&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.477103Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.477103Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-58e530eac3794455a2d8019c831e9e18&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.489645Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.494091Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77138&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.497676Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.654439Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.658283Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.659897Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77143&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.662780Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.809674Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.809682Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;DUPLICATE_EFFECT&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.811797Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-b89d1d44be3644b98ce3f422e6c7b869&quot;,
+        &quot;digest&quot;: &quot;fa8e7f16525bf4865a4e120b26cf5bdfcdfa4acdb6196b0c369ca6427c3421d9&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.822315Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;baffedc560e9474e9952eb0ec28da3d9&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+          &quot;event_effect_count&quot;: 2,
+          &quot;event_effect_total&quot;: 5000,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 5000
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;DUPLICATE_EFFECT&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-ed2f4a83d1de4157ab61752d65741ce0&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;candidate&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.658394Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;b4b70d80db8f42548a544e625dae5501&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77139,
+            &quot;process_group_id&quot;: 77139,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.501064Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;3cdbb228e41840a6b986f29d4ebad1b0&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.821140Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;601e06f2ff2a4e278a68e1a0917408fd&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77144,
+            &quot;process_group_id&quot;: 77144,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.662516Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;ebce102542654f149794ee331b156415&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.477228Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.477228Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-b89d1d44be3644b98ce3f422e6c7b869&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.489893Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.498844Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77139&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.501456Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.654579Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.658396Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.659941Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77144&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.662876Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.821486Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.821489Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;DUPLICATE_EFFECT&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.822315Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-d3152108a7ce4680a0b7d3bab600a0a9&quot;,
+        &quot;digest&quot;: &quot;aaa04e77ae664a386d12376259d2b417d957b84b7ce982c455f7d1a910bb1b75&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.814567Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;e8fe8eaa05654d8ba9ecd4636cb9805f&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+          &quot;event_effect_count&quot;: 2,
+          &quot;event_effect_total&quot;: 5000,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 5000
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;DUPLICATE_EFFECT&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-e9053985ee564511b085b25668e7076a&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;candidate&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.645726Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;5a4fe579b7bd49dfb486f7b9060ef481&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77135,
+            &quot;process_group_id&quot;: 77135,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.493165Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;5cc588cc71bd43e7a1313c512de4947e&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.813398Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;38da3a54bcea42a3896b9811fbb16fd3&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77142,
+            &quot;process_group_id&quot;: 77142,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.653963Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;78178796e6964beeb9613062c2913d1c&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.477313Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.477313Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-d3152108a7ce4680a0b7d3bab600a0a9&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.488921Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.490414Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77135&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.493561Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.644272Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.645735Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.652599Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77142&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.654182Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.813707Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.813709Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;DUPLICATE_EFFECT&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.814567Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-2f9de0faa0de4bf1811c6b8cd3c63171&quot;,
+        &quot;digest&quot;: &quot;ce9a5c659871ddc98e2d936e82c7778e8379676b00510b7cf2e2ab214ba09292&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.234369Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;893428976fab410a97f5d87f25697d9a&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit_and_mark&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;EXACTLY_ONCE&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-e9d0e8b42e304e8e8351e2c6d221aec6&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;corrected&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.994140Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;4a0e083b90c04bc0811c2dd9a4572bef&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77147,
+            &quot;process_group_id&quot;: 77147,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.848440Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;ac1a841975f04a01bfe64d5580f74f4e&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.232326Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;c5473b9dac3f40f3b22d65953ecb9633&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77152,
+            &quot;process_group_id&quot;: 77152,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.998114Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;c9060354e069436b94d6491ec7cb3eab&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.825394Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.825394Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-2f9de0faa0de4bf1811c6b8cd3c63171&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.840900Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.845584Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77147&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.849108Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.989931Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.994148Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.995082Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77152&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.998442Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.233158Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.233187Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;EXACTLY_ONCE&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.234369Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-dde97633b84b4f349a2a57577f4d0447&quot;,
+        &quot;digest&quot;: &quot;827f88a8402b5c0e3d2ed968864103f5d9d53661c62417bc1dea569be5500910&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.217561Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;8c0838e91eb6434698740dcf05cab923&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit_and_mark&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;EXACTLY_ONCE&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-8be122ec118040129ff72f35fa1e162a&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;corrected&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.972420Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;ad09738fe07e459a9175201d120723b0&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77145,
+            &quot;process_group_id&quot;: 77145,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.842774Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;979046a13a6f42eab7c7f6ef8f5bc2fa&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.214802Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;027a412e7da3405299e4f1c85e00dad4&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77150,
+            &quot;process_group_id&quot;: 77150,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.976604Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;b744231c8c9a42848ff988ee8408d30e&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.825518Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.825518Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-dde97633b84b4f349a2a57577f4d0447&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.838628Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.840595Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77145&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.843110Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.968508Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.972429Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.973917Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77150&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.976964Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.215988Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.216001Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;EXACTLY_ONCE&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.217561Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-6aaca379687a44578a25c2974536bab8&quot;,
+        &quot;digest&quot;: &quot;c7b43736249b1d2d3e7547758d73e494f80c659b15a5ba98b23c51cffd04b717&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.226272Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;d4ea9d9497c5413c964060da97d25d5a&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit_and_mark&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;EXACTLY_ONCE&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-83ce8ee4c5d044d687d7d25a1d8da452&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;corrected&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.982484Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;c4498722b1b54b838beaee20a9457824&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77148,
+            &quot;process_group_id&quot;: 77148,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.848856Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;52975b73351844849316ee5f679ee269&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.223900Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;e17d1c0b66de40f0b699df0b601b0f6a&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77151,
+            &quot;process_group_id&quot;: 77151,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.987696Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;f515716d01334262859cda93e1cf40ec&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.825503Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.825503Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-6aaca379687a44578a25c2974536bab8&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.840409Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.843734Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77148&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.849267Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.978688Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.982491Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.984544Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77151&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.988306Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.224864Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.224874Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;EXACTLY_ONCE&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.226272Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-bd5493615c884c29b694fb564257fc7b&quot;,
+        &quot;digest&quot;: &quot;f1be63db28429f7a67e78f0db4337f59be563771898bcadc025917f3ad6bb17d&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.245619Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;3a66bfa0b83c4497b0efb71b6663d9df&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit_and_mark&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;EXACTLY_ONCE&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-c9b414a018ac48d98e38dd2951ef2bf3&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;corrected&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.002166Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;183f4a5a27d84729add588b0a72b13e5&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77146,
+            &quot;process_group_id&quot;: 77146,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.845222Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;6f00647c91dd48208897e4ea53d1e643&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.243805Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;146075e9a2194d4593c0ff0c96b15d9c&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77153,
+            &quot;process_group_id&quot;: 77153,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:50.005146Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;e7cffcda18e74a9e9c98adb4fa28e962&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.825690Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.825690Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-bd5493615c884c29b694fb564257fc7b&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.839495Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.843429Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77146&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.845632Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.000605Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.002171Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.003098Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77153&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.006055Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.244351Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.244355Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;EXACTLY_ONCE&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.245619Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;
+      },
+      {
+        &quot;binding_digest&quot;: &quot;b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;checkpoint_reached&quot;: true,
+        &quot;checkpoint_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;database_id&quot;: &quot;db-cfad813fda884c5a9b4ea0ad3284c1fe&quot;,
+        &quot;digest&quot;: &quot;72e80d8b584f0ef9c6e127c2531df302786aa85d738382b0eae5eacce4038441&quot;,
+        &quot;effect_delta&quot;: 2500,
+        &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.243002Z&quot;,
+        &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+        &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+        &quot;execution_nonce&quot;: &quot;0067c44abcc44ae79e8e2c8cb834075e&quot;,
+        &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+        &quot;failure_detail&quot;: null,
+        &quot;final_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;first_worker_operations&quot;: [
+          &quot;credit_and_mark&quot;
+        ],
+        &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+        &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+        &quot;integrity_status&quot;: &quot;VALID&quot;,
+        &quot;kill_after_commit&quot;: null,
+        &quot;kill_signal&quot;: 9,
+        &quot;observation&quot;: &quot;EXACTLY_ONCE&quot;,
+        &quot;post_execution_tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;,
+        &quot;post_kill_snapshot&quot;: {
+          &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+          &quot;event_effect_count&quot;: 1,
+          &quot;event_effect_total&quot;: 2500,
+          &quot;event_marker_count&quot;: 1,
+          &quot;subject_total&quot;: 2500
+        },
+        &quot;pre_crash_snapshot&quot;: {
+          &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+          &quot;event_effect_count&quot;: 0,
+          &quot;event_effect_total&quot;: 0,
+          &quot;event_marker_count&quot;: 0,
+          &quot;subject_total&quot;: 0
+        },
+        &quot;provider_image_id&quot;: null,
+        &quot;provider_operation_id&quot;: null,
+        &quot;receipt_id&quot;: &quot;attempt-f873c9180cd3452aa2baab245d97cdfe&quot;,
+        &quot;replay_acknowledged&quot;: true,
+        &quot;role&quot;: &quot;corrected&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;spawns&quot;: [
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.005410Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: -9,
+            &quot;ipc_session_id&quot;: &quot;065296ddb41147b9aa86f50ba80ccb87&quot;,
+            &quot;phase&quot;: &quot;first&quot;,
+            &quot;pid&quot;: 77149,
+            &quot;process_group_id&quot;: 77149,
+            &quot;spawn_index&quot;: 1,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:49.852821Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;bb44e6c1dfd04f188eacf48dbb9a6b4f&quot;
+          },
+          {
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.241181Z&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;exit_code&quot;: 0,
+            &quot;ipc_session_id&quot;: &quot;8ba332e13b7a4c36a64ea92967ba334b&quot;,
+            &quot;phase&quot;: &quot;replay&quot;,
+            &quot;pid&quot;: 77154,
+            &quot;process_group_id&quot;: 77154,
+            &quot;spawn_index&quot;: 2,
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:50.009793Z&quot;,
+            &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+            &quot;stderr_excerpt&quot;: &quot;&quot;,
+            &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+            &quot;stdout_excerpt&quot;: &quot;&quot;,
+            &quot;worker_nonce&quot;: &quot;b687ac9ac18742b1930f80ae90ffdbcd&quot;
+          }
+        ],
+        &quot;started_at&quot;: &quot;2026-09-06T15:53:49.825674Z&quot;,
+        &quot;timeline&quot;: [
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PREFLIGHT&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.825674Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;db-cfad813fda884c5a9b4ea0ad3284c1fe&quot;,
+            &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.840482Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;&quot;,
+            &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.850911Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77149&quot;,
+            &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:49.853030Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.000892Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;-9&quot;,
+            &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.005421Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.007605Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;77154&quot;,
+            &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.010171Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.241934Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.241944Z&quot;
+          },
+          {
+            &quot;detail&quot;: &quot;EXACTLY_ONCE&quot;,
+            &quot;state&quot;: &quot;COMPLETE&quot;,
+            &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.243002Z&quot;
+          }
+        ],
+        &quot;transport&quot;: &quot;LOCAL&quot;,
+        &quot;tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;
+      }
+    ],
+    &quot;bindings&quot;: [
+      {
+        &quot;adapter_id&quot;: &quot;credit-store-v1&quot;,
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;digest&quot;: &quot;2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca&quot;,
+        &quot;fault_intent_id&quot;: &quot;first-credit-effect-commit-v1&quot;,
+        &quot;handler_path&quot;: &quot;app/credits.py&quot;,
+        &quot;handler_symbol&quot;: &quot;apply_credit&quot;,
+        &quot;resolved_source_identity&quot;: &quot;fixture:sqlite-credit-v1/buggy&quot;,
+        &quot;scenario_id&quot;: &quot;sqlite-credit-v1&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;source_ref&quot;: &quot;fixture:sqlite-credit-v1/buggy&quot;,
+        &quot;tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;
+      },
+      {
+        &quot;adapter_id&quot;: &quot;credit-store-v1&quot;,
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;digest&quot;: &quot;dd4b97883bf04d086ee260730b3a1dd1ea0660b7b4104e0c2a079563c7540b40&quot;,
+        &quot;fault_intent_id&quot;: &quot;first-credit-effect-commit-v1&quot;,
+        &quot;handler_path&quot;: &quot;app/credits.py&quot;,
+        &quot;handler_symbol&quot;: &quot;apply_credit&quot;,
+        &quot;resolved_source_identity&quot;: &quot;fixture:sqlite-credit-v1/misleading-green&quot;,
+        &quot;scenario_id&quot;: &quot;sqlite-credit-v1&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;source_ref&quot;: &quot;fixture:sqlite-credit-v1/misleading-green&quot;,
+        &quot;tree_digest&quot;: &quot;3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f&quot;
+      },
+      {
+        &quot;adapter_id&quot;: &quot;credit-store-v1&quot;,
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;digest&quot;: &quot;b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131&quot;,
+        &quot;fault_intent_id&quot;: &quot;first-credit-effect-commit-v1&quot;,
+        &quot;handler_path&quot;: &quot;app/credits.py&quot;,
+        &quot;handler_symbol&quot;: &quot;apply_credit&quot;,
+        &quot;resolved_source_identity&quot;: &quot;fixture:sqlite-credit-v1/atomic&quot;,
+        &quot;scenario_id&quot;: &quot;sqlite-credit-v1&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;source_ref&quot;: &quot;fixture:sqlite-credit-v1/atomic&quot;,
+        &quot;tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;
+      }
+    ],
+    &quot;candidate_author&quot;: null,
+    &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+    &quot;digest&quot;: &quot;d5c00e01036e538fb72148eb96c1c9224140a6ed0c21ddaec269a3564921787f&quot;,
+    &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.843552Z&quot;,
+    &quot;engine_code_digest&quot;: &quot;39833a5640c9053727c7832d6b72ddb14b4684d21b04daa6043c4e32c182e53b&quot;,
+    &quot;engine_source_commit&quot;: &quot;14cd428bc01d4da44bf05758afb1cb69188479f5&quot;,
+    &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+    &quot;hypothesis_receipts&quot;: [
+      {
+        &quot;attempt&quot;: {
+          &quot;binding_digest&quot;: &quot;2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca&quot;,
+          &quot;capsule_digest&quot;: &quot;f3024d5d82d7bae4709e1e6a86b70e611f589c21ecd7e6eedd90d457d4480c12&quot;,
+          &quot;checkpoint_reached&quot;: true,
+          &quot;checkpoint_snapshot&quot;: {
+            &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;event_effect_count&quot;: 1,
+            &quot;event_effect_total&quot;: 2500,
+            &quot;event_marker_count&quot;: 0,
+            &quot;subject_total&quot;: 2500
+          },
+          &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+          &quot;database_id&quot;: &quot;db-9a84461d203d4f4aae57eeb4852752df&quot;,
+          &quot;digest&quot;: &quot;0a21ba0004b5364930575bd33e51a2fa9b527d8ebc560d44db8e79083ae48d7f&quot;,
+          &quot;effect_delta&quot;: 2500,
+          &quot;ended_at&quot;: &quot;2026-09-06T15:53:48.772410Z&quot;,
+          &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+          &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+          &quot;execution_nonce&quot;: &quot;2595073c17db41fba6bf63607402ab99&quot;,
+          &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+          &quot;failure_detail&quot;: null,
+          &quot;final_snapshot&quot;: {
+            &quot;digest&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+            &quot;event_effect_count&quot;: 2,
+            &quot;event_effect_total&quot;: 5000,
+            &quot;event_marker_count&quot;: 1,
+            &quot;subject_total&quot;: 5000
+          },
+          &quot;first_worker_operations&quot;: [
+            &quot;credit&quot;
+          ],
+          &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+          &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+          &quot;integrity_status&quot;: &quot;VALID&quot;,
+          &quot;kill_after_commit&quot;: null,
+          &quot;kill_signal&quot;: 9,
+          &quot;observation&quot;: &quot;DUPLICATE_EFFECT&quot;,
+          &quot;post_execution_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+          &quot;post_kill_snapshot&quot;: {
+            &quot;digest&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+            &quot;event_effect_count&quot;: 1,
+            &quot;event_effect_total&quot;: 2500,
+            &quot;event_marker_count&quot;: 0,
+            &quot;subject_total&quot;: 2500
+          },
+          &quot;pre_crash_snapshot&quot;: {
+            &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+            &quot;event_effect_count&quot;: 0,
+            &quot;event_effect_total&quot;: 0,
+            &quot;event_marker_count&quot;: 0,
+            &quot;subject_total&quot;: 0
+          },
+          &quot;provider_image_id&quot;: null,
+          &quot;provider_operation_id&quot;: null,
+          &quot;receipt_id&quot;: &quot;attempt-2138b3fe69cc4c0784470f734105587f&quot;,
+          &quot;replay_acknowledged&quot;: true,
+          &quot;role&quot;: &quot;base&quot;,
+          &quot;schema_version&quot;: &quot;1&quot;,
+          &quot;spawns&quot;: [
+            {
+              &quot;ended_at&quot;: &quot;2026-09-06T15:53:48.627287Z&quot;,
+              &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+              &quot;exit_code&quot;: -9,
+              &quot;ipc_session_id&quot;: &quot;99e73d6350d7490887eae0ce4f902db5&quot;,
+              &quot;phase&quot;: &quot;first&quot;,
+              &quot;pid&quot;: 77116,
+              &quot;process_group_id&quot;: 77116,
+              &quot;spawn_index&quot;: 1,
+              &quot;started_at&quot;: &quot;2026-09-06T15:53:48.499776Z&quot;,
+              &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+              &quot;stderr_excerpt&quot;: &quot;&quot;,
+              &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+              &quot;stdout_excerpt&quot;: &quot;&quot;,
+              &quot;worker_nonce&quot;: &quot;cfb7fe1ddc254fc599e6941f797241d3&quot;
+            },
+            {
+              &quot;ended_at&quot;: &quot;2026-09-06T15:53:48.770911Z&quot;,
+              &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+              &quot;exit_code&quot;: 0,
+              &quot;ipc_session_id&quot;: &quot;28a3071db046434f8c3bc419e2c1328e&quot;,
+              &quot;phase&quot;: &quot;replay&quot;,
+              &quot;pid&quot;: 77118,
+              &quot;process_group_id&quot;: 77118,
+              &quot;spawn_index&quot;: 2,
+              &quot;started_at&quot;: &quot;2026-09-06T15:53:48.630671Z&quot;,
+              &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+              &quot;stderr_excerpt&quot;: &quot;&quot;,
+              &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+              &quot;stdout_excerpt&quot;: &quot;&quot;,
+              &quot;worker_nonce&quot;: &quot;09663c1bcb6d4360960c215f2afd353d&quot;
+            }
+          ],
+          &quot;started_at&quot;: &quot;2026-09-06T15:53:48.489968Z&quot;,
+          &quot;timeline&quot;: [
+            {
+              &quot;detail&quot;: &quot;&quot;,
+              &quot;state&quot;: &quot;PREFLIGHT&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.489968Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;db-9a84461d203d4f4aae57eeb4852752df&quot;,
+              &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.495721Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;&quot;,
+              &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.496596Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;77116&quot;,
+              &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.500174Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+              &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.625930Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;-9&quot;,
+              &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.627291Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;895757555b90f0786bdbbfbb4036152a92a3610509dfa6e8dc6fc236d7eb3d45&quot;,
+              &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.628578Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;77118&quot;,
+              &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.631170Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+              &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.771392Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;fbfca7a2919eb5286837b803af0e6277facdf6e1b61b9dc8cb3d750d4649f827&quot;,
+              &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.771402Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;DUPLICATE_EFFECT&quot;,
+              &quot;state&quot;: &quot;COMPLETE&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.772410Z&quot;
+            }
+          ],
+          &quot;transport&quot;: &quot;LOCAL&quot;,
+          &quot;tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;
+        },
+        &quot;canonical_rank&quot;: 1,
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;digest&quot;: &quot;a38f814beca8cf877cb374c6499e5d1a14c71344c79f8b82f8b3d9b7e51fdaf3&quot;,
+        &quot;fault_boundary&quot;: &quot;effect-commit&quot;,
+        &quot;hypothesis_id&quot;: &quot;effect-commit-v1&quot;,
+        &quot;originating_base_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+        &quot;provisional_capsule_digest&quot;: &quot;f3024d5d82d7bae4709e1e6a86b70e611f589c21ecd7e6eedd90d457d4480c12&quot;,
+        &quot;reproduced&quot;: true,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;selected&quot;: true,
+        &quot;trusted_operation_count&quot;: 1
+      },
+      {
+        &quot;attempt&quot;: {
+          &quot;binding_digest&quot;: &quot;2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca&quot;,
+          &quot;capsule_digest&quot;: &quot;9e3ff45fe022e347541e71c325e685d2ffd69935fee5d65b3b3645f106c092f9&quot;,
+          &quot;checkpoint_reached&quot;: true,
+          &quot;checkpoint_snapshot&quot;: {
+            &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;event_effect_count&quot;: 1,
+            &quot;event_effect_total&quot;: 2500,
+            &quot;event_marker_count&quot;: 1,
+            &quot;subject_total&quot;: 2500
+          },
+          &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+          &quot;database_id&quot;: &quot;db-6fe2c7cd73144b9d8b0230fe585fd7b1&quot;,
+          &quot;digest&quot;: &quot;c85191d6950444a6b80321632bbb1825aa17db6a9a74f354d0ee2074b2b32f20&quot;,
+          &quot;effect_delta&quot;: 2500,
+          &quot;ended_at&quot;: &quot;2026-09-06T15:53:48.790627Z&quot;,
+          &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+          &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+          &quot;execution_nonce&quot;: &quot;7ea58f7404d4406fbc9a4a0327893756&quot;,
+          &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+          &quot;failure_detail&quot;: null,
+          &quot;final_snapshot&quot;: {
+            &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;event_effect_count&quot;: 1,
+            &quot;event_effect_total&quot;: 2500,
+            &quot;event_marker_count&quot;: 1,
+            &quot;subject_total&quot;: 2500
+          },
+          &quot;first_worker_operations&quot;: [
+            &quot;credit&quot;,
+            &quot;mark_processed&quot;
+          ],
+          &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+          &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+          &quot;integrity_status&quot;: &quot;VALID&quot;,
+          &quot;kill_after_commit&quot;: null,
+          &quot;kill_signal&quot;: 9,
+          &quot;observation&quot;: &quot;EXACTLY_ONCE&quot;,
+          &quot;post_execution_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+          &quot;post_kill_snapshot&quot;: {
+            &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;event_effect_count&quot;: 1,
+            &quot;event_effect_total&quot;: 2500,
+            &quot;event_marker_count&quot;: 1,
+            &quot;subject_total&quot;: 2500
+          },
+          &quot;pre_crash_snapshot&quot;: {
+            &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+            &quot;event_effect_count&quot;: 0,
+            &quot;event_effect_total&quot;: 0,
+            &quot;event_marker_count&quot;: 0,
+            &quot;subject_total&quot;: 0
+          },
+          &quot;provider_image_id&quot;: null,
+          &quot;provider_operation_id&quot;: null,
+          &quot;receipt_id&quot;: &quot;attempt-09ab71cb29d44ad7900d18add47b8374&quot;,
+          &quot;replay_acknowledged&quot;: true,
+          &quot;role&quot;: &quot;base&quot;,
+          &quot;schema_version&quot;: &quot;1&quot;,
+          &quot;spawns&quot;: [
+            {
+              &quot;ended_at&quot;: &quot;2026-09-06T15:53:48.630969Z&quot;,
+              &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+              &quot;exit_code&quot;: -9,
+              &quot;ipc_session_id&quot;: &quot;27d33cc3d0b24e9f8c866eb7be062aa5&quot;,
+              &quot;phase&quot;: &quot;first&quot;,
+              &quot;pid&quot;: 77117,
+              &quot;process_group_id&quot;: 77117,
+              &quot;spawn_index&quot;: 1,
+              &quot;started_at&quot;: &quot;2026-09-06T15:53:48.501569Z&quot;,
+              &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+              &quot;stderr_excerpt&quot;: &quot;&quot;,
+              &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+              &quot;stdout_excerpt&quot;: &quot;&quot;,
+              &quot;worker_nonce&quot;: &quot;ede04f5597104c0aacbf1baaa37dac04&quot;
+            },
+            {
+              &quot;ended_at&quot;: &quot;2026-09-06T15:53:48.787999Z&quot;,
+              &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+              &quot;exit_code&quot;: 0,
+              &quot;ipc_session_id&quot;: &quot;53be195201da4906880f6f1141ad52e3&quot;,
+              &quot;phase&quot;: &quot;replay&quot;,
+              &quot;pid&quot;: 77119,
+              &quot;process_group_id&quot;: 77119,
+              &quot;spawn_index&quot;: 2,
+              &quot;started_at&quot;: &quot;2026-09-06T15:53:48.634136Z&quot;,
+              &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+              &quot;stderr_excerpt&quot;: &quot;&quot;,
+              &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+              &quot;stdout_excerpt&quot;: &quot;&quot;,
+              &quot;worker_nonce&quot;: &quot;286177c5c6274cc997fb6f55d21dcb69&quot;
+            }
+          ],
+          &quot;started_at&quot;: &quot;2026-09-06T15:53:48.490012Z&quot;,
+          &quot;timeline&quot;: [
+            {
+              &quot;detail&quot;: &quot;&quot;,
+              &quot;state&quot;: &quot;PREFLIGHT&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.490012Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;db-6fe2c7cd73144b9d8b0230fe585fd7b1&quot;,
+              &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.496002Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;&quot;,
+              &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.499647Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;77117&quot;,
+              &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.501751Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+              &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.626955Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;-9&quot;,
+              &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.630979Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+              &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.632178Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;77119&quot;,
+              &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.634332Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+              &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.789132Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+              &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.789144Z&quot;
+            },
+            {
+              &quot;detail&quot;: &quot;EXACTLY_ONCE&quot;,
+              &quot;state&quot;: &quot;COMPLETE&quot;,
+              &quot;timestamp&quot;: &quot;2026-09-06T15:53:48.790627Z&quot;
+            }
+          ],
+          &quot;transport&quot;: &quot;LOCAL&quot;,
+          &quot;tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;
+        },
+        &quot;canonical_rank&quot;: 2,
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;digest&quot;: &quot;242a598a52eeab21f2ce31ae720d4e660e55a8989b2d32dd9b09a2656e02423b&quot;,
+        &quot;fault_boundary&quot;: &quot;marker-commit&quot;,
+        &quot;hypothesis_id&quot;: &quot;marker-commit-v1&quot;,
+        &quot;originating_base_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+        &quot;provisional_capsule_digest&quot;: &quot;9e3ff45fe022e347541e71c325e685d2ffd69935fee5d65b3b3645f106c092f9&quot;,
+        &quot;reproduced&quot;: false,
+        &quot;schema_version&quot;: &quot;1&quot;,
+        &quot;selected&quot;: false,
+        &quot;trusted_operation_count&quot;: 2
+      }
+    ],
+    &quot;integrity_status&quot;: &quot;VALID&quot;,
+    &quot;minimization_receipts&quot;: [
+      {
+        &quot;candidate_schedule&quot;: [],
+        &quot;confirmations&quot;: [
+          {
+            &quot;binding_digest&quot;: &quot;2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca&quot;,
+            &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+            &quot;database_id&quot;: &quot;db-507aff3d742f4671afa39feefa329f12&quot;,
+            &quot;digest&quot;: &quot;79aab741809bd0fb7dce7df9076badf4f5043f0694e22d83167753f134961083&quot;,
+            &quot;effect_delta&quot;: 2500,
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.108965Z&quot;,
+            &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;execution_nonce&quot;: &quot;1dca4fc7c1b249f4a9033895e6ec5b2c&quot;,
+            &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+            &quot;failure_detail&quot;: null,
+            &quot;final_snapshot&quot;: {
+              &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+              &quot;event_effect_count&quot;: 1,
+              &quot;event_effect_total&quot;: 2500,
+              &quot;event_marker_count&quot;: 1,
+              &quot;subject_total&quot;: 2500
+            },
+            &quot;first_delivery_commit_count&quot;: 2,
+            &quot;first_delivery_operations&quot;: [
+              &quot;credit&quot;,
+              &quot;mark_processed&quot;
+            ],
+            &quot;first_delivery_snapshot&quot;: {
+              &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+              &quot;event_effect_count&quot;: 1,
+              &quot;event_effect_total&quot;: 2500,
+              &quot;event_marker_count&quot;: 1,
+              &quot;subject_total&quot;: 2500
+            },
+            &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+            &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+            &quot;initial_snapshot&quot;: {
+              &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+              &quot;event_effect_count&quot;: 0,
+              &quot;event_effect_total&quot;: 0,
+              &quot;event_marker_count&quot;: 0,
+              &quot;subject_total&quot;: 0
+            },
+            &quot;integrity_status&quot;: &quot;VALID&quot;,
+            &quot;observation&quot;: &quot;EXACTLY_ONCE&quot;,
+            &quot;parent_capsule_digest&quot;: &quot;f3024d5d82d7bae4709e1e6a86b70e611f589c21ecd7e6eedd90d457d4480c12&quot;,
+            &quot;post_execution_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+            &quot;receipt_id&quot;: &quot;no-fault-819422b38547498fbbae8cbf2c498ff1&quot;,
+            &quot;replay_commit_count&quot;: 0,
+            &quot;replay_operations&quot;: [],
+            &quot;role&quot;: &quot;base&quot;,
+            &quot;schema_version&quot;: &quot;2&quot;,
+            &quot;spawns&quot;: [
+              {
+                &quot;ended_at&quot;: &quot;2026-09-06T15:53:48.966250Z&quot;,
+                &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+                &quot;exit_code&quot;: 0,
+                &quot;ipc_session_id&quot;: &quot;db74afc7cb254b8eb73f398ce03fd8eb&quot;,
+                &quot;phase&quot;: &quot;first&quot;,
+                &quot;pid&quot;: 77121,
+                &quot;process_group_id&quot;: 77121,
+                &quot;spawn_index&quot;: 1,
+                &quot;started_at&quot;: &quot;2026-09-06T15:53:48.806783Z&quot;,
+                &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+                &quot;stderr_excerpt&quot;: &quot;&quot;,
+                &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+                &quot;stdout_excerpt&quot;: &quot;&quot;,
+                &quot;worker_nonce&quot;: &quot;5a78c450e7514f2cbe234d6019c79e40&quot;
+              },
+              {
+                &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.103670Z&quot;,
+                &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+                &quot;exit_code&quot;: 0,
+                &quot;ipc_session_id&quot;: &quot;77097ae8ff304861b25a06f180cfb380&quot;,
+                &quot;phase&quot;: &quot;replay&quot;,
+                &quot;pid&quot;: 77122,
+                &quot;process_group_id&quot;: 77122,
+                &quot;spawn_index&quot;: 2,
+                &quot;started_at&quot;: &quot;2026-09-06T15:53:48.970569Z&quot;,
+                &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+                &quot;stderr_excerpt&quot;: &quot;&quot;,
+                &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+                &quot;stdout_excerpt&quot;: &quot;&quot;,
+                &quot;worker_nonce&quot;: &quot;8d37dc2f3cb14f849ee3e8e4d71a3036&quot;
+              }
+            ],
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:48.795818Z&quot;,
+            &quot;transport&quot;: &quot;LOCAL&quot;,
+            &quot;tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;
+          },
+          {
+            &quot;binding_digest&quot;: &quot;2e904b8bf876405a2844acfa84b34062513c4370c20b20bfaa657ec66461e2ca&quot;,
+            &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+            &quot;database_id&quot;: &quot;db-1b5557f043ed4e4f90471e97745909f2&quot;,
+            &quot;digest&quot;: &quot;f7af9d7ee921c71ad86782a613c29f09b23f72d708144c3ea5c9bd4dbaae9ee0&quot;,
+            &quot;effect_delta&quot;: 2500,
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.107748Z&quot;,
+            &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;execution_nonce&quot;: &quot;648ffcbcd9864c0c920a1fa6d9283e63&quot;,
+            &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+            &quot;failure_detail&quot;: null,
+            &quot;final_snapshot&quot;: {
+              &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+              &quot;event_effect_count&quot;: 1,
+              &quot;event_effect_total&quot;: 2500,
+              &quot;event_marker_count&quot;: 1,
+              &quot;subject_total&quot;: 2500
+            },
+            &quot;first_delivery_commit_count&quot;: 2,
+            &quot;first_delivery_operations&quot;: [
+              &quot;credit&quot;,
+              &quot;mark_processed&quot;
+            ],
+            &quot;first_delivery_snapshot&quot;: {
+              &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+              &quot;event_effect_count&quot;: 1,
+              &quot;event_effect_total&quot;: 2500,
+              &quot;event_marker_count&quot;: 1,
+              &quot;subject_total&quot;: 2500
+            },
+            &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+            &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+            &quot;initial_snapshot&quot;: {
+              &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+              &quot;event_effect_count&quot;: 0,
+              &quot;event_effect_total&quot;: 0,
+              &quot;event_marker_count&quot;: 0,
+              &quot;subject_total&quot;: 0
+            },
+            &quot;integrity_status&quot;: &quot;VALID&quot;,
+            &quot;observation&quot;: &quot;EXACTLY_ONCE&quot;,
+            &quot;parent_capsule_digest&quot;: &quot;f3024d5d82d7bae4709e1e6a86b70e611f589c21ecd7e6eedd90d457d4480c12&quot;,
+            &quot;post_execution_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+            &quot;receipt_id&quot;: &quot;no-fault-c8bde5fa33ab44ce9408bd8035bed77e&quot;,
+            &quot;replay_commit_count&quot;: 0,
+            &quot;replay_operations&quot;: [],
+            &quot;role&quot;: &quot;base&quot;,
+            &quot;schema_version&quot;: &quot;2&quot;,
+            &quot;spawns&quot;: [
+              {
+                &quot;ended_at&quot;: &quot;2026-09-06T15:53:48.966374Z&quot;,
+                &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+                &quot;exit_code&quot;: 0,
+                &quot;ipc_session_id&quot;: &quot;bd997fd43ff1457ea083fae9dd5ee465&quot;,
+                &quot;phase&quot;: &quot;first&quot;,
+                &quot;pid&quot;: 77120,
+                &quot;process_group_id&quot;: 77120,
+                &quot;spawn_index&quot;: 1,
+                &quot;started_at&quot;: &quot;2026-09-06T15:53:48.804904Z&quot;,
+                &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+                &quot;stderr_excerpt&quot;: &quot;&quot;,
+                &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+                &quot;stdout_excerpt&quot;: &quot;&quot;,
+                &quot;worker_nonce&quot;: &quot;5aa102269e514ea8a567989cabacf9c8&quot;
+              },
+              {
+                &quot;ended_at&quot;: &quot;2026-09-06T15:53:49.103608Z&quot;,
+                &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+                &quot;exit_code&quot;: 0,
+                &quot;ipc_session_id&quot;: &quot;1cfee0a5cbe54fc0957a4d613fc4dacf&quot;,
+                &quot;phase&quot;: &quot;replay&quot;,
+                &quot;pid&quot;: 77123,
+                &quot;process_group_id&quot;: 77123,
+                &quot;spawn_index&quot;: 2,
+                &quot;started_at&quot;: &quot;2026-09-06T15:53:48.972935Z&quot;,
+                &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+                &quot;stderr_excerpt&quot;: &quot;&quot;,
+                &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+                &quot;stdout_excerpt&quot;: &quot;&quot;,
+                &quot;worker_nonce&quot;: &quot;66d42b5bd69e47748f6afa39faac786d&quot;
+              }
+            ],
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:48.795763Z&quot;,
+            &quot;transport&quot;: &quot;LOCAL&quot;,
+            &quot;tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;
+          }
+        ],
+        &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+        &quot;deletion_accepted&quot;: false,
+        &quot;digest&quot;: &quot;15aa647677bd5f7e2dc6fa36bb9e73eb6e84072fa967533cd71ce1646191ddc3&quot;,
+        &quot;empty_schedule_reproduced_duplicate&quot;: false,
+        &quot;originating_base_tree_digest&quot;: &quot;e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2&quot;,
+        &quot;parent_capsule_digest&quot;: &quot;f3024d5d82d7bae4709e1e6a86b70e611f589c21ecd7e6eedd90d457d4480c12&quot;,
+        &quot;parent_schedule&quot;: [
+          &quot;effect-commit&quot;
+        ],
+        &quot;removed_fault&quot;: &quot;effect-commit&quot;,
+        &quot;schema_version&quot;: &quot;2&quot;,
+        &quot;sole_fault_action_necessary_for_fixture&quot;: true,
+        &quot;trace_digest&quot;: &quot;3e8f8183df3a3d57c169f28732bc058b3708ebe1cad21904bda6ff5178aeae75&quot;
+      }
+    ],
+    &quot;run_id&quot;: &quot;local-20260906T155348-0b0883b5&quot;,
+    &quot;schema_version&quot;: &quot;1&quot;,
+    &quot;started_at&quot;: &quot;2026-09-06T15:53:48.478808Z&quot;,
+    &quot;summary&quot;: &quot;The candidate replayed evt_1042 to a durable +$50 duplicate effect.&quot;,
+    &quot;sweeps&quot;: [
+      {
+        &quot;attempts&quot;: [
+          {
+            &quot;binding_digest&quot;: &quot;b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131&quot;,
+            &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+            &quot;checkpoint_reached&quot;: true,
+            &quot;checkpoint_snapshot&quot;: {
+              &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+              &quot;event_effect_count&quot;: 1,
+              &quot;event_effect_total&quot;: 2500,
+              &quot;event_marker_count&quot;: 1,
+              &quot;subject_total&quot;: 2500
+            },
+            &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+            &quot;database_id&quot;: &quot;db-746e0c62332b420ab03fd1adef0bcffb&quot;,
+            &quot;digest&quot;: &quot;2f5c6e9baf9a95eee529e0d2ffb5e8ab7015451fc4a4b775af0eea5a89ea497c&quot;,
+            &quot;effect_delta&quot;: 2500,
+            &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.840452Z&quot;,
+            &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+            &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+            &quot;execution_nonce&quot;: &quot;fb25ae6a542c4a9dbe04f2261e257bc1&quot;,
+            &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+            &quot;failure_detail&quot;: null,
+            &quot;final_snapshot&quot;: {
+              &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+              &quot;event_effect_count&quot;: 1,
+              &quot;event_effect_total&quot;: 2500,
+              &quot;event_marker_count&quot;: 1,
+              &quot;subject_total&quot;: 2500
+            },
+            &quot;first_worker_operations&quot;: [
+              &quot;credit_and_mark&quot;
+            ],
+            &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+            &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+            &quot;integrity_status&quot;: &quot;VALID&quot;,
+            &quot;kill_after_commit&quot;: 1,
+            &quot;kill_signal&quot;: 9,
+            &quot;observation&quot;: &quot;EXACTLY_ONCE&quot;,
+            &quot;post_execution_tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;,
+            &quot;post_kill_snapshot&quot;: {
+              &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+              &quot;event_effect_count&quot;: 1,
+              &quot;event_effect_total&quot;: 2500,
+              &quot;event_marker_count&quot;: 1,
+              &quot;subject_total&quot;: 2500
+            },
+            &quot;pre_crash_snapshot&quot;: {
+              &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+              &quot;event_effect_count&quot;: 0,
+              &quot;event_effect_total&quot;: 0,
+              &quot;event_marker_count&quot;: 0,
+              &quot;subject_total&quot;: 0
+            },
+            &quot;provider_image_id&quot;: null,
+            &quot;provider_operation_id&quot;: null,
+            &quot;receipt_id&quot;: &quot;attempt-48f15b5fdb394d7080b7ed167d1527e6&quot;,
+            &quot;replay_acknowledged&quot;: true,
+            &quot;role&quot;: &quot;corrected&quot;,
+            &quot;schema_version&quot;: &quot;1&quot;,
+            &quot;spawns&quot;: [
+              {
+                &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.715571Z&quot;,
+                &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+                &quot;exit_code&quot;: -9,
+                &quot;ipc_session_id&quot;: &quot;cbd466109db14831bfa027eb7cd99ab7&quot;,
+                &quot;phase&quot;: &quot;first&quot;,
+                &quot;pid&quot;: 77157,
+                &quot;process_group_id&quot;: 77157,
+                &quot;spawn_index&quot;: 1,
+                &quot;started_at&quot;: &quot;2026-09-06T15:53:50.593630Z&quot;,
+                &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+                &quot;stderr_excerpt&quot;: &quot;&quot;,
+                &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+                &quot;stdout_excerpt&quot;: &quot;&quot;,
+                &quot;worker_nonce&quot;: &quot;ff6499303a674fb48805f72a3900cb6a&quot;
+              },
+              {
+                &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.838756Z&quot;,
+                &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+                &quot;exit_code&quot;: 0,
+                &quot;ipc_session_id&quot;: &quot;79260c553a7a465285f7462a66249343&quot;,
+                &quot;phase&quot;: &quot;replay&quot;,
+                &quot;pid&quot;: 77158,
+                &quot;process_group_id&quot;: 77158,
+                &quot;spawn_index&quot;: 2,
+                &quot;started_at&quot;: &quot;2026-09-06T15:53:50.718443Z&quot;,
+                &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+                &quot;stderr_excerpt&quot;: &quot;&quot;,
+                &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+                &quot;stdout_excerpt&quot;: &quot;&quot;,
+                &quot;worker_nonce&quot;: &quot;ead8de1d567c44aa9f9a057afa11ae2e&quot;
+              }
+            ],
+            &quot;started_at&quot;: &quot;2026-09-06T15:53:50.584715Z&quot;,
+            &quot;timeline&quot;: [
+              {
+                &quot;detail&quot;: &quot;&quot;,
+                &quot;state&quot;: &quot;PREFLIGHT&quot;,
+                &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.584715Z&quot;
+              },
+              {
+                &quot;detail&quot;: &quot;db-746e0c62332b420ab03fd1adef0bcffb&quot;,
+                &quot;state&quot;: &quot;DATABASE_SEEDED&quot;,
+                &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.590986Z&quot;
+              },
+              {
+                &quot;detail&quot;: &quot;&quot;,
+                &quot;state&quot;: &quot;PRE_CRASH_PROBED&quot;,
+                &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.591521Z&quot;
+              },
+              {
+                &quot;detail&quot;: &quot;77157&quot;,
+                &quot;state&quot;: &quot;FIRST_WORKER_STARTED&quot;,
+                &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.593845Z&quot;
+              },
+              {
+                &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+                &quot;state&quot;: &quot;CHECKPOINT_REACHED&quot;,
+                &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.714203Z&quot;
+              },
+              {
+                &quot;detail&quot;: &quot;-9&quot;,
+                &quot;state&quot;: &quot;WORKER_KILLED&quot;,
+                &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.715577Z&quot;
+              },
+              {
+                &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+                &quot;state&quot;: &quot;POST_KILL_PROBED&quot;,
+                &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.716425Z&quot;
+              },
+              {
+                &quot;detail&quot;: &quot;77158&quot;,
+                &quot;state&quot;: &quot;REPLAY_WORKER_STARTED&quot;,
+                &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.718870Z&quot;
+              },
+              {
+                &quot;detail&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+                &quot;state&quot;: &quot;EVENT_REPLAYED&quot;,
+                &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.839429Z&quot;
+              },
+              {
+                &quot;detail&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+                &quot;state&quot;: &quot;FINAL_STATE_PROBED&quot;,
+                &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.839436Z&quot;
+              },
+              {
+                &quot;detail&quot;: &quot;EXACTLY_ONCE&quot;,
+                &quot;state&quot;: &quot;COMPLETE&quot;,
+                &quot;timestamp&quot;: &quot;2026-09-06T15:53:50.840452Z&quot;
+              }
+            ],
+            &quot;transport&quot;: &quot;LOCAL&quot;,
+            &quot;tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;
+          }
+        ],
+        &quot;binding_digest&quot;: &quot;b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131&quot;,
+        &quot;capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+        &quot;census&quot;: {
+          &quot;binding_digest&quot;: &quot;b9724ce089c371e47bb7e8e64200322df83305786d9f2ccf280c4e080b76b131&quot;,
+          &quot;contract_digest&quot;: &quot;a7dda9b1726fc74de0b594c57d3ce2647c21e4e4231431d78f22c92a466f562a&quot;,
+          &quot;database_id&quot;: &quot;db-feb883f6c74549418b890e28c04fd6fd&quot;,
+          &quot;digest&quot;: &quot;392a36354ee6c9adad6dfccdbf7d8ebaab07e54c8d2fffb35f612c554547e7de&quot;,
+          &quot;effect_delta&quot;: 2500,
+          &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.583920Z&quot;,
+          &quot;environment_digest&quot;: &quot;7e4301b5f54c56b990d36be1201436a064c302a2371689fb1ce1b80bf43f3fa9&quot;,
+          &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+          &quot;execution_nonce&quot;: &quot;b3f44d8f328547c5af363b45261e30c8&quot;,
+          &quot;execution_status&quot;: &quot;COMPLETED&quot;,
+          &quot;failure_detail&quot;: null,
+          &quot;final_snapshot&quot;: {
+            &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;event_effect_count&quot;: 1,
+            &quot;event_effect_total&quot;: 2500,
+            &quot;event_marker_count&quot;: 1,
+            &quot;subject_total&quot;: 2500
+          },
+          &quot;first_delivery_commit_count&quot;: 1,
+          &quot;first_delivery_operations&quot;: [
+            &quot;credit_and_mark&quot;
+          ],
+          &quot;first_delivery_snapshot&quot;: {
+            &quot;digest&quot;: &quot;4fa81f5232b2eac838d36e49eded526344337b516aaca9d56738e4fa5287be2d&quot;,
+            &quot;event_effect_count&quot;: 1,
+            &quot;event_effect_total&quot;: 2500,
+            &quot;event_marker_count&quot;: 1,
+            &quot;subject_total&quot;: 2500
+          },
+          &quot;initial_database_digest&quot;: &quot;8ecc527398763a26042cc2df0432de315a75149a50b6eeb048e53c21e544b937&quot;,
+          &quot;initial_database_file_digest&quot;: &quot;aee3d1b089e0418bdebd12895485422269757a8c5b9dde3f0fd71d8be47887db&quot;,
+          &quot;initial_snapshot&quot;: {
+            &quot;digest&quot;: &quot;9038bda2e742dde1697b35c1dc00101431c2fe13cf622198c69628bfc198dc92&quot;,
+            &quot;event_effect_count&quot;: 0,
+            &quot;event_effect_total&quot;: 0,
+            &quot;event_marker_count&quot;: 0,
+            &quot;subject_total&quot;: 0
+          },
+          &quot;integrity_status&quot;: &quot;VALID&quot;,
+          &quot;observation&quot;: &quot;EXACTLY_ONCE&quot;,
+          &quot;parent_capsule_digest&quot;: &quot;800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572&quot;,
+          &quot;post_execution_tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;,
+          &quot;receipt_id&quot;: &quot;no-fault-7285a0e05b54449ab4ee0c77c70cbafe&quot;,
+          &quot;replay_commit_count&quot;: 0,
+          &quot;replay_operations&quot;: [],
+          &quot;role&quot;: &quot;corrected&quot;,
+          &quot;schema_version&quot;: &quot;2&quot;,
+          &quot;spawns&quot;: [
+            {
+              &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.414615Z&quot;,
+              &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+              &quot;exit_code&quot;: 0,
+              &quot;ipc_session_id&quot;: &quot;5f206073babe486eafdcf6ed8033856c&quot;,
+              &quot;phase&quot;: &quot;first&quot;,
+              &quot;pid&quot;: 77155,
+              &quot;process_group_id&quot;: 77155,
+              &quot;spawn_index&quot;: 1,
+              &quot;started_at&quot;: &quot;2026-09-06T15:53:50.252816Z&quot;,
+              &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+              &quot;stderr_excerpt&quot;: &quot;&quot;,
+              &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+              &quot;stdout_excerpt&quot;: &quot;&quot;,
+              &quot;worker_nonce&quot;: &quot;8a5510a9631b4f379837f02dcd716ed8&quot;
+            },
+            {
+              &quot;ended_at&quot;: &quot;2026-09-06T15:53:50.581719Z&quot;,
+              &quot;event_digest&quot;: &quot;4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293&quot;,
+              &quot;exit_code&quot;: 0,
+              &quot;ipc_session_id&quot;: &quot;4cff3e33133f413eb45216318a2ca0ec&quot;,
+              &quot;phase&quot;: &quot;replay&quot;,
+              &quot;pid&quot;: 77156,
+              &quot;process_group_id&quot;: 77156,
+              &quot;spawn_index&quot;: 2,
+              &quot;started_at&quot;: &quot;2026-09-06T15:53:50.418472Z&quot;,
+              &quot;stderr_digest&quot;: &quot;0842a14241c7ee81b8e32ea387bc6de7275414a0e8ce170b780a06c584f0be02&quot;,
+              &quot;stderr_excerpt&quot;: &quot;&quot;,
+              &quot;stdout_digest&quot;: &quot;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&quot;,
+              &quot;stdout_excerpt&quot;: &quot;&quot;,
+              &quot;worker_nonce&quot;: &quot;562b11e8f66f4c2ea1c0168e8d6af998&quot;
+            }
+          ],
+          &quot;started_at&quot;: &quot;2026-09-06T15:53:50.246625Z&quot;,
+          &quot;transport&quot;: &quot;LOCAL&quot;,
+          &quot;tree_digest&quot;: &quot;ccdce21b146ff0146fd93f3aa86f3d047f937153215cae4e2ab80c92d93954de&quot;
+        },
+        &quot;digest&quot;: &quot;05cb3f70c57e58efaad6de399515ec4151c2848795b74f8e947c734785eed8ee&quot;,
+        &quot;observation&quot;: &quot;EXACTLY_ONCE&quot;,
+        &quot;role&quot;: &quot;corrected&quot;,
+        &quot;schema_version&quot;: &quot;1&quot;
+      }
+    ],
+    &quot;transport&quot;: &quot;LOCAL&quot;,
+    &quot;verdict&quot;: &quot;PATCH_FAILED_STILL_REPRODUCES&quot;
+  }
+}</pre></details>
+</main>
+</body>
+</html>

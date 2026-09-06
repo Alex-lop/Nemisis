@@ -1,11 +1,12 @@
 # CrashCheck benchmark
 
-Status: measured `LOCAL` / `FIXTURE` evidence generated on 2026-09-05 from clean source commit
-`305667621ef62b49523d35a65491dafbf1e779ef`. The result is
+Status: measured `LOCAL` / `FIXTURE` evidence generated on 2026-09-06 from clean source commit
+`14cd428bc01d4da44bf05758afb1cb69188479f5`. The result is
 [`benchmarks/results/crashcheck-v1.json`](../benchmarks/results/crashcheck-v1.json).
 
-This benchmark compares ordinary green checks with the real process-kill counterexample for the
-one audited `sqlite-credit-v1` scenario. It is not a cloud-performance, arbitrary-repository, or
+This benchmark compares ordinary green checks with the real process-kill counterexample for one of
+the two audited scenarios, `sqlite-credit-v1`. The other, `sqlite-inventory-v1`, is audited and
+checkable but is not benchmarked here. This is not a cloud-performance, arbitrary-repository, or
 general schedule-search benchmark.
 
 ## Protocol
@@ -25,16 +26,16 @@ fresh confirmation worlds are required for each base, candidate, and corrected r
 
 | Variant | Existing test | Sequential duplicate | CrashCheck | Valid worlds | CrashCheck wall |
 | --- | --- | --- | --- | ---: | ---: |
-| `buggy` | PASS (1/1, 113.670 ms) | PASS / exactly once (1.192 ms) | `DUPLICATE_EFFECT` | 5/5 | 271.661 ms |
-| `misleading-green` | PASS (1/1, 98.296 ms) | PASS / exactly once (0.576 ms) | `DUPLICATE_EFFECT` | 5/5 | 265.878 ms |
-| `atomic` | PASS (1/1, 98.683 ms) | PASS / exactly once (0.545 ms) | `EXACTLY_ONCE` | 5/5 | 256.213 ms |
+| `buggy` | PASS (1/1, 140.953 ms) | PASS / exactly once (1.443 ms) | `DUPLICATE_EFFECT` | 5/5 | 338.785 ms |
+| `misleading-green` | PASS (1/1, 106.646 ms) | PASS / exactly once (0.670 ms) | `DUPLICATE_EFFECT` | 5/5 | 322.594 ms |
+| `atomic` | PASS (1/1, 104.579 ms) | PASS / exactly once (0.791 ms) | `EXACTLY_ONCE` | 5/5 | 325.144 ms |
 
-The `buggy` and `misleading-green` rows are identical by design: both trees carry the same
-check-then-act guard (`if processed: return`, credit, mark) written two ways, so every ordinary check
-passes on both and only the crash separates them from `atomic`, which commits the credit and the
-marker together. The misleading-green candidate therefore receives `PATCH_FAILED_STILL_REPRODUCES`:
-every crash world ends at `$50`, two ledger effects, and one marker. Every corrected world ends at
-`$25`, one effect, and one marker.
+The `buggy` and `misleading-green` outcomes are identical by design, and only their timings differ.
+Both trees carry the same check-then-act guard (`if processed: return`, credit, mark) written two
+ways, so every ordinary check passes on both and only the crash separates them from `atomic`, which
+commits the credit and the marker together. The misleading-green candidate therefore receives
+`PATCH_FAILED_STILL_REPRODUCES`: every crash world ends at `$50`, two ledger effects, and one
+marker. Every corrected world ends at `$25`, one effect, and one marker.
 
 The hypothesis hunt produced one reproducer from two valid worlds and selected
 `effect-commit-v1` by fixed catalog rank. The no-crash control then delivered the event twice with
@@ -43,29 +44,29 @@ attributed to the crash. (The JSON still names this the deletion trial.)
 
 Measured local timing:
 
-- time to first base witness: 259.309 ms;
-- two-world no-crash control: 238.623 ms;
-- complete CrashCheck portion (including the corrected tree's commit sweep): 1.809 s; and
-- total benchmark: 2.163 s.
+- time to first base witness: 269.272 ms;
+- two-world no-crash control: 271.980 ms;
+- complete CrashCheck portion (including the corrected tree's commit sweep): 2.108 s; and
+- total benchmark: 2.517 s.829 s.
 
 Timing is diagnostic only. It came from CPython 3.12.13, SQLite 3.53.1, Pytest 9.1.1, Darwin/arm64;
 host load can change it. No provider latency, concurrency limit, or cost was measured.
 
 ## Exact bindings
 
-- source commit: `305667621ef62b49523d35a65491dafbf1e779ef`
-- engine code digest: `a9b1227d5c32db9500232be0a161906a23128f7c95d5d9e06c82a26bc34897ad`
-- capsule digest: `41a29044bceec3314dc82d6261cc4f53e7e28a218759c09deecb97825266d99c`
+- source commit: `14cd428bc01d4da44bf05758afb1cb69188479f5`
+- engine code digest: `39833a5640c9053727c7832d6b72ddb14b4684d21b04daa6043c4e32c182e53b`
+- capsule digest: `800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572`
 - event digest: `4ad9ce16a3a060a5dbde7dffafdd7fd2f047e612c4e34c6ca30635355778b293`
-- result digest: `fe98afd23f5a5bf3b5cf72a52a42558f2fb6d32ef848392fbc7f6dd26b51f8ef`
+- result digest: `b7a03b92f4bb8cf1a6416b1e88a4ff26d62f74d5fd172607d800c8aab7b96643`
 
 The evidence commit necessarily follows the clean measured source commit. The JSON retains that
 immediately preceding SHA rather than pretending the unexecuted evidence commit measured itself.
 
 The capsule and result digests are bound to the measured environment (CPython 3.12.13, SQLite
-3.53.1, Darwin arm64) through the runner environment digest; only the engine code digest is
-environment-independent. A rerun on another interpreter prints different capsule and result
-digests for the same observed behavior.
+3.53.1, Darwin arm64) through the runner environment digest. The source commit, the engine code
+digest, and the event digest do not depend on the environment. A rerun on another interpreter
+prints different capsule and result digests for the same observed behavior.
 
 Regenerate with:
 
@@ -80,5 +81,7 @@ this file to a manifest, so regenerating it is a set: rerun `check` with
 `--output-dir docs/assets/crashcheck-hero`, replace the old `runs/<run-id>/` and
 `repros/double-credit/<capsule-digest>/` directories with the new ones, point the `run_id` in
 `docs/assets/crashcheck-hero/index.html` at the new run, and update the digests above and in
-`docs/STATUS.md` and `docs/PROOF.md`, all in one follow-up commit; `tests/test_static_hero.py`
-fails until the set is consistent.
+`docs/STATUS.md` and `docs/PROOF.md`, all in one follow-up commit. `tests/test_static_hero.py`
+fails until the viewer's `run_id`, the run manifest, and the benchmark JSON agree, and until
+`docs/STATUS.md` names the recorded engine digest and commit. No test reads this file, so check the
+digests above against the JSON by hand.

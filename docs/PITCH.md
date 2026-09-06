@@ -60,14 +60,17 @@ static HTML report, and a content-addressed repro capsule you can replay against
 
 ## Why a single kill point is not enough
 
-The checker was red-teamed against thirty adversarially written handlers. Three that fooled an
-earlier engine now ship as fixture refs. `mark-first` is the important one: it passes the unit
-test, passes call-it-twice, and passes the kill the original handler failed, because its marker is
-already durable when the kill lands. Killed one commit earlier, it marks the event done and never
-credits it. CrashCheck therefore sweeps: a claimed fix is killed once after every store commit it
-makes, and only a clean sweep earns `FIX_PROVEN_FOR_THIS_CAPSULE`. Every durable change must also
-be attributable to a store commit the worker reported; money moved around the store is an integrity
-failure, never a verdict.
+The checker is red-teamed by a generator with an independent oracle: ten generated handlers on every
+test run, three hundred nightly, on top of a fixed zoo of hand-written shapes. Five of those
+hand-written handlers ship as fixture refs (`mark-first`, `leftover-credit`, `never-marks`,
+`raw-sql`, `shadow-table`). Two of them fooled an earlier engine: `mark-first`, and `shadow-table`,
+which kept its dedup state in a table inside the store's own database. `mark-first` is the important
+one: it passes the unit test, passes call-it-twice, and passes the kill the original handler failed,
+because its marker is already durable when the kill lands. Killed one commit earlier, it marks the
+event done and never credits it. CrashCheck therefore sweeps: a claimed fix is killed once after
+every store commit it makes, and only a clean sweep earns `FIX_PROVEN_FOR_THIS_CAPSULE`. Every
+durable change must also be attributable to a store commit the worker reported; money moved around
+the store is an integrity failure, never a verdict.
 
 ## Why it is not "an LLM judging an LLM"
 
@@ -86,29 +89,29 @@ that passes on both sides as non-discriminating. Nemisis's own `verify` command 
 applied to one immutable test bundle bound by digest to both worlds, with per-claim verdicts.
 
 The limit of every such tool is the one it shares with the test suite: it can only observe what a
-test exercises. No ordinary test kills the process between two statements, so a differential run
-of the packaged `idempotency-retry` fixture (`uv run nemisis verify --fixture idempotency-retry
---mode local`; the matrix is in the README) marks its crash-retry claim `UNRESOLVED` (base fails,
-candidate fails, nothing learned) and stops. CrashCheck starts there. It does not run the
-repository's tests at all. It drives the real handler to its durable checkpoint, kills it, replays,
-and reads durable state; the verdict is a database row count and a process exit code, and the crash
-is preserved as a capsule that any later patch must survive.
+test exercises. No ordinary test kills the process between two statements, so a differential run of
+the packaged `idempotency-retry` fixture (`uv run nemisis verify --fixture idempotency-retry --mode
+local`; the expected four-row matrix is in [LIVE_SETUP.md](LIVE_SETUP.md)) marks its crash-retry
+claim `UNRESOLVED` (base fails, candidate fails, nothing learned) and stops. CrashCheck starts
+there. It does not run the repository's tests at all. It drives the real handler to its durable
+checkpoint, kills it, replays, and reads durable state; the verdict is a database row count and a
+process exit code, and the crash is preserved as a capsule that any later patch must survive.
 
 Killing a process at a durable checkpoint and inspecting what survived is not new either:
 crash-consistency and fault-injection testing (Jepsen, ALICE, CrashMonkey and their relatives) have
 done it to databases and file systems for years. What is specific here is the packaging: the kill is
 aimed at one patch's exact side effect, the base is checked candidate-blind first, the verdict is a
 per-patch accept/reject with exit codes a CI gate can use, and the crash is frozen into a
-content-addressed capsule that the next patch has to beat. It is deliberately narrow: one audited
-scenario, one handler shape, executed rather than inferred.
+content-addressed capsule that the next patch has to beat. It is deliberately narrow: two audited
+scenarios, one handler shape, executed rather than inferred.
 
 ## What it is not, on purpose
 
-One scenario (`sqlite-credit-v1`), one handler shape, Python 3.12+, SQLite, POSIX `SIGKILL`. It
-is not a general fuzzer, not a formal verifier, and a passing result means "this exact tree
-defeated this exact capsule and every kill point of its own," nothing broader. Five worlds must
-agree or there is no verdict; a nondeterministic handler is reported as a split, never averaged.
-The narrowness is what makes the verdict trustworthy.
+Two scenarios (`sqlite-credit-v1`, `sqlite-inventory-v1`), one handler shape, Python 3.12+, SQLite,
+POSIX `SIGKILL`. It is not a general fuzzer, not a formal verifier, and a passing result means "this
+exact tree defeated this exact capsule and every kill point of its own," nothing broader. Five
+worlds must agree or there is no verdict; a nondeterministic handler is reported as a split, never
+averaged. The narrowness is what makes the verdict trustworthy.
 
 ## The ask
 

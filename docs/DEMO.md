@@ -1,9 +1,11 @@
-# 90-second demo
+# Two-minute demo
 
-Five commands, one story: the agent's retry patch is green, and the money still moves twice. Every
-expected output below is pasted from a real local run of this tree; the screenshots and GIF it
-points at live in [`docs/assets/screenshots/`](assets/screenshots/) and were captured from the same
-commands. The longer three-minute cut with fallbacks is [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
+Six commands, one story: the agent's retry patch is green, and the money still moves twice. The
+expected output below was pasted from a local run of this tree. No test regenerates it, so re-run
+the commands if a line reads differently. The screenshots and GIF live in
+[`docs/assets/screenshots/`](assets/screenshots/); the 0:15, 0:40, and 0:55 aids were captured from
+those exact commands, and the 1:15 and 1:35 aids are the nearest committed renders of a different
+run. The longer three-minute cut with fallbacks is [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
 
 ## The pitch, one paragraph (say this first)
 
@@ -26,8 +28,9 @@ rm -rf .nemisis/runs .nemisis/repros
 clear
 ```
 
-Terminal at 17 pt or larger, about 140 columns, dark theme. Run from the repository root so every
-printed path is relative (`.nemisis/…`) and no home directory appears on screen.
+Terminal at 17 pt or larger, about 140 columns, dark theme. Run from the repository root so
+`check` and `replay` print relative paths (`.nemisis/…`). The optional `init` beat below prints its
+`config:` path in full, so record from a checkout outside your home directory if you use it.
 
 ## The script
 
@@ -124,7 +127,7 @@ nothing; say "fail closed" and continue. Never show a `MOCKED` receipt as live.
   [`viewer-01-initial.png`](assets/screenshots/viewer-01-initial.png),
   [`viewer-02-mid-replay.png`](assets/screenshots/viewer-02-mid-replay.png),
   [`viewer-03-verdict-receipt.png`](assets/screenshots/viewer-03-verdict-receipt.png).
-- **No browser.** Skip 1:15; the terminal verdicts carry the story.
+- **No browser.** Skip the 1:35 report beat; the terminal verdicts carry the story.
 - **Stale `.nemisis/`.** `rm -rf .nemisis/runs .nemisis/repros` and start again from 0:15.
-- **Nothing runs.** Play [`crashcheck-demo.gif`](assets/screenshots/crashcheck-demo.gif) (30 s,
+- **Nothing runs.** Play [`crashcheck-demo.gif`](assets/screenshots/crashcheck-demo.gif) (33 s,
   buggy → agent's patch → atomic fix) and narrate over it.

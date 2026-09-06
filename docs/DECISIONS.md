@@ -56,13 +56,14 @@ below. No live generation is claimed until a genuine receipt exists.
 ## Nemotron plays the coding agent, never the judge
 
 The thesis is that AI-written retry patches look green and still lose money. The honest,
-load-bearing job for NVIDIA's model is therefore to write the patch. `nemisis propose-patch`
-gives Nemotron the bug report, the base module, and the storage API, and nothing else: no kill
-points, no catalog, no verdict rules. Its module is accepted only after deterministic AST checks
-(one synchronous `(store, event)` handler, `typing` imports only, no private attributes, no
-dangerous builtins) and is then an ordinary candidate tree. The authorship receipt is provenance in
-the manifest and report; the verdict comes from executing the tree. This keeps the authority model
-intact: the model proposes the thing under test, deterministic code decides what happened to it.
+load-bearing job for NVIDIA's model is therefore to write the patch. `nemisis propose-patch` gives
+Nemotron the bug report, the base module, and the storage API, and nothing else: no kill points, no
+catalog, no verdict rules. Its module is accepted only after deterministic AST checks (one
+synchronous `(store, event)` handler, imports from `typing` and `__future__` only, no private names
+or attributes, no dangerous builtins, no `global` or `nonlocal`) and is then an ordinary candidate
+tree. The authorship receipt is provenance in the manifest and report; the verdict comes from
+executing the tree. This keeps the authority model intact: the model proposes the thing under test,
+deterministic code decides what happened to it.
 
 Without a `NEBIUS_API_KEY` the command exits `2` and writes nothing. Injected clients yield a
 `MOCKED` receipt, which the report labels as such. No `LIVE` authorship receipt exists in this tree.
@@ -117,9 +118,11 @@ a repair in this slice.
 
 ## Preserve one supported scenario after the viewer
 
-Choose Option A for this sprint: keep `sqlite-credit-v1` as the single supported CrashCheck slice.
-A second adapter would not close the missing live transport, exact sponsor receipt, public hosting,
-or demo-video gates, and would add a new trust surface before a second consumer is justified.
+Superseded on 2026-09-06 by "The second scenario is a decrement, not a renamed credit". At the
+time of this decision the sprint kept `sqlite-credit-v1` as the single supported CrashCheck slice.
+A second adapter would not have closed the missing live transport, exact sponsor receipt, public
+hosting, or demo-video gates, and would have added a new trust surface before a second consumer
+was justified.
 
 ## Depth before width: the commit sweep instead of a second scenario (2026-09-05)
 
@@ -154,10 +157,12 @@ Inference defaults to `https://api.tokenfactory.nebius.com/v1/` and
 regional HTTPS `/v1` host pattern. ConTree comes from the official profile and an immutable image
 UUID; there is no generic provider layer or automatic fallback.
 
-Only the original `idempotency-retry` verifier is connected to Nemotron and ConTree. Its JUnit XML is
-guest-produced bounded evidence, not provider-owned attestation, so arbitrary repositories remain
-unsupported. CrashCheck live provider transport is explicitly unimplemented; it remains blocked
-even when external credentials and image prerequisites are otherwise satisfied.
+Only the original `idempotency-retry` verifier is connected to ConTree. CrashCheck's own Nemotron
+calls are the bounded contract proposal (`init --nemotron`) and `propose-patch`, and both are
+provenance beside the verdict rather than input to it. The verifier's JUnit XML is guest-produced
+bounded evidence, not provider-owned attestation, so arbitrary repositories remain unsupported.
+CrashCheck live provider transport is explicitly unimplemented; it remains blocked even when
+external credentials and image prerequisites are otherwise satisfied.
 
 ## Published low-level ConTree client
 
@@ -168,15 +173,17 @@ published high-level interface provides equivalent evidence.
 
 ## The Scenario seam (2026-09-06)
 
-The hardcoded points listed above now read from one object, `nemisis.scenario.Scenario`, whose
-only instance is `nemisis.scenarios.sqlite_credit_v1.SCENARIO`. It supplies the catalog ids, the
-target, the packaged resources and their pinned digests, the SQLite schema and seed, the trusted
-store class the handler is handed, the delta each store operation may make (attribution), the
-event shape and its normalization, the checkpoint predicate, the effect delta the verdict rule
-uses, the repro directory name, and the words a summary prints. The kernel in `sqlite_runner.py`
-and `crashcheck.py` reads the scenario and special-cases nothing; the worker is told the scenario
-id on its command line and constructs the scenario's store. The scenario modules are trusted
-engine resources and enter the engine code digest.
+The hardcoded points listed above now read from one object, `nemisis.scenario.Scenario`. Its
+instances are `nemisis.scenarios.sqlite_credit_v1.SCENARIO` and
+`nemisis.scenarios.sqlite_inventory_v1.SCENARIO`, and the kernel resolves a scenario id against the
+registry in `nemisis.scenarios`. A scenario supplies the catalog ids, the target, the packaged
+resources and their pinned digests, the SQLite schema and seed, the trusted store class the handler
+is handed, the delta each store operation may make (attribution), the event shape and its
+normalization, the checkpoint predicate, the effect delta the verdict rule uses, the repro
+directory name, and the words a summary prints. The kernel in `sqlite_runner.py` and
+`crashcheck.py` reads the scenario and special-cases nothing; the worker is told the scenario id on
+its command line and constructs the scenario's store. The scenario modules are trusted engine
+resources and enter the engine code digest.
 
 The seam landed in two steps. The first changed no behavior: every packaged tree kept its verdict,
 exit code, and summary, and the capsule and hunt contents were identical apart from the engine and
@@ -211,11 +218,12 @@ packaged three. `nemisis redteam` turns that into a generator: a grammar over st
 handler modules, `check` judges each, and an oracle that only knows the operation sequence (what
 each store call does to the durable state, where a kill can land, that a write around the store
 forfeits the verdict, that a second marker raises) names the verdict the checker must return. The
-oracle is pinned on every packaged tree and on the hardening night's shapes; ten fixed-seed cases
-run in the normal suite and a nightly workflow runs three hundred. A disagreement fails the run
-and is either a checker false pass or false fail, the most valuable bug this repository can find,
-or an oracle bug. The generator is deliberately outside the trusted engine: it writes candidates
-and reads verdicts.
+oracle is pinned on the packaged credit trees its grammar can express and on the hardening night's
+shapes; ten fixed-seed cases run in the normal suite and a nightly workflow runs three hundred. The
+grammar is credit-shaped, so `sqlite-inventory-v1`'s trees are covered by their own tests rather
+than by the oracle. A disagreement fails the run and is either a checker false pass or false fail,
+the most valuable bug this repository can find, or an oracle bug. The generator is deliberately
+outside the trusted engine: it writes candidates and reads verdicts.
 
 ## Attribution is the whole database and the whole world (2026-09-06)
 
@@ -233,3 +241,21 @@ world runs in its own directory with the worker's cwd two levels inside it and `
 WAL sidecars. Durable state by absolute path elsewhere on the machine remains a documented
 boundary. The table handler ships as `fixture:sqlite-credit-v1/shadow-table`; the others are
 pinned as tests. The generator's oracle was unaffected: its grammar has no such op yet.
+
+## What the controller cannot read, it does not claim (2026-09-06, after the second review)
+
+The review of the whole-database fix wrote seven more handlers that still passed: a flag in the
+journal-mode header bits (the store's own first connection used to flip them), a rowid, the
+free-page count after `CREATE` and `DROP TABLE`, the schema cookie, a file deleted before exit, a
+bytecode-cache file or an empty directory in the bound tree, the database's own permission bits,
+a file at the `-shm` name, and `../../..` into the shared scratch tree. Structural answers landed
+for all but two: the seed stays in WAL; the header read covers every durable field a commit never
+touches; rowids are read and modelled; the crashed world is scanned right after the kill and the
+census world between its deliveries; the file's permission bits and extended attributes must be
+the seed's; the bound tree is compared entry by entry; a BLOB is carried as its hex; the scratch
+tree may hold nothing but the worlds. Two channels stay open and are written down instead of
+claimed away: a flag the store's own next commit overwrites (the file's modification time, the WAL
+bytes) and a flag at the sidecar names the store owns. A kill world whose commits are not a prefix
+of the census's is refused outright, because that is what hidden state looks like from outside.
+The lesson the night leaves behind: in-process instrumentation can attribute everything it can
+read; the honest sentence is the list of what it reads.

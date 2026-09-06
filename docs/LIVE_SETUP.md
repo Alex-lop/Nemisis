@@ -1,17 +1,19 @@
 # Live setup: from a Token Factory key to a genuine `LIVE` receipt
 
-This is the turnkey path. Everything in the repository that touches a provider is already wired and
-tested; the only thing missing in the development environment is the credential. Follow the stages
-in order. Each stage says exactly what a success looks like and exactly what a failure looks like,
-so nothing has to be interpreted.
+This is the turnkey path. The Nemotron and ConTree client paths are wired and tested. CrashCheck's
+own live provider transport is not implemented, and this development environment holds none of the
+three live prerequisites: `NEBIUS_API_KEY`, a ConTree profile, and `NEMISIS_CONTREE_ROOT_IMAGE`.
+Follow the stages in order. Each stage says exactly what a success looks like and exactly what a
+failure looks like, so nothing has to be interpreted.
 
 Two rules that never bend:
 
 - Nothing is labelled `LIVE` unless a real Token Factory call produced it. Injected clients are
   `MOCKED`; the packaged evidence is `FIXTURE`. The labels are checked by code, not by hand.
-- Nothing ever falls back from live to local. A blocked live run exits `2` and records no
-  observations: `verify --mode live` writes nothing, and `check --mode live` writes only an
-  `EVIDENCE_INCOMPLETE` manifest and report whose observations are absent.
+- Nothing ever falls back from live to local. A blocked live run exits `2` and observes nothing.
+  `verify --mode live` writes nothing. `check --mode live` writes an `EVIDENCE_INCOMPLETE` manifest
+  and report whose single attempt is `NOT_OBSERVED` with every snapshot null, plus the frozen
+  `FIXTURE`-labelled Repro Capsule. No regression test is published.
 
 ## What you need
 
@@ -21,7 +23,7 @@ Two rules that never bend:
 | `CONTREE_PROFILE`, or an active profile in `~/.config/contree/auth.ini` | Stage B only | Created by the official ConTree client login. Stage A does not need it. |
 | `NEMISIS_CONTREE_ROOT_IMAGE` | Stage B only | An immutable Sandbox image **UUID** (never a tag) that provides `/bin/sh`, `/bin/tar`, `/usr/bin/env`, `python` with `pytest`, and `git`. See the [live runbook](LIVE_RUNBOOK.md#immutable-root-image-contract). |
 | `NEMISIS_TOKEN_FACTORY_BASE_URL` (optional) | Endpoint override | Defaults to `https://api.tokenfactory.nebius.com/v1/`. Any override must be an official Nebius global or regional HTTPS `/v1` endpoint; anything else is refused before a request is sent. |
-| `NEMISIS_MODEL_ID` (optional) | Model override | Defaults to `nvidia/nemotron-3-super-120b-a12b`. The model must be active, `text->text`, and structured-output capable in your authenticated catalog, or the call fails closed. |
+| `NEMISIS_MODEL_ID` (optional) | Model override | Defaults to `nvidia/nemotron-3-super-120b-a12b`. The model must be `text->text` and structured-output capable in your authenticated catalog, and it must not be listed as inactive, or the call fails closed. A catalog entry that carries no `status` field passes the status gate. |
 
 Put the values in `.env` (it is gitignored; `.env.example` lists the names) and load them into the
 shell before running anything:
@@ -109,11 +111,13 @@ uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate ./nemotro
   --mode local
 ```
 
-Success for the first command is exit `0` and five lines: `candidate:`, a `nemotron:` line whose
-label is `LIVE`, `patch:`, the model's `rationale:`, and the exact `next:` command. The model saw
-the bug report, the base module, and the store API; it saw nothing about kill points or verdicts.
-Its module was accepted only after deterministic checks (signature, imports, attribute access), and
-`.nemisis/agent-patches/<candidate tree digest>.json` in your checkout is the sanitized receipt (never inside the candidate tree, so a pull request cannot claim its own author).
+Success for the first command is exit `0` and six lines: `candidate:`, the `receipt:` path, a
+`nemotron:` line whose label is `LIVE`, `patch:`, the model's `rationale:`, and the exact `next:`
+command. The model saw the bug report, the base module, and the store API; it saw nothing about
+kill points or verdicts. Its module was accepted only after deterministic checks (signature,
+imports, attribute access), and `.nemisis/agent-patches/<candidate tree digest>.json` in your
+checkout is the sanitized receipt (never inside the candidate tree, so a pull request cannot claim
+its own author).
 
 The second command's verdict is whatever the model earned. Either outcome is a good demo: a
 `FIX_PROVEN_FOR_THIS_CAPSULE` shows the checker blessing a real AI patch; a
@@ -141,8 +145,11 @@ uv run python -c "import json,glob; m=json.load(open(sorted(glob.glob('.nemisis/
 ```
 
 That prints `LIVE`. If it prints `MOCKED`, the run used an injected client and is not a live
-claim. If it prints `ABSENT`, the run carried no proposal (the manifest's `contract_proposal` is
-`null`), which is what every `check` without `--scenario .nemisis/config.json` produces.
+claim. If it prints `ABSENT`, the run carried no bound proposal and the manifest's
+`contract_proposal` is `null`. That happens three ways: you did not pass
+`--scenario .nemisis/config.json`, or no `.nemisis/proposal.json` sits beside that config, or the
+sidecar does not bind to this contract. A sidecar that exists but fails strict validation aborts the
+run with an error instead.
 
 ### A4. Record it
 
@@ -187,8 +194,9 @@ uv run nemisis verify --fixture idempotency-retry --mode live
 Success begins `NEMISIS — LIVE` (not `LOCAL FIXTURE`), prints the four-row matrix, and names a
 `manifest:` and `report:` under `.nemisis/runs/live-…/`. The expected matrix is the same as local:
 three `SUPPORTED` rows and one `UNRESOLVED` crash-retry row, `artifact: REJECTED`. Networking is
-disabled inside the guest; the JUnit evidence is guest-produced and returned through bounded output,
-which the report says in as many words.
+disabled inside the guest, and the JUnit evidence is guest-produced and returned through bounded
+output. The [live runbook](LIVE_RUNBOOK.md#what-nemisis-can-run-live-today) states that in as many
+words; the report itself records only the JUnit hash for each execution receipt.
 
 Failure is one of:
 

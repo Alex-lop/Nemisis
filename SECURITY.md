@@ -1,17 +1,19 @@
 # Security
 
 Nemisis executes repository code in local worker processes. Local mode is for a trusted checkout;
-it is not a sandbox for hostile code. The full trust boundary, what the controller owns, and what a
+it is not a sandbox for hostile code. The trust boundary, what the controller owns, and what a
 candidate cannot influence are in [docs/SECURITY.md](docs/SECURITY.md).
 
 ## Reporting a vulnerability
 
-Please report privately through
-[GitHub Security Advisories](https://github.com/Alex-lop/Nemisis/security/advisories/new) rather
-than a public issue. Include the handler or input that demonstrates the problem and the verdict you
-observed. A report that shows CrashCheck issuing `FIX_PROVEN_FOR_THIS_CAPSULE` for a handler that
-loses or duplicates money is the most valuable kind and will be treated as a bug in the checker,
-not in the handler.
+Report privately if you can. GitHub private vulnerability reporting is not switched on for this
+repository yet, so
+[the advisory form](https://github.com/Alex-lop/Nemisis/security/advisories/new) is open to
+maintainers only. Until it is switched on, open an issue that names the affected surface and the
+verdict you observed, and hold back the handler or input that demonstrates it; a maintainer will
+open a private advisory and collect the rest there. A report that shows CrashCheck issuing
+`FIX_PROVEN_FOR_THIS_CAPSULE` for a handler that loses or duplicates money is the most valuable
+kind and will be treated as a bug in the checker, not in the handler.
 
 ## Scope
 

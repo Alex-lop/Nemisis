@@ -372,7 +372,7 @@ summary { cursor: pointer; font-weight: 750; }
 </div>
 </main>
 <script id="receipt-config" type="application/json">
-{"run_id":"local-20260905T084629-5830de69"}
+{"run_id":"local-20260906T155348-0b0883b5"}
 </script>
 <script>
 const button = document.querySelector("#replay");
@@ -424,7 +424,7 @@ Promise.all([
       && attempt.integrity_status === "VALID"
       && attempt.observation === observation
       && attempt.final_state.balance_cents === (
-        observation === "DUPLICATE_EFFECT" ? capsule.amount_cents * 2 : capsule.amount_cents
+        observation === "DUPLICATE_EFFECT" ? capsule.effect_delta * 2 : capsule.effect_delta
       )
       && attempt.final_state.ledger_count === (
         observation === "DUPLICATE_EFFECT" ? 2 : 1
@@ -478,9 +478,9 @@ Promise.all([
   field("green-durations", `Measured durations: ${milliseconds(candidate.pytest.wall_time_ns)} pytest; ${milliseconds(candidate.sequential.wall_time_ns)} sequential.`);
   field("hunt", `${benchmark.hunt.valid_world_count} / ${benchmark.hunt.attempted_world_count} boundary checks valid · deletion trial: empty schedule EXACTLY_ONCE in ${benchmark.hunt.deletion_confirmation_world_count} / ${benchmark.hunt.deletion_confirmation_world_count} fresh base worlds · final fault actions ${benchmark.hunt.final_fault_action_count} / ${benchmark.hunt.initial_fault_action_count} · witness in ${milliseconds(benchmark.hunt.time_to_first_witness_ns)}`);
   field("worker-kill", `worker PID ${firstWorker.pid} · process group ${firstWorker.process_group_id} · exit ${firstWorker.exit_code}`);
-  field("post-kill", `Post-kill probe: ${money(candidateAttempt.post_kill_snapshot.account_balance_cents)} durable balance · ${candidateAttempt.post_kill_snapshot.event_ledger_count} ledger row · ${candidateAttempt.post_kill_snapshot.event_marker_count} marker`);
+  field("post-kill", `Post-kill probe: ${money(candidateAttempt.post_kill_snapshot.subject_total)} durable balance · ${candidateAttempt.post_kill_snapshot.event_effect_count} ledger row · ${candidateAttempt.post_kill_snapshot.event_marker_count} marker`);
   field("fresh-worker", `Fresh worker PID ${replayWorker.pid}, distinct worker nonce and IPC session,`);
-  field("expected", money(capsule.amount_cents));
+  field("expected", money(capsule.effect_delta));
   field("observed", money(candidate.crashcheck.attempts[0].final_state.balance_cents));
   field("candidate-proof", `2 ledger rows · duplicate in ${candidate.crashcheck.valid_world_count} / ${candidate.crashcheck.attempted_world_count} fresh worlds`);
   field("candidate-verdict", result.verdict);

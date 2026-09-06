@@ -41,8 +41,9 @@ The packaged fixture command is the audited shortcut because its contract is alr
    reproducer, then run the no-crash control: deliver the same event twice with no kill in two
    fresh base worlds. Proceed only when both end exactly once, which shows the base's duplicate
    needs the crash and is not a handler that is simply wrong.
-3. In every proof world, observe the durable `$25` effect, send process-group `SIGKILL`, confirm
-   exit `-9`, start a fresh worker, and replay the byte-identical event.
+3. In every proof world, observe the scenario's durable effect (the `$25` credit in
+   `sqlite-credit-v1`, the two-unit reservation in `sqlite-inventory-v1`), send process-group
+   `SIGKILL`, confirm exit `-9`, start a fresh worker, and replay the byte-identical event.
 4. Require five fresh base and candidate worlds, plus five corrected worlds when supplied. A
    claimed fix whose five boundary worlds end exactly once is then swept: a census delivery with no
    kill records every store commit the handler makes, and one more fresh world kills the worker
@@ -89,8 +90,8 @@ The inventory scenario's store has the same shape with its own names: `reserved(
 | Verdict | Exit | Exact meaning |
 | --- | ---: | --- |
 | `BUG_REPRODUCED` | 1 | The exact base reproduced the capsule's duplicate effect. |
-| `PATCH_FAILED_STILL_REPRODUCES` | 1 | The exact candidate reproduced the same duplicate effect (two credits, with or without the marker). |
-| `PATCH_FAILED_INVARIANT_BROKEN` | 1 | Every candidate world completed, but the durable state was neither exactly-once nor the capsule's duplicate: a lost credit, a triple credit, or another broken invariant. |
+| `PATCH_FAILED_STILL_REPRODUCES` | 1 | The exact candidate reproduced the same duplicate effect (two credits or two reservations, with or without the marker). |
+| `PATCH_FAILED_INVARIANT_BROKEN` | 1 | Every candidate world completed, but the durable state was neither exactly-once nor the capsule's duplicate: a lost effect, a tripled effect, or another broken invariant. |
 | `FIX_PROVEN_FOR_THIS_CAPSULE` | 0 | The exact candidate completed exactly once in every required world for this capsule only. |
 | `EVIDENCE_INCOMPLETE` | 2 | Required execution, mapping, integrity, or provenance evidence is missing or contradictory. |
 | `UNSUPPORTED_TARGET` | 2 | Deterministic preflight proves the scenario, catalog ID, adapter, or target shape is outside the alpha. |
@@ -102,14 +103,16 @@ An accepted catalog target whose exact-tree anchor has zero, multiple, or invali
 
 ## Model and isolation roles
 
-Nemotron has two jobs, and neither touches a verdict, a probe, a SQL statement, or an assertion.
+In CrashCheck, Nemotron has two jobs. Neither touches a verdict, a probe, a SQL statement, or an
+assertion.
 
 `nemisis propose-patch` is the load-bearing one: Nemotron plays the coding agent. It receives the
 bug report, the base handler module, and the storage API, and returns a complete replacement
 module. It sees nothing about how CrashCheck kills or judges. Deterministic rules accept the module
-only if it keeps the exact `(store, event)` signature, imports nothing but `typing`, and touches no
-private attribute or dangerous builtin; a rejected module writes nothing. An accepted module becomes
-an ordinary candidate tree, with a sanitized receipt written to the operator's `.nemisis/agent-patches/<tree digest>.json`, and `check`
+only if it keeps the exact `(store, event)` signature, imports nothing but `typing` and
+`__future__`, and touches no private attribute or dangerous builtin; a rejected module writes
+nothing. An accepted module becomes an ordinary candidate tree, with a sanitized receipt written to
+the operator's `.nemisis/agent-patches/<tree digest>.json`, and `check`
 executes that tree exactly like a human's patch, carrying the receipt into the manifest and report
 as the candidate's author (`LIVE` for a real Token Factory call, `MOCKED` for an injected client).
 The model that wrote the patch is never the thing that judges it.
@@ -117,8 +120,9 @@ The model that wrote the patch is never the thing that judges it.
 `nemisis init --nemotron` is the smaller role: bounded base-only context (issue text and
 the exact base handler) becomes a typed catalog proposal plus one bounded scalar. That call may not
 emit commands, probes, SQL, assertions, or verdicts. Deterministic code accepts the proposal only
-when it selects the audited fault intent and the exact `amount_cents`; otherwise no contract is
-drafted. The sanitized receipt (`.nemisis/proposal.json`) is provenance carried into the check
+when it selects the audited fault intent and the exact value of the scenario's one bounded scalar
+(`amount_cents` in `sqlite-credit-v1`, `quantity` in `sqlite-inventory-v1`); otherwise no contract
+is drafted. The sanitized receipt (`.nemisis/proposal.json`) is provenance carried into the check
 manifest and report, never crash evidence, and it never enters the capsule digest. The adapter is
 contract-tested with injected clients (`MOCKED`); a `LIVE` receipt requires a genuine Token Factory
 call with `NEBIUS_API_KEY`, which this environment lacks. The inherited differential live path has a

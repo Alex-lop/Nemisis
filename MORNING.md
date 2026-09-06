@@ -1,131 +1,102 @@
 # Morning
 
-Branch `overnight/hardening`, pushed, `main` untouched. Gate green on every commit that is on the
-remote (ruff, mypy, 364 tests). Read `git log origin/main..overnight/hardening` top to bottom; each
-commit is one idea and says why. This file is the two-minute version.
+CrashCheck now attributes everything it can read of the database and of the directory a worker
+runs in and names the two channels it cannot, judges two scenarios with one kernel, is red-teamed
+by a generator on every CI run, and tells a judge who writes raw SQL the one-line change; no `LIVE`
+receipt exists, because no key does.
 
-## What is different
+Ten PRs, `main` untouched, in merge order:
 
-1. **The checker was fooled, then fixed, three times over.** I wrote candidates to beat it, ran
-   two adversarial rounds (30 agents against the baseline, 25 against the hardened engine), and
-   had four hostile reviewers read the night's diff; every finding was verified by an independent
-   agent before I acted on it. Real false passes and holes found:
-   - `mark_processed` then `credit` was PROVEN. Killed between the two, the retry sees the marker
-     and never credits: $25 lost, exit 0.
-   - The credit written through the handler's own `sqlite3` connection, then `store.mark_processed`,
-     was PROVEN. The controller only saw store commits.
-   - A `str` subclass with a lying `__eq__` bound a shadow account into the store's own SQL;
-     `mark_processed(None)` committed a NULL marker row.
-   - A handler that could tell which world it was in (directory named `census`, nonce named
-     `candidate-sweep-1`) behaved atomically only where the sweep was counting.
-   - A dedup file written beside the database before the atomic call: a crash window no store
-     commit can reach, blessed by the sweep.
-   - Attribution watched only this event's rows, so a handler could fund another account through
-     its own connection and stay PROVEN.
-   - A model-written module could reach `__import__` through `__builtins__[...]`, and the
-     authorship receipt lived inside the candidate tree where a PR author could hand-write "LIVE".
-   - One undecodable byte on stdout ended the text-mode output drain and hid a detached child
-     holding the worker's pipes.
-   Fixes: every claimed fix is killed once after **each** store commit it makes (a census delivery
-   counts them first, and that single delivery must itself be exactly once); every durable change
-   must match the store operation the worker reported and every row outside the event must stay
-   as seeded; the store requires exact types and values; worlds are named by opaque ids; files
-   written beside the database forfeit the verdict; the AST check rejects every underscore name;
-   the authorship receipt lives with the operator, keyed by tree digest; drains read raw bytes.
-   Every one of these handlers now fails for the right reason.
-2. **Complete-but-wrong is a failed patch, not missing evidence.** `PATCH_FAILED_INVARIANT_BROKEN`
-   (exit 1) for lost, tripled, or flooded money. Receipts validate through one shared final-state
-   rule, so real duplicated-money evidence is never again rejected as "orchestration failed".
-3. **Nemotron has a load-bearing job.** `nemisis propose-patch`: the model is the coding agent. Bug
-   report, buggy module, and store API in; whole module out; nothing about how CrashCheck kills or
-   judges. AST-checked, written as an ordinary candidate, crash-tested like anyone's patch, named as
-   author in the report. `init --nemotron` remains the smaller job.
-4. **Three red-team handlers are packaged fixtures** (`mark-first`, `leftover-credit`,
-   `never-marks`), one flag each, and `nemisis export` gives anyone an editable tree in one line.
-   CI smokes `mark-first` from the built wheel on every push.
-5. **Messages a Tuesday-afternoon user would hit are fixed:** chatty handlers no longer time out on
-   a full pipe; cleanup errors no longer hide the real failure; split worlds are named
-   ("3 DUPLICATE_EFFECT, 2 EXACTLY_ONCE"), never averaged; exception types and the delivery phase
-   appear in the message; a handler that never credits is told so, and what its no-crash delivery
-   did to the money is reported (not judged).
-6. **README rewritten** (counterexample first, one command, the zoo as a table, the Nemotron beat).
-   Root `SECURITY.md` and `CONTRIBUTING.md`. GitHub description and topics set. Hero, benchmark,
-   GIF, stills, and viewer captures regenerated at the hardened engine.
-7. **The "necessity proof" is called a no-crash control** everywhere a human reads.
+| PR | Title | Head | CI on that head | State | Merge |
+| -- | ----- | ---- | --------------- | ----- | ----: |
+| #5 | ci: run the gate on CPython 3.12 and 3.13 | `a6a4801` | [34011484455](https://github.com/Alex-lop/Nemisis/actions/runs/34011484455) (both legs, at `13fe088`) + head run green | ready | 1 |
+| #6 | ci(pages): stage the viewer for GitHub Pages, fail-closed until enabled | `e84ff7e` | [34011486985](https://github.com/Alex-lop/Nemisis/actions/runs/34011486985) | staged: needs the Pages toggle | 2 |
+| #7 | fix(action): re-pin the example workflow; guard the pin | `0cd0bf3` | [34011609883](https://github.com/Alex-lop/Nemisis/actions/runs/34011609883) | ready | 3 |
+| #8 | test: the README's point-it-at-your-code sequence on a real git repo | `62079a7` | [34011612193](https://github.com/Alex-lop/Nemisis/actions/runs/34011612193) | ready, stacked on #7 | 4 |
+| #9 | feat(zoo): the raw-SQL judge handler earns a remedy, not a trap | `3a02ed7` | [34012175516](https://github.com/Alex-lop/Nemisis/actions/runs/34012175516) | ready, stacked on #8 | 5 |
+| #10 | refactor(scenario): the Scenario seam, zero behavior change | `cfcdea4` | [34012509943](https://github.com/Alex-lop/Nemisis/actions/runs/34012509943) | ready, stacked on #9 | 6 |
+| #11 | feat(scenario): generic receipts + sqlite-inventory-v1 | `db37ae8` | [34013254317](https://github.com/Alex-lop/Nemisis/actions/runs/34013254317) | ready, stacked on #10 | 7 |
+| #12 | feat(redteam): grammar, oracle, nightly sweep | `883841b` | [34013915213](https://github.com/Alex-lop/Nemisis/actions/runs/34013915213) | ready, stacked on #11 | 8 |
+| #13 | fix(kernel): attribution is the whole database and the whole world | `14cd428` | [34043689355](https://github.com/Alex-lop/Nemisis/actions/runs/34043689355) (the first head `5c7590b` was green on [34014576360](https://github.com/Alex-lop/Nemisis/actions/runs/34014576360)) | ready, stacked on #12 | 9 |
+| #14 | docs+evidence: claims sweep, hero regenerated, this report | tip of `overnight2/docs-and-evidence` (this file is in it, so it cannot quote its own SHA) | [branch runs](https://github.com/Alex-lop/Nemisis/actions?query=branch%3Aovernight2%2Fdocs-and-evidence), queued when this was pushed | ready, stacked on #13 | 10 |
 
-Fresh clone of the branch: `uv sync` 0.4 s, quickstart 2.8 s, replay proven, `mark-first` fails on
-the right kill point, export-and-edit proven, `propose-patch` without a key exits 2 and writes nothing.
+Merge each with "delete branch"; GitHub retargets the next PR to `main` by itself. Every PR body is
+a mini-ledger (what, why, proof, not-done, revert).
 
-## The three dismissals
+## The evidence ledger
 
-- **"One hardcoded fixture, can't point it at my code."** Half dead. Any handler body works inside
-  the `(store, event)` + `CreditStore` shape, `nemisis export` makes trying one a 30-second job, and
-  55 adversarial handlers prove the checker discriminates between bodies. A second scenario is
-  **not** built; the seam does not exist yet and the exact hardcoded points are listed in
-  `docs/DECISIONS.md` ("Depth before width"). I chose depth. I would defend that to a judge: the core
-  claim ("survives a real crash") was false for five handler shapes at midnight and is true now.
-- **"You wrote the bug, the fix, and the checker."** Mostly dead. The handlers that broke it were
-  written by adversaries, three are packaged, and Nemotron can author the candidate. Missing: a
-  `LIVE` Nemotron-written patch, which needs the key.
-- **"NVIDIA integration is mocked."** Honest, not dead. Two model paths are wired and tested,
-  `NEBIUS_API_KEY` switches them on, receipts carry `MOCKED` or `LIVE` by code. No key exists on
-  this machine, so no `LIVE` receipt exists. The Sandbox transport is still `BLOCKED`.
+| # | Claim | PR | Status | Proof (exact command → expected output) |
+| - | ----- | -- | ------ | -------------------------------------- |
+| 1 | Gate on clean `main` (`4db4213`) is green | – | PASS | `uv sync --frozen --dev && uv run ruff format --check src tests && uv run ruff check src tests && uv run mypy src tests && uv run pytest -q && uv build` → 364 passed; laptop wall 1:43 (pytest 100.9 s) |
+| 2 | Gate at the final head is green | #14 | PASS | same commands at the commit before this file was added → 453 passed; laptop wall 2:32 (pytest 2:30) |
+| 3 | CI runs the gate on CPython 3.12 and 3.13 | #5 | PASS | run 34011484455: `verify (3.12)` 4m5s, `verify (3.13)` 3m49s, both green |
+| 4 | The example workflow's pin equals the reviewed pin STATUS names | #7 | PASS | `uv run pytest -q tests/test_docs_identity.py` → 3 passed; `grep -n "Nemisis@" .github/examples/crashcheck.yml` → `4db42137…`; the same SHA on STATUS's "reviewed action pin" line |
+| 5 | README's init → accept → check runs on a real git repo through the CLI, digest parsed from stdout | #8 | PASS | `uv run pytest -q tests/test_point_at_your_code.py` → 1 passed (exit 0 `FIX_PROVEN…` on the fix branch, exit 1 `PATCH_FAILED_STILL_REPRODUCES` on the rewrite) |
+| 6 | `uv tool install "git+https://github.com/Alex-lop/Nemisis@main"` works | – | PASS | installed in 3.9 s into a scratch tool dir; `nemisis doctor --mode local` → READY; `nemisis check … --candidate fixture:sqlite-credit-v1/mark-first` → `PATCH_FAILED_INVARIANT_BROKEN` at engine `99ef8ade…` |
+| 7 | Every packaged credit tree keeps its verdict at the final engine | #14 | PASS | `uv run pytest -q tests/test_verdict_paths.py -k packaged_zoo` → 3 passed; `tests/test_crashcheck.py` hero → `PATCH_FAILED_STILL_REPRODUCES`; atomic → `FIX_PROVEN…` |
+| 8 | The sweep still catches `mark-first` | #14 | PASS | `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/mark-first` → `PATCH_FAILED_INVARIANT_BROKEN`, "commit 1 of 2 (mark_processed)", exit 1 |
+| 9 | Attribution refuses a write around the store | #13 | PASS | `--candidate fixture:sqlite-credit-v1/shadow-table` → `EVIDENCE_INCOMPLETE`, integrity `INVALID`, "the schema changed (a table, index, or trigger this scenario did not seed)", exit 2 |
+| 10 | Eleven hidden-flag shapes from two hostile reviews are refused | #13 | PASS | `uv run pytest -q tests/test_verdict_paths.py -k "hidden_from_the_probes or shadow_table or other_account or second_hostile_review or scratch_tree or schedule"` → 21 passed (table, three header fields, rowid, free pages, `../` and `../../..` files, empty dir, `~`, `TMPDIR`, `__pycache__`, tree dir, mode bits, deleted-on-exit, re-pointed row, renamed table, split schedule, BLOB) |
+| 11 | The raw-SQL judge handler gets a remedy, not a trap | #9 | PASS | `--candidate fixture:sqlite-credit-v1/raw-sql` → `EVIDENCE_INCOMPLETE`, summary names `store.credit_and_mark(account_id, event_id, amount_cents)` and `docs/PRODUCT.md#the-store-api`, exit 2; CI smokes it from the wheel |
+| 12 | The Scenario seam changed no behavior | #10 | PASS | `f1_equivalence.py` (pasted below): six trees, verdict/exit/summary/axes/hunt/capsule/manifest/repro dir all IDENTICAL between `3a02ed7` and `cfcdea4` |
+| 13 | Second scenario: buggy / atomic verdicts | #11 | PASS | `--base fixture:sqlite-inventory-v1/buggy --candidate …/misleading-green` → `PATCH_FAILED_STILL_REPRODUCES` (6 units), exit 1; `…/atomic` → `FIX_PROVEN…` (8 units), exit 0; `…/mark-first` → `PATCH_FAILED_INVARIANT_BROKEN` (10 units, marked), exit 1; base replay → `BUG_REPRODUCED` |
+| 14 | Second scenario is not a renamed copy | #11 | PASS | seed 10 not 0, effect −2 not +2500, predicate on `reservations`/`reserved_orders`; `uv run pytest -q tests/test_inventory_scenario.py` → 9 passed |
+| 15 | Generated handlers vs oracle: normal suite | #12 | PASS | `uv run pytest -q tests/test_redteam.py` → 30 passed (10 generated cases, 0 disagreements) |
+| 16 | Generated handlers vs oracle: local sweeps | #12/#13 | PASS | 60 cases seed 11 → 0 disagreements (after one oracle bug, case 44, was fixed and pinned); 300 cases seed 2026 at `5c7590b` → 0 disagreements (8:39 under load); 300 cases at the final engine `14cd428` → 0 disagreements (6:04) |
+| 17 | Hostile review counts | #9–#13 | PASS | #9+#10: 13 handlers, 23 findings, 20 confirmed (5 false passes → #13); #11: 21 handlers, 16 findings, 13 confirmed (mkdir flag, table flag, `user_version`, parent-directory file, 9 wording/validator items) → all in #13; #13: 7 handlers, 15 findings, 12 confirmed (journal-mode bits, rowid, free pages, schema cookie, deleted-on-exit file, `__pycache__`, tree directory, mode bits, `-shm` name, `../../..`, BLOB TypeError, prose) → 10 closed in #13's second commit, 2 named as the boundary |
+| 18 | README H1 equals the proven level | #14 | PASS | H1: "CrashCheck proves an AI patch survives a real crash, not just that its tests pass." (unchanged: every handler shape a judge or two hostile reviews could write either fails for its real reason or is refused with the reason named); rows 7–10 are the proof |
+| 19 | `LIVE` receipt | – | FAIL | `printenv NEBIUS_API_KEY \| wc -c` → 0; nothing is `LIVE`; `BLOCKED` stays |
+| 20 | GitHub Pages public URL | #6 | UNKNOWN | Pages is not enabled (`gh api repos/Alex-lop/Nemisis/pages` → 404); the workflow is green and skips deploy until it is |
+| 21 | Hero regenerated at the final engine | #14 | PASS | `uv run pytest -q tests/test_static_hero.py` → 2 passed on the strict branch (engine digest equal); identities in STATUS |
+| 22 | pytest-xdist | – | not done, by rule | the laptop gate was 1:43 < 4 min at the start (2:32 (pytest 2:30) at the end after +89 tests; still under) |
 
-## Decisions I made for you
+## Explicit negatives
+- **This report is late.** The reviews ran hours longer than the code; the engine fix they produced (#13) was worth it. Everything above is pushed; nothing was rushed past its gate.
+- **Two channels stay outside local mode's sight**, named in `docs/SECURITY.md`: a flag the store's own next commit overwrites (file mtime, WAL bytes) and a flag at the `-wal`/`-shm` names. In-process instrumentation attributes what it can read; the docs now list exactly what it reads.
+- **#13's second commit was not re-reviewed by a third hostile round** (time); its tests pin every shape the second round found.
+- **One flaky observation, not hidden.** While recording the pytest still with 65 MB of memory free (the first recording was killed by the OS for memory), `tests/test_inventory_scenario.py::test_the_hero_story_holds_for_a_decrement` came back `EVIDENCE_INCOMPLETE` instead of `PATCH_FAILED_STILL_REPRODUCES` once. Three solo reruns and the full gate afterwards passed (453/453); the still was re-recorded. The likely path is the worker's 10 s hello timeout under memory starvation; it is unchanged and unwidened. Row 2 stands on the gate, not on the still.
+- No `LIVE` anything: `NEBIUS_API_KEY` is absent on this machine (0 bytes). `BLOCKED` stays; Stage A is one command away.
+- ConTree transport (K): not started; E–H took the night and the hostile review produced an engine fix that was worth more.
+- Pages: staged, not enabled, no URL claimed.
+- The generator covers the credit scenario only; the inventory grammar is a table away.
+- Durable state by absolute path elsewhere on the machine (`/var/tmp/x`) is still invisible and documented.
+- A first 300-case sweep was invalid: I removed a worktree under it mid-run. The reported sweeps are reruns.
+- The imgbot PR #3 is closed; PR #2 was already closed before tonight (salvage below).
+- xdist not added (threshold not met); a parallel run would multiply concurrent kill worlds under a fixed 10 s IPC timeout.
 
-- **No package or repo rename.** Too invasive for one night (install URL, action pin, `.nemisis/`
-  paths). I removed the "spelling is intentional" sentence. Recipe: `git mv src/nemisis
-  src/nemesis`; `sed -i '' 's/nemisis/nemesis/g; s/Nemisis/Nemesis/g'` over `src tests docs
-  pyproject.toml action.yml .github README.md`; rename the `.nemisis` paths in `crashcheck.py`
-  (`CONFIG_PATH`, `AUTHOR_RECEIPTS_DIR`, `_IGNORED`) and `agent_patch.py`; regenerate hero and
-  benchmark (`scratchpad/regen.sh` was my script; the steps are in `docs/BENCHMARK.md`); rename the
-  GitHub repo (old URL redirects). Half a day with the gate.
-- **GitHub description and 10 topics changed** via `gh repo edit`. Revert with the same command.
-- **The Nemotron authorship receipt is written to your `.nemisis/agent-patches/<tree digest>.json`**,
-  not into the candidate tree, and `check` attaches it only when the bound handler's module digest
-  matches. Anything a pull request carries about its own author is ignored.
-- **Files written beside the database now forfeit the verdict**, including an innocent audit log.
-  The tool cannot tell a log from a dedup journal, so it says it cannot judge either. If you want
-  logs allowed, the check is `_require_only_the_store_wrote` in `sqlite_credit.py`; I would not.
-- **Kept five worlds.** They mean unanimity or nothing; a nondeterministic handler is reported as a
-  split. Documented instead of shrunk.
-- **Kept `MinimizationReceipt` field names** in JSON; only prose, CLI, and report say "no-crash
-  control". Renaming fields is mechanical.
-- **A handler that never credits stays `EVIDENCE_INCOMPLETE`** (the crash test cannot run) with the
-  no-crash money reported in the summary. One verifier argued it should be a failing verdict; I
-  kept "conclusive requires completed" intact. Your call.
-- **Hero test re-validates committed evidence with live models only when the engine digest
-  matches**; otherwise structural checks. Without this every model change forced a two-commit regen.
-- **Two local commits were red when first made and were amended before push** (a gate script bug
-  swallowed a failing exit code twice, then fixed). Nothing on the remote was ever rewritten.
-- **The imgbot PR #3** is untouched; it now conflicts with the re-recorded PNGs. Close it.
+## Decisions made for you
+- **Message-only for raw SQL (E option 1), not a `store.transaction()` primitive.** A raw-SQL surface on the store's database widens the trust boundary for no gain; `credit_and_mark` already is the one-line atomic form. Revert: none needed; to add the primitive, extend `StoreBase` and `Scenario.apply`.
+- **Receipts renamed generically** (`StateSnapshot.subject_total`…, `effect_delta`, capsule `event`). The old hero JSON no longer validates against the strict models; it was regenerated. Revert: `git revert 3ece6b3` and every commit after it.
+- **`sqlite_credit.py` renamed to `sqlite_runner.py`, runner id `sqlite-runner-v2`.** Old capsules say `sqlite-credit-runner-v1` and are refused with "run check again". Revert: `git mv` back and restore the two constants.
+- **CLI infers the scenario from a fixture base ref**; an explicit mismatch is refused. Revert: set the three `--scenario` defaults back to `sqlite-credit-v1`.
+- **Each world is a directory with `HOME` and `TMPDIR` inside it**, and anything in it but the database forfeits the verdict (files and empty directories). Revert: `_make_sandbox`/`_require_only_the_store_wrote` in `sqlite_runner.py`.
+- **`shadow-table` joins the zoo** as the packaged false pass of the night; fifteen sibling shapes are tests, not fixtures.
+- **PR #3 closed** (captures are regenerated from tapes at every engine change). Revert: reopen.
+- **Two attribution channels are documented, not claimed** (a flag the store's next commit overwrites; the sidecar names). Revert: none, it is prose; closing them means reading the sidecars between store commits, which DECISIONS leaves for a day with a reason.
+- **Two PR bodies name a follow-up pin bump** (see hands).
 
-## What I tried that did not work
+## Needs your hands
+1. Merge in the order above, each with "delete branch".
+2. `gh pr edit … --base main` is NOT needed: deleting each head branch retargets the next PR.
+3. After the last merge: set the action pin in `.github/examples/crashcheck.yml` and STATUS's "reviewed action pin" to the new `main` SHA (one line each; `tests/test_docs_identity.py` refuses drift).
+4. Settings → Pages → Build and deployment → Source: GitHub Actions; then Actions → Pages → Run workflow. Only then is there a URL.
+5. `set -a; source .env; set +a` with `NEBIUS_API_KEY`, then `docs/LIVE_SETUP.md` Stage A2b (`propose-patch` + `check`) and A2 (`init --nemotron`). Commit the receipts.
+6. Actions → Nightly red team → Run workflow (300 cases) once, to see it green on GitHub's Linux.
+7. On a quiet laptop: `uv run nemisis benchmark --output benchmarks/results/crashcheck-v1.json` and commit; tonight's timings were taken under load and BENCHMARK says so.
 
-- Finding the "Nemisis" image: not in the repo, any branch, history, `~/Downloads`, `~/Desktop`,
-  or Spotlight. I did not substitute anything. The README has no logo.
-- A generic scenario seam. Mapped, not built. Every receipt validator, capsule field, summary, the
-  report, the benchmark, and the viewer assume credits; doing it honestly is the next half day.
+## Alex's ten-minute grading pass
+1. `for n in 5 6 7 8 9 10 11 12 13 14; do gh pr view $n --json headRefOid,title -q '.headRefOid+" "+.title'; gh pr checks $n; done` — every head green.
+2. `git fetch origin && git checkout overnight2/docs-and-evidence && uv sync --frozen --dev && uv run pytest -q` → 453 passed (2:30 on this laptop).
+3. `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/mark-first` → `PATCH_FAILED_INVARIANT_BROKEN`, exit 1.
+4. `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/raw-sql` → `EVIDENCE_INCOMPLETE` and the sentence with `store.credit_and_mark(...)`, exit 2.
+5. `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/shadow-table` → `EVIDENCE_INCOMPLETE`, "the schema changed", exit 2. This one was `FIX_PROVEN` at 03:00.
+6. `uv run nemisis check --base fixture:sqlite-inventory-v1/buggy --candidate fixture:sqlite-inventory-v1/misleading-green` → `timeline: 8 units durable -> SIGKILL -> fresh worker -> 6 units`, exit 1.
+7. `open .nemisis/runs/$(ls -t .nemisis/runs | head -1)/report.html` — "Expected stock after one delivery: 8 units" vs "6 units".
+8. `uv run nemisis redteam --cases 30 --seed 3 --out ./redteam` → "0 disagreements", exit 0.
+9. `git diff 4db4213..overnight2/docs-and-evidence -- src | grep -nE "^\+.*(sleep|xfail|skip\(|timeout=|LIVE)"` → exactly two added lines, both `sqlite3.connect(…, timeout=5)` on read-only probe connections; no sleep, no xfail, no skip, no relabeling.
+10. Read the README H1, then row 9 and row 13 of the ledger.
 
-## What is still weak
-
-- **Nothing is `LIVE`.** `docs/LIVE_SETUP.md` Stage A2b (`propose-patch`) is the exact fix and the
-  best demo beat.
-- **The AST allowlist for model-written modules is a blocklist plus an underscore rule.** It held
-  against a hostile reviewer after the fix, but a sandbox (ConTree) is the real answer for running
-  model-written code, and the docs say so.
-- **In-process instrumentation has a floor.** A handler can always detect it is inside CrashCheck
-  (the store object is in its hands) and behave; a detached child that writes after the final probe
-  still passes. Both documented; ConTree is the answer.
-- **Non-store durable state elsewhere on disk** (not beside the database) is invisible; documented.
-- **The textbook atomic fix as one direct-SQL transaction** gets `EVIDENCE_INCOMPLETE` with a clear
-  message, not a pass. A judge who writes their own SQL sees this in minute one.
-- **One scenario.** See above.
-
-## First thing to do
-
-1. `git log --oneline origin/main..overnight/hardening`, then the README quickstart and
-   `--candidate fixture:sqlite-credit-v1/mark-first`. Two minutes.
-2. If it reads right, open a PR from `overnight/hardening` or fast-forward `main`; close imgbot #3.
-3. Get a Token Factory key and run Stage A2b. That single receipt turns the weakest dismissal into
-   the strongest beat.
+## What I would do next
+1. Put the attribution ops into the generator's grammar (extra table, pragma, `..` file, `~` file) and add an inventory grammar; then the nightly sweep covers the shapes that fooled this engine.
+2. Run Stage A2b with a key: the `LIVE` Nemotron patch is the demo beat and the last dismissal left.
+3. The ConTree transport for CrashCheck (K), designed first in DECISIONS: spawn, subprocess result, process-group kill inside a Sandbox, and what the kernel cannot get from the provider.
