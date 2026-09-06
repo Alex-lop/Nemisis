@@ -144,6 +144,22 @@ def _parser() -> argparse.ArgumentParser:
     )
     export.add_argument("out", type=Path, help="new directory for the tree")
 
+    redteam = commands.add_parser(
+        "redteam",
+        help="generate handlers from a grammar, run check on each, compare with an oracle",
+    )
+    redteam.add_argument("--cases", type=int, default=10, help="how many handlers to generate")
+    redteam.add_argument(
+        "--seed", type=int, default=7, help="generator seed; same seed, same handlers"
+    )
+    redteam.add_argument(
+        "--out",
+        type=Path,
+        default=Path(".nemisis/redteam"),
+        help="new directory for handlers and evidence",
+    )
+    redteam.add_argument("--json", action="store_true")
+
     doctor_command = commands.add_parser("doctor", help="check CrashCheck prerequisites")
     doctor_command.add_argument(
         "--mode",
@@ -549,6 +565,56 @@ def main() -> None:
                 f"next: nemisis check --base {scenario.buggy_ref} --candidate {args.out} "
                 "--mode local"
             )
+            return
+
+        if args.command == "redteam":
+            from nemisis.redteam import run as run_redteam
+
+            if args.out.exists():
+                _fail(f"output directory already exists: {args.out}", crashcheck=False)
+            cases = run_redteam(args.cases, args.seed, args.out)
+            disagreements = [case for case in cases if not case.agrees]
+            if args.json:
+                print(
+                    canonical_json(
+                        {
+                            "cases": [
+                                {
+                                    "agrees": case.agrees,
+                                    "expected": case.expected.value,
+                                    "index": case.index,
+                                    "ops": [op.value for op in case.ops],
+                                    "reason": case.reason,
+                                    "summary": case.summary,
+                                    "verdict": case.verdict,
+                                }
+                                for case in cases
+                            ],
+                            "disagreements": len(disagreements),
+                            "seed": args.seed,
+                        }
+                    ).decode()
+                )
+            else:
+                print(f"{'case':<5} {'ops':<36} {'oracle':<32} {'checker':<32} agree")
+                for case in cases:
+                    ops = ", ".join(op.value for op in case.ops) or "(empty)"
+                    print(
+                        f"{case.index:<5} {ops:<36} {case.expected.value:<32} "
+                        f"{case.verdict:<32} {'yes' if case.agrees else 'NO'}"
+                    )
+                print(
+                    f"generated {len(cases)} handlers from seed {args.seed}; "
+                    f"{len(disagreements)} disagreement{'s' if len(disagreements) != 1 else ''}"
+                )
+                for case in disagreements:
+                    print(
+                        f"  case {case.index}: oracle says {case.reason}; checker said: "
+                        f"{case.summary}"
+                    )
+                print(f"handlers and evidence: {args.out.resolve()}")
+            if disagreements:
+                raise SystemExit(1)
             return
 
         if args.command == "doctor":
