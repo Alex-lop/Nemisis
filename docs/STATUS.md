@@ -85,8 +85,7 @@ benchmark and manifest pass their runtime bindings. This is `LOCAL` / `FIXTURE` 
 provider run.
 
 ## Verified gates
-
-- locked dependency sync, formatter, Ruff, mypy, 435 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 412 tests, and package build: pass locally on
   Python 3.12.13 (the suite also passed on 3.13 during development);
 - exact engine CI for the committed hero: [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355);
 - exact measured-source CI: [successful run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096);
