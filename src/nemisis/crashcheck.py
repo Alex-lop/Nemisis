@@ -87,9 +87,12 @@ _ENGINE_RESOURCES = (
     "scenario.py",
     "scenarios/__init__.py",
     "scenarios/sqlite_credit_v1.py",
+    "scenarios/sqlite_inventory_v1.py",
     "sqlite_runner.py",
     "fixtures/sqlite_credit_v1/contract.json",
     "fixtures/sqlite_credit_v1/event.json",
+    "fixtures/sqlite_inventory_v1/contract.json",
+    "fixtures/sqlite_inventory_v1/event.json",
 )
 _HYPOTHESES = (
     (1, "effect-commit-v1", FaultBoundary.EFFECT_COMMIT, 1),
@@ -656,6 +659,13 @@ def _contract_for_check(scenario: str | Path | RetryContract, base: _Source) -> 
     elif str(scenario) in SCENARIOS:
         registered = SCENARIOS[str(scenario)]
         audited = _audited_contract(registered)
+        if base.ref.startswith("fixture:") and not base.ref.startswith(
+            f"fixture:{registered.scenario_id}/"
+        ):
+            raise CrashCheckError(
+                f"base {base.ref} belongs to another scenario; pass --scenario "
+                f"{base.ref.removeprefix('fixture:').partition('/')[0]}"
+            )
         if (
             base.ref == registered.buggy_ref
             and base.tree_digest == audited.originating_base_tree_digest

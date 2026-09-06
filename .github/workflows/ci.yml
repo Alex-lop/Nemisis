@@ -113,3 +113,16 @@ jobs:
             echo "Expected raw-sql to exit 2 and name the store call, got $raw_status." >&2
             exit 2
           fi
+          # The second scenario: a decrement, its own seed and predicate, the same kernel.
+          set +e
+          uv tool run --from "${wheels[0]}" nemisis check \
+            --base fixture:sqlite-inventory-v1/buggy \
+            --candidate fixture:sqlite-inventory-v1/mark-first \
+            --mode local \
+            --output-dir "$smoke_root/inventory" | tee "$smoke_root/inventory.txt"
+          inventory_status=$?
+          set -e
+          if [[ "$inventory_status" -ne 1 ]] || ! grep -q "10 units on hand instead of 8 units" "$smoke_root/inventory.txt"; then
+            echo "Expected inventory mark-first to exit 1 with the lost reservation named, got $inventory_status." >&2
+            exit 2
+          fi

@@ -1,0 +1,1 @@
+"""SQLite inventory reservation application."""

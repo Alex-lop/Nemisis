@@ -190,3 +190,15 @@ its scalar, and the CLI and report ask the scenario how to print its quantity. T
 renamed `sqlite_runner.py` (runner id `sqlite-runner-v2`) because it no longer knows about credits.
 The committed hero was recorded under the old shape; `tests/test_static_hero.py` checks it
 structurally until it is regenerated at this engine.
+
+## The second scenario is a decrement, not a renamed credit (2026-09-06)
+
+`sqlite-inventory-v1` reserves two units of a SKU for an order: stock 10 becomes 8, the buggy
+handler is check, decrement, mark, a kill after the decrement and a retry oversell to 6, and
+exactly once is one reservation row, one marker, eight on hand. It has its own seed (not zero),
+its own effect direction (the subject goes down), and its own predicate, which is what forced the
+receipts generic. It is the same bug the original differential verifier's `idempotency-retry`
+fixture leaves `UNRESOLVED`, so the row the old product could not decide is the second thing the
+new product proves. It ships with buggy, misleading-green, atomic, and mark-first trees, its issue
+text, a README row, and a wheel smoke in CI. The CLI infers the scenario from a fixture base ref;
+an explicit mismatch is refused with the flag to pass.
