@@ -4,7 +4,7 @@ Updated 2026-09-05 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
 
 ## Exact identities
 
-Committed hero evidence (regenerated 2026-09-06 at the current engine):
+Committed hero evidence (regenerated 2026-09-06 at engine `14cd428`):
 
 - measured clean source: `14cd428bc01d4da44bf05758afb1cb69188479f5`
 - evidence/viewer publication: the commit that follows it on `overnight2/docs-and-evidence`
@@ -16,7 +16,7 @@ Committed hero evidence (regenerated 2026-09-06 at the current engine):
 
 Current tree:
 
-- engine code digest: `39833a5640c9053727c7832d6b72ddb14b4684d21b04daa6043c4e32c182e53b`
+- engine code digest: `228430389fa7292570b4df0772ed0fdb9ee915a6e89fe49b7dcf9aa3ac588831`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)

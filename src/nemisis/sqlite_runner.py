@@ -24,7 +24,7 @@ import sys
 import threading
 import uuid
 from collections.abc import Callable, Mapping
-from contextlib import suppress
+from contextlib import closing, suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from importlib.metadata import version
@@ -804,7 +804,9 @@ class _Ledger:
 def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -> dict[str, object]:
     """Everything durable in the file: the schema, the header pragmas, every row of every table."""
     try:
-        with _read_only(path) as connection:
+        # ``closing``: a sqlite3 connection's own context manager ends the transaction and
+        # leaves the handle open, and an open reader holds the WAL lock the worker needs.
+        with closing(_read_only(path)) as connection:
             schema = [
                 list(row)
                 for row in connection.execute(

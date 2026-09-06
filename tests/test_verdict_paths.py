@@ -1133,7 +1133,8 @@ def apply_credit(store, event):
         connection.execute("PRAGMA journal_mode=DELETE")
     finally:
         connection.close()
-    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
 """
 
 ROWID_FLAG = """import sqlite3
@@ -1278,9 +1279,6 @@ def apply_credit(store, event):
 @pytest.mark.parametrize(
     ("name", "source", "fragment"),
     [
-        # The seed now stays in WAL, so flipping the mode either shows in the header or breaks
-        # the store's own next connection; both are refusals, neither is a verdict.
-        ("journal-mode", JOURNAL_MODE_FLAG, "did not complete"),
         ("rowid", ROWID_FLAG, "rows that belong to other accounts or events changed"),
         ("freelist", FREELIST_FLAG, "the database header changed"),
         ("schema-version", SCHEMA_VERSION_FLAG, "the database header changed"),
@@ -1307,6 +1305,28 @@ def test_side_channels_from_the_second_hostile_review_forfeit_the_verdict(
     assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
     assert fragment in result.summary, result.summary
     assert cli._exit_code(result.verdict) == 2
+
+
+def test_a_journal_mode_flag_does_not_survive_the_store_and_the_duplicate_shows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hostile review: a dedup flag kept in the journal-mode header bits. The seed leaves the
+    file in WAL and the store's own connection puts it back in WAL on every commit, so the flag is
+    gone by the time a redelivery looks for it and the credit lands twice. That is the patch's
+    real failure, and it is the same on every machine: an earlier engine leaked a read-only probe
+    connection, which made the handler's own PRAGMA fail with "database is locked" in whichever
+    delivery lost the race, and the case was pinned to that accident."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "journal-mode", JOURNAL_MODE_FLAG)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES, result.summary
+    assert "duplicate" in result.summary, result.summary
+    assert result.integrity_status.value == "VALID"
+    assert all(a.failure_detail is None for a in result.attempts), [
+        a.failure_detail for a in result.attempts
+    ]
 
 
 def test_a_flag_written_into_the_scratch_tree_stops_the_run_without_a_verdict(
