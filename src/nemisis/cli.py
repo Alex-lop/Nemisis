@@ -158,6 +158,11 @@ def _parser() -> argparse.ArgumentParser:
         default=Path(".nemisis/redteam"),
         help="new directory for handlers and evidence",
     )
+    redteam.add_argument(
+        "--scenario",
+        default="sqlite-credit-v1",
+        help="which audited scenario's vocabulary the grammar speaks",
+    )
     redteam.add_argument("--json", action="store_true")
 
     doctor_command = commands.add_parser("doctor", help="check CrashCheck prerequisites")
@@ -572,7 +577,10 @@ def main() -> None:
 
             if args.out.exists():
                 _fail(f"output directory already exists: {args.out}", crashcheck=False)
-            cases = run_redteam(args.cases, args.seed, args.out)
+            try:
+                cases = run_redteam(args.cases, args.seed, args.out, args.scenario)
+            except ValueError as error:
+                _fail(str(error), crashcheck=False)
             disagreements = [case for case in cases if not case.agrees]
             if args.json:
                 print(
@@ -582,6 +590,7 @@ def main() -> None:
                                 {
                                     "agrees": case.agrees,
                                     "expected": case.expected.value,
+                                    "helper": case.helper,
                                     "index": case.index,
                                     "ops": [op.value for op in case.ops],
                                     "reason": case.reason,
@@ -591,16 +600,19 @@ def main() -> None:
                                 for case in cases
                             ],
                             "disagreements": len(disagreements),
+                            "scenario": args.scenario,
                             "seed": args.seed,
                         }
                     ).decode()
                 )
             else:
-                print(f"{'case':<5} {'ops':<36} {'oracle':<32} {'checker':<32} agree")
+                print(f"{'case':<5} {'ops':<48} {'oracle':<32} {'checker':<32} agree")
                 for case in cases:
                     ops = ", ".join(op.value for op in case.ops) or "(empty)"
+                    if case.helper:
+                        ops += " (helper)"
                     print(
-                        f"{case.index:<5} {ops:<36} {case.expected.value:<32} "
+                        f"{case.index:<5} {ops:<48} {case.expected.value:<32} "
                         f"{case.verdict:<32} {'yes' if case.agrees else 'NO'}"
                     )
                 print(
