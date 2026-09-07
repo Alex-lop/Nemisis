@@ -24,6 +24,8 @@ plumbing. Unreleased until a `v0.2.0` tag is pushed.
   the relative layout it was recorded against.
 - A release workflow on `v*` tags: one build, attached to a GitHub release with this file's
   section as its notes, and published to PyPI through a Trusted Publisher with no API token.
+- An on-demand `evidence` workflow that reruns the hero check and the benchmark on a Linux runner
+  and prints every digest, so the Darwin-measured numbers can be compared against another machine.
 
 ### Changed
 
