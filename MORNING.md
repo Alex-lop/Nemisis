@@ -15,9 +15,9 @@ Eight PRs, `main` untouched, in merge order (each stacked on the one above it):
 | #17 | feat(check): init refuses what check would refuse; a remedy for every refusal | `466a065` | [34090021960](https://github.com/Alex-lop/Nemisis/actions/runs/34090021960) green | 3 |
 | #18 | docs(seam): what a third scenario would need the seam to say, with the limit pinned | `cc89e8a` | [34091409390](https://github.com/Alex-lop/Nemisis/actions/runs/34091409390) green | 4 |
 | #19 | fix(kernel): close the four root causes the third hostile review found | `2e8aee6` | [34093890874](https://github.com/Alex-lop/Nemisis/actions/runs/34093890874) green | 5 |
-| #20 | ci+release: CPython 3.14, a Linux hero on demand, a tag-driven release, a Dockerfile | `8382c38` | [34094345512](https://github.com/Alex-lop/Nemisis/actions/runs/34094345512), running when this was written | 6 |
-| #21 | docs(story): demo scripts, PRODUCT, and the site brought to the engine that exists | `c339aa9` | [34094580768](https://github.com/Alex-lop/Nemisis/actions/runs/34094580768), running when this was written | 7 |
-| #22 | docs+evidence: hero at the final engine, the design entries, this report | tip of `overnight3/morning` (this file is in it) | [branch runs](https://github.com/Alex-lop/Nemisis/actions?query=branch%3Aovernight3%2Fmorning) | 8 |
+| #20 | ci+release: CPython 3.14, a Linux hero on demand, a tag-driven release, a Dockerfile | `8382c38` | [34094345512](https://github.com/Alex-lop/Nemisis/actions/runs/34094345512) green | 6 |
+| #21 | docs(story): demo scripts, PRODUCT, and the site brought to the engine that exists | `c339aa9` | [34094580768](https://github.com/Alex-lop/Nemisis/actions/runs/34094580768) green | 7 |
+| #22 | docs+evidence: hero at the final engine, the design entries, this report | tip of `overnight3/morning` (this file is in it) | [34094921411](https://github.com/Alex-lop/Nemisis/actions/runs/34094921411) green on `b126610`, the commit before this line | 8 |
 
 Merge each with "delete branch"; GitHub retargets the next PR by itself. Every PR body is a
 mini-ledger. The subagent branches (#20, #21) carry a merge commit from the PR below them rather
