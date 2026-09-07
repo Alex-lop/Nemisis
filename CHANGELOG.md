@@ -26,6 +26,8 @@ plumbing. Unreleased until a `v0.2.0` tag is pushed.
   section as its notes, and published to PyPI through a Trusted Publisher with no API token.
 - An on-demand `evidence` workflow that reruns the hero check and the benchmark on a Linux runner
   and prints every digest, so the Darwin-measured numbers can be compared against another machine.
+- A `Dockerfile` and `.dockerignore`, so a judge with Docker and no uv can build the image and run
+  one check without touching their own machine.
 
 ### Changed
 
