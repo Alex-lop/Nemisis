@@ -7,8 +7,13 @@
 # fetches (`runs/<id>/manifest.json`, `../../../benchmarks/results/crashcheck-v1.json`) resolve.
 # The site links to it at docs/assets/crashcheck-hero/.
 #
-# Nothing deploys until GitHub Pages is enabled for the repository with "Source: GitHub Actions"
-# (Settings -> Pages). Until then the workflow reports that and exits green without publishing.
+# Nothing deploys until the repository's Pages source is GitHub Actions. The gate reads
+# `build_type` from `repos/<owner>/<repo>/pages` and publishes only when it reads "workflow".
+# Asking whether that endpoint merely answers is not the same test: the legacy "deploy from a
+# branch" source answers it too (`build_type: "legacy"`), so that gate would let this workflow
+# and the branch publisher both write the same URL and race over it. Until the source is switched
+# (Settings -> Pages -> Build and deployment -> Source: GitHub Actions) the workflow reports the
+# source it found and exits green without publishing.
 name: Pages
 
 on:
@@ -42,22 +47,26 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Check whether GitHub Pages is enabled
+      - name: Check whether the Pages source is this workflow
         id: pages
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh api "repos/${GITHUB_REPOSITORY}/pages" >/dev/null 2>&1; then
+          build_type="$(gh api "repos/${GITHUB_REPOSITORY}/pages" --jq '.build_type' 2>/dev/null || true)"
+          if [[ "$build_type" == "workflow" ]]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
             {
               echo "## Pages"
               echo
-              echo "GitHub Pages is not enabled for this repository, so nothing was published."
-              echo "Enable it under Settings -> Pages -> Build and deployment -> Source: GitHub Actions,"
-              echo "then re-run this workflow."
+              echo "Nothing was published: the repository's Pages source is" \
+                "\`${build_type:-not enabled}\`, not \`workflow\`."
+              echo
+              echo "While the source is a branch, that branch is the publisher and this workflow"
+              echo "must stay out of the way. Switch it under Settings -> Pages -> Build and"
+              echo "deployment -> Source: GitHub Actions, then re-run this workflow."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Stage the site and the viewer with the relative layout it was recorded against

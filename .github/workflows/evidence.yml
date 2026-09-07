@@ -1,0 +1,91 @@
+# Regenerates the hero counterexample and the benchmark on a Linux runner, on demand.
+#
+# Every digest in docs/ was measured on the author's Darwin/arm64 machine. This job reruns the
+# same check and the same benchmark on ubuntu-latest and prints what that environment produces:
+# the engine code digest does not depend on the environment and must match the committed one,
+# while the capsule and result digests are bound to the interpreter and SQLite build through the
+# runner environment digest and are expected to differ. Nothing is written back to the repository;
+# the whole directory is uploaded as an artifact so the numbers can be checked against it.
+name: Evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hero:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.29"
+          python-version: "3.12"
+      - run: uv sync --frozen --dev
+      - name: Run the hero check and the benchmark, and print every digest
+        shell: bash
+        run: |
+          hero="$RUNNER_TEMP/hero"
+          mkdir -p "$hero"
+
+          set +e
+          uv run nemisis check \
+            --base fixture:sqlite-credit-v1/buggy \
+            --candidate fixture:sqlite-credit-v1/misleading-green \
+            --corrected fixture:sqlite-credit-v1/atomic \
+            --mode local \
+            --output-dir "$hero" | tee "$hero/check.txt"
+          check_status="${PIPESTATUS[0]}"
+          set -e
+          if [[ "$check_status" -ne 1 ]]; then
+            echo "Expected the misleading-green candidate to exit 1, got $check_status." >&2
+            exit 2
+          fi
+
+          # `benchmark` refuses a dirty execution-critical tree, so this must run on a clean
+          # checkout. Wall-clock timings enter result_digest, so every run prints a new one.
+          uv run nemisis benchmark --output "$hero/crashcheck-v1.json" --json >/dev/null
+
+          manifest="$(find "$hero/runs" -name manifest.json | sort | head -n 1)"
+          benchmark="$hero/crashcheck-v1.json"
+          engine="$(uv run python -c 'from nemisis.crashcheck import engine_code_digest; print(engine_code_digest())')"
+
+          {
+            echo "## Linux hero evidence"
+            echo
+            echo "| Fact | Value |"
+            echo "| --- | --- |"
+            printf '| check exit status | `%s` |\n' "$check_status"
+            printf '| verdict | `%s` |\n' "$(jq -r '.result.verdict' "$manifest")"
+            printf '| engine code digest | `%s` |\n' "$engine"
+            printf '| capsule digest | `%s` |\n' "$(jq -r '.capsule.digest' "$manifest")"
+            printf '| result digest | `%s` |\n' "$(jq -r '.result.digest' "$manifest")"
+            printf '| runner environment digest | `%s` |\n' "$(jq -r '.capsule.environment_digest' "$manifest")"
+            printf '| event digest | `%s` |\n' "$(jq -r '.capsule.event_digest' "$manifest")"
+            echo
+            echo "| Benchmark | Value |"
+            echo "| --- | --- |"
+            printf '| engine code digest | `%s` |\n' "$(jq -r '.engine_code_digest' "$benchmark")"
+            printf '| capsule digest | `%s` |\n' "$(jq -r '.capsule_digest' "$benchmark")"
+            printf '| result digest | `%s` |\n' "$(jq -r '.result_digest' "$benchmark")"
+            printf '| environment digest | `%s` |\n' "$(jq -r '.environment.crashcheck_environment_digest' "$benchmark")"
+            printf '| source commit | `%s` |\n' "$(jq -r '.source_commit' "$benchmark")"
+            echo
+            echo "| Runner | Value |"
+            echo "| --- | --- |"
+            printf '| python --version | `%s` |\n' "$(uv run python --version)"
+            printf '| sqlite3.sqlite_version | `%s` |\n' "$(uv run python -c 'import sqlite3; print(sqlite3.sqlite_version)')"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the whole hero directory
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux-hero-${{ github.run_id }}
+          path: ${{ runner.temp }}/hero
+          if-no-files-found: error
+          retention-days: 90

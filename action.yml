@@ -30,6 +30,15 @@ outputs:
   artifact-path:
     description: Directory containing the manifest, report, and repro capsule.
     value: ${{ steps.prepare.outputs.artifact-path }}
+  verdict:
+    description: The run's verdict, or EVIDENCE_INCOMPLETE when no manifest was written.
+    value: ${{ steps.crashcheck.outputs.verdict }}
+  summary:
+    description: One line naming what the candidate did.
+    value: ${{ steps.crashcheck.outputs.summary }}
+  manifest-path:
+    description: Absolute path to the run manifest, empty when the run wrote none.
+    value: ${{ steps.crashcheck.outputs.manifest-path }}
 
 runs:
   using: composite
@@ -55,6 +64,7 @@ runs:
         echo "artifact-path=$artifact_path" >> "$GITHUB_OUTPUT"
 
     - name: Run CrashCheck
+      id: crashcheck
       shell: bash
       env:
         ARTIFACT_PATH: ${{ steps.prepare.outputs.artifact-path }}
@@ -72,6 +82,12 @@ runs:
             echo
             printf '    EVIDENCE_INCOMPLETE — %s\n' "$1"
           } >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "verdict=EVIDENCE_INCOMPLETE"
+            echo "summary=$1"
+            echo "manifest-path="
+          } >> "$GITHUB_OUTPUT"
+          printf '::error::EVIDENCE_INCOMPLETE: %s\n' "$1"
           exit 2
         }
 
@@ -134,4 +150,42 @@ runs:
         if [[ "$status" != 0 && "$status" != 1 && "$status" != 2 ]]; then
           status=2
         fi
+
+        # The verdict and the summary belong to the run, not to the exit code, so a caller can
+        # read them without parsing stdout. Both come from the manifest the check just sealed.
+        manifest="$(find "$ARTIFACT_PATH/runs" -name manifest.json 2>/dev/null | sort | head -n 1)"
+        verdict=EVIDENCE_INCOMPLETE
+        summary="The run wrote no manifest."
+        handler=""
+        if [[ -n "$manifest" ]]; then
+          verdict="$(jq -r '.result.verdict // empty' "$manifest" 2>/dev/null || true)"
+          summary="$(jq -j '.result.summary // empty' "$manifest" 2>/dev/null | tr '\n' ' ' || true)"
+          # The candidate's binding is the one its attempts point at; every attempt of a role
+          # shares it, so take the first.
+          handler="$(
+            jq -r '
+              (.result.attempts[]? | select(.role == "candidate") | .binding_digest) as $binding
+              | .result.bindings[]? | select(.digest == $binding) | .handler_path
+            ' "$manifest" 2>/dev/null | head -n 1 || true
+          )"
+          : "${verdict:=EVIDENCE_INCOMPLETE}"
+          : "${summary:=The run manifest carried no summary.}"
+        fi
+        {
+          echo "verdict=$verdict"
+          echo "summary=$summary"
+          echo "manifest-path=$manifest"
+        } >> "$GITHUB_OUTPUT"
+
+        # One annotation, on the handler file when the manifest names one, so the verdict shows up
+        # in the Files changed view and not only in the log.
+        annotation="::notice"
+        if [[ "$status" != 0 ]]; then
+          annotation="::error"
+        fi
+        if [[ -n "$handler" ]]; then
+          annotation="$annotation file=$handler"
+        fi
+        printf '%s::%s: %s\n' "$annotation" "$verdict" "$summary"
+
         exit "$status"
