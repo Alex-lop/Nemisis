@@ -9,6 +9,12 @@
 name: Evidence
 
 on:
+  # TEMPORARY, removed in the next commit. `workflow_dispatch` can only be dispatched from the
+  # default branch, so this is the only way to prove the job runs before it is merged.
+  push:
+    branches: [overnight3/ci-release]
+    paths:
+      - .github/workflows/evidence.yml
   workflow_dispatch:
 
 permissions:
