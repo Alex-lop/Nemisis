@@ -170,6 +170,12 @@ Commit the accepted `.nemisis/config.json` on the base branch, then drop
 [the example workflow](.github/examples/crashcheck.yml) into `.github/workflows/` to run it on every
 pull request.
 
+Every wall-clock wait in the kernel is one budget, ten seconds re-armed for each phase of each
+world (the worker's hello, reaching the next store commit, finishing the delivery), and its expiry
+is an `EVIDENCE_INCOMPLETE` whose message names the phase, the commits seen so far, and the
+budget. On a slow or loaded machine, `NEMISIS_WORKER_TIMEOUT_SECONDS=30` raises it; no receipt
+depends on the value, and a value outside 1 to 600 is refused rather than clamped.
+
 ## Two scenarios, one kernel
 
 The kernel is written once; a scenario is one object (schema, seed, store, probe, predicate, words).
