@@ -291,3 +291,22 @@ phase, the commits seen so far, the budget, and the knob; a base hunt or confirm
 worlds did not complete says so, and a base that completes exactly once is told to pass the tree
 that still has the bug. The default did not move. A `Soak` workflow repeats the kernel's slow
 tests N times on GitHub's Linux, with the knob as an input, so the next flake is found there.
+
+## The judge's first five minutes (2026-09-07)
+
+`init` drafted a contract for any target string and any base tree; the judge learned that the
+target could not bind only at `check`, after accepting a digest, and a wrong target was refused
+with a sentence that did not say which target the scenario binds. Now `init` binds the audited
+target against the base tree before it writes anything and refuses, in `check`'s own words,
+with the one change that would make it bind: a target other than the scenario's names the one
+to pass; a tree without a top-level `def apply_credit(store, event)` in `app/credits.py` is told
+to add it; a handler with the wrong shape is told the shape. `check` keeps its own anchor
+receipt path for a config that arrived by other means, and that path now carries the same
+remedy. Three refusals that only said what happened say why and what to do: the no-crash
+control reports what the base did with no kill at all (a bug on the plain path is one for an
+ordinary test); the corrected control reports what the known-good tree did and that the
+candidate's verdict does not depend on it; and the eighteen clauses that make five worlds "not
+one observation" each have a sentence, so "Execution completed without one stable supported
+observation" never stands alone. Worker stdout and stderr stay hashed and unpersisted: a
+handler's output could carry a secret into committed evidence, and the test that pins the
+decision was kept.
