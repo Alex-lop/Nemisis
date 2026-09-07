@@ -4,11 +4,20 @@ build-backend = "hatchling.build"
 
 [project]
 name = "nemisis"
-version = "0.1.0"
+version = "0.2.0"
 description = "Deterministic evidence for AI patches and crash/retry counterexamples"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { file = "LICENSE" }
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: POSIX",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Software Development :: Testing",
+]
 dependencies = [
   "contree-client[httpx]==0.3.0",
   "openai>=1,<3",
