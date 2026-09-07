@@ -59,16 +59,22 @@
       <p class="eyebrow">One command</p>
       <h2>One verdict. An exit code CI can block on.</h2>
       <div class="command-grid">
+        <div class="command-out">
         <pre class="terminal" aria-label="Terminal output of nemisis check"><code><span class="prompt">$</span> uv run nemisis check --base fixture:sqlite-credit-v1/buggy \
-    --candidate fixture:sqlite-credit-v1/misleading-green
+    --candidate fixture:sqlite-credit-v1/misleading-green --mode local
 <span class="dim">NEMISIS CRASHCHECK — LOCAL</span>
 execution: COMPLETED
 integrity: VALID
-verdict:   <span class="red">PATCH_FAILED_STILL_REPRODUCES</span>
-summary:   The candidate replayed evt_1042 to a durable +$50 duplicate effect.
-sweep:     killed after each store commit: #1 → $50.00 DUPLICATE_EFFECT
-timeline:  $25.00 durable → SIGKILL → fresh worker → <span class="red">$50.00</span>
+verdict: <span class="red">PATCH_FAILED_STILL_REPRODUCES</span>
+summary: The candidate replayed evt_1042 to a durable +$50 duplicate effect.
+<span class="dim">…</span>
+hypotheses: 2 run -&gt; selected effect-commit (effect-commit-v1)
+<span class="dim">…</span>
+timeline: $25.00 durable -&gt; SIGKILL -&gt; fresh worker -&gt; <span class="red">$50.00</span>
+<span class="dim">…</span>
 <span class="dim">exit code 1</span></code></pre>
+        <p class="terminal-note">Real stdout of that command. Each <code>…</code> stands for lines left out: the capsule, engine and commit digests; the no-crash control; the capsule, manifest and report paths. Nothing else is elided, and a candidate that fails its boundary worlds is never swept, so there is no <code>sweep:</code> line.</p>
+        </div>
         <div class="verdicts">
           <div><b>0</b><span class="mono">FIX_PROVEN_FOR_THIS_CAPSULE</span><p>Every kill point replayed to exactly once.</p></div>
           <div><b>1</b><span class="mono red">PATCH_FAILED</span><p>A crash window still duplicates the effect.</p></div>
