@@ -26,9 +26,12 @@ from nemisis.crash_models import (
     TimelineState,
     WorkerSpawnReceipt,
     WorldRole,
+    classify_final,
 )
+from nemisis.crashcheck import _audited_contract, _seal_capsule
 from nemisis.hashing import canonical_json, sha256_json
 from nemisis.models import TruthLabel
+from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
 
 NOW = datetime(2026, 8, 30, tzinfo=UTC)
 HASHES = tuple(f"{index:x}" * 64 for index in range(10))
@@ -1254,3 +1257,22 @@ def test_result_artifacts_must_be_portable_relative_paths() -> None:
 
     with pytest.raises(ValidationError, match="unsafe path"):
         CrashCheckResult.with_digest(**values)
+
+
+def test_the_four_field_rule_cannot_see_a_second_subject() -> None:
+    """Why a transfer scenario is not honest on this seam (docs/DECISIONS.md, 2026-09-07).
+
+    A naive transfer scenario would make the destination the subject. A handler that credits
+    the destination and never debits the source then presents exactly the exactly-once shape,
+    and the rule has no field in which the missing debit could show. The zero-delta encoding
+    (the conserved sum as the subject) is refused by the capsule itself.
+    """
+    money_from_nothing = StateSnapshot.with_digest(
+        subject_total=2500, event_effect_count=1, event_effect_total=2500, event_marker_count=1
+    )
+    assert classify_final(money_from_nothing, 2500, 0) is CrashObservation.EXACTLY_ONCE
+
+    capsule = _seal_capsule(_audited_contract(CREDIT))
+    fields = {name: value for name, value in capsule.model_dump().items() if name != "digest"}
+    with pytest.raises(ValidationError, match="nonzero effect"):
+        ReproCapsule.with_digest(**{**fields, "effect_delta": 0})

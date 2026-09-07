@@ -1,22 +1,22 @@
 # Status
 
-Updated 2026-09-05 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
+Updated 2026-09-07 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
 
 ## Exact identities
 
-Committed hero evidence (regenerated 2026-09-06 at engine `14cd428`):
+Committed hero evidence (regenerated 2026-09-07 at engine `c339aa9`, the third hostile round's fix):
 
-- measured clean source: `14cd428bc01d4da44bf05758afb1cb69188479f5`
-- evidence/viewer publication: the commit that follows it on `overnight2/docs-and-evidence`
-- engine code digest at that source: `39833a5640c9053727c7832d6b72ddb14b4684d21b04daa6043c4e32c182e53b`
-- capsule digest: `800b4651c63b4f4a091d6366d84bcea65931f52da872e3068fd1bc4ef7db4572`
-- benchmark result digest: `b7a03b92f4bb8cf1a6416b1e88a4ff26d62f74d5fd172607d800c8aab7b96643`
+- measured clean source: `c339aa90f32ec0874b03d51ff8432505596694b2`
+- evidence/viewer publication: the commit that follows it on `overnight3/morning`
+- engine code digest at that source: `29205c5be25169f0ec17faccddd824e2b931ef0efbcaadae23b6f38c7217e94d`
+- capsule digest: `190d62ea98c2884eaeb6f8f30f38bdf0c733e40d186b8cfab8896a691696c0f6`
+- benchmark result digest: `7d0672e42f30a30ee7a8cba2c52970e7fffbc9e154ea70b8aad21e26604d5540`
 - the capsule and benchmark digests are bound to CPython 3.12.13 / SQLite 3.53.1 / Darwin arm64
   through the runner environment digest; only the engine code digest is environment-independent
 
 Current tree:
 
-- engine code digest: `228430389fa7292570b4df0772ed0fdb9ee915a6e89fe49b7dcf9aa3ac588831`
+- engine code digest: `29205c5be25169f0ec17faccddd824e2b931ef0efbcaadae23b6f38c7217e94d`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
@@ -69,7 +69,14 @@ New since 2026-09-05, from `overnight/hardening` and the `overnight2/*` branches
   free-page count, a re-pointed row, a renamed table, files and directories beside, above, under
   `~`, under `TMPDIR`, in the bound tree, deleted on exit). Each is pinned in
   `tests/test_verdict_paths.py`; the table one ships as `fixture:sqlite-credit-v1/shadow-table`.
-  Two channels stay outside local mode's sight and are named in `docs/SECURITY.md`.
+  A third review on 2026-09-07 confirmed thirty-seven more (a header field the probe never read,
+  the reserved header bytes, bytes past the last page, a file flag, an extended attribute on the
+  platform where the guard was inert, the mode and mtime of the world's own directories, HOME
+  removed or replaced, a directory made unlistable, a scratch-tree whitelist built from names, the
+  store patched at import); the probe now reads the file's raw header and length, the world scan
+  pins every entry's metadata and refuses what it cannot list, the scratch root is known by
+  recorded identity, and the worker refuses a patched store. Thirteen shapes are pinned; the
+  channels that remain are listed in `docs/SECURITY.md`.
 - Three red-team handlers ship as `fixture:sqlite-credit-v1/{mark-first,leftover-credit,never-marks}`,
   and `fixture:sqlite-credit-v1/raw-sql` is the textbook fix written as one raw SQL transaction:
   it gets no verdict and a one-line remedy, because a write the store did not make has no kill
@@ -78,6 +85,11 @@ New since 2026-09-05, from `overnight/hardening` and the `overnight2/*` branches
   tree (relative file writes no longer dirty it), cleanup errors no longer mask primary failures,
   and split worlds are named ("3 DUPLICATE_EFFECT, 2 EXACTLY_ONCE") instead of averaged.
 - The "single-action necessity proof" is called what it is, a no-crash control.
+- The judge's first five minutes: `init` refuses a target the base tree cannot bind at draft
+  time, in the sentence `check` would have printed plus the one change that makes it bind;
+  every anchor refusal, the no-crash control, the corrected control, and the eighteen ways five
+  worlds can fail to cohere name what happened and, where one exists, the remedy; `nemisis
+  --version` exists and `redteam` says what to do about an existing `--out`.
 
 New since 2026-08-30: `nemisis init --nemotron` asks Nemotron on Token Factory for a candidate-blind
 contract proposal (audited catalog IDs plus the expected single effect), accepts it only when fixed
@@ -96,15 +108,29 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 482 tests, and package build: pass locally on
-  Python 3.12.13; CI runs the same gate on CPython 3.12 and 3.13
-  ([run 34011484455](https://github.com/Alex-lop/Nemisis/actions/runs/34011484455), both legs green);
-- CI passed on the older commits these links were written for, every one of them earlier than the
-  source measured above:
-  [successful run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355),
-  [successful run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096), and
-  [successful run 33349903736](https://github.com/Alex-lop/Nemisis/actions/runs/33349903736); no CI
-  run at the measured source is cited here yet;
+- locked dependency sync, formatter, Ruff, mypy, 530 tests, and package build: pass locally on
+  Python 3.12.13; CI runs the same gate on CPython 3.12, 3.13, and 3.14 (the 3.14 leg first ran
+  green on a real runner at
+  [run 34093138705](https://github.com/Alex-lop/Nemisis/actions/runs/34093138705), where the only
+  failure on all three legs was the test-count line this file requotes);
+- the nightly red team's first run on GitHub's Linux:
+  [run 34086693284](https://github.com/Alex-lop/Nemisis/actions/runs/34086693284), 300 generated
+  handlers at seed 20260907, 0 disagreements, on the engine before tonight's grammar and fixes;
+  two local sweeps of 300 per scenario at the post-fix engine also had 0 disagreements;
+- a second, independent measurement of the hero on GitHub's Linux (CPython 3.12.3, SQLite 3.45.1,
+  x86_64): [run 34092142968](https://github.com/Alex-lop/Nemisis/actions/runs/34092142968), the
+  `Evidence` workflow at engine `228430389f…`, verdict `PATCH_FAILED_STILL_REPRODUCES`, engine and
+  event digests byte-identical to the laptop's, capsule digest `85adf7b9…` and environment digest
+  `13fc1958…` different, as the environment binding says they must be; its artifact is
+  `linux-hero-34092142968` (90 days);
+- the same check inside the `Dockerfile` image (77 MB, `python:3.12.13-slim`, SQLite 3.46.1):
+  `doctor --mode local` READY and `mark-first` `PATCH_FAILED_INVARIANT_BROKEN` at the same engine
+  digest, with `--network none`;
+- CI passed on the older commits these links were written for:
+  [run 33348963355](https://github.com/Alex-lop/Nemisis/actions/runs/33348963355),
+  [run 33349114096](https://github.com/Alex-lop/Nemisis/actions/runs/33349114096),
+  [run 33349903736](https://github.com/Alex-lop/Nemisis/actions/runs/33349903736), and
+  [run 34011484455](https://github.com/Alex-lop/Nemisis/actions/runs/34011484455);
 - local doctor: `READY` for Python 3.12, POSIX `SIGKILL`, and SQLite WAL/`FULL`;
 - `init --nemotron` without `NEBIUS_API_KEY`: exit `2`, nothing written (verified);
 - `init --nemotron` with an injected client, then `check --scenario .nemisis/config.json`: receipt
@@ -124,7 +150,9 @@ stills, and reports are real local runs of the packaged fixture on this tree; th
 render the committed hero receipt, bound to its own earlier commit; every surface carries `LOCAL` /
 `FIXTURE` labels where it shows labels; `tests/test_readme_truth.py` fails if an embedded image is missing or
 malformed. The viewer was redesigned on 2026-09-04 (stepped replay, pinned truth-label bar,
-PASS / FAIL colour language) and re-verified by the same tests. No public hosted URL is claimed and no
+PASS / FAIL colour language) and re-verified by the same tests. The landing page and the viewer are
+served at <https://alex-lop.github.io/Nemisis/> from the repository root by GitHub Pages' branch
+source (the `Pages` workflow deploys only once the source is switched to GitHub Actions). No
 provider run appears in any image.
 
 ## Sponsor and submission state
@@ -152,7 +180,8 @@ Option A is retained: one excellent SQLite slice, made undeniable. In order:
 3. Connect the CrashCheck kernel to a Token Factory Sandbox (spawn, subprocess result, process-group
    kill) against one immutable image so untrusted pull requests can be checked; keep `doctor` and
    `check --mode live` `BLOCKED` until a real receipt exists.
-4. Publish the static viewer at a public URL.
+4. Published: the static viewer and the landing page are live at
+   <https://alex-lop.github.io/Nemisis/>.
 
 A second scenario exists: `sqlite-inventory-v1` (stock 10 to 8, oversold to 6 by the crash),
 built on the `Scenario` seam that now owns every point `sqlite_runner.py` and `crash_models.py`

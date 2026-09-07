@@ -1,0 +1,91 @@
+# One build per `v*` tag, attached to a GitHub release and pushed to PyPI.
+#
+# PyPI publishing goes through a Trusted Publisher, so this repository holds no PyPI API token and
+# none should ever be added. The `pypi` job fails until the owner registers the pending publisher
+# at https://pypi.org/manage/account/publishing/ with exactly these fields:
+#
+#     PyPI project name:  nemisis
+#     Owner:              Alex-lop
+#     Repository name:    Nemisis
+#     Workflow name:      release.yml
+#     Environment name:   pypi
+#
+# Until that is registered, a tag still produces a GitHub release with the built sdist and wheel
+# attached; only the PyPI leg is red, and it can be re-run on its own once the publisher exists.
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.29"
+          python-version: "3.12"
+      - run: uv build
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist
+          path: dist
+          if-no-files-found: error
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      # The checkout is only for CHANGELOG.md; the artifacts come from the build job.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: dist
+          path: dist
+      - name: Cut the release with this version's changelog section as its notes
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes="$(mktemp)"
+          awk -v want="## [$version]" '
+            index($0, want) == 1 { inside = 1; next }
+            inside && index($0, "## [") == 1 { exit }
+            inside { print }
+          ' CHANGELOG.md > "$notes"
+          if [[ ! -s "$notes" ]]; then
+            echo "CHANGELOG.md has no ## [$version] section; refusing to publish empty notes." >&2
+            exit 1
+          fi
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file "$notes"
+
+  pypi:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: dist
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2

@@ -40,6 +40,9 @@ The sanitized authorship receipt is written to the operator's own
 `.nemisis/agent-patches/<candidate tree digest>.json`, never inside the candidate tree. `check`
 names Nemotron as the candidate's author only when it runs where that receipt lives and the
 receipt binds the scenario, the contract's base tree, and the bound handler's exact module digest.
+`uv run nemisis propose-patch --help` lists `--scenario {sqlite-credit-v1,sqlite-inventory-v1}`:
+`--issue src/nemisis/fixtures/sqlite_inventory_v1/issue.md --base fixture:sqlite-inventory-v1/buggy
+--scenario sqlite-inventory-v1` runs the same beat on the stock-reservation scenario.
 
 The other is the candidate-blind contract proposal; its receipt is labelled `LIVE`, stored beside
 the contract, and carried into the next `check` manifest and report:

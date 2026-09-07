@@ -66,7 +66,7 @@ def test_the_hero_story_holds_for_a_decrement(
 
     result = check(BUGGY, GREEN, SCENARIO_ID, corrected=ATOMIC, mode="local")
 
-    assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES
+    assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES, result.summary
     assert "double reservation (6 units on hand, expected 8 units)" in result.summary
     by_role = {
         role: {a.observation for a in result.attempts if a.role is role} for role in WorldRole
@@ -115,7 +115,7 @@ def test_mark_first_loses_the_reservation_and_the_summary_says_so(
 
     result = check(BUGGY, MARK_FIRST, SCENARIO_ID, mode="local")
 
-    assert result.verdict is CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN
+    assert result.verdict is CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN, result.summary
     assert "commit 1 of 2 (mark_reserved)" in result.summary
     assert "10 units on hand instead of 8 units (0 reservation rows, 1 marker)" in result.summary
     assert "order is unfilled" in result.summary

@@ -81,9 +81,19 @@ that expresses the same fix. That is `EVIDENCE_INCOMPLETE` (exit `2`), never a p
 fail, because the kill could not be placed where the money moved.
 `fixture:sqlite-credit-v1/raw-sql` is exactly that handler, one flag away.
 
-The inventory scenario's store has the same shape with its own names: `reserved(event_id)`,
-`reserve(sku, event_id, quantity)`, `mark_reserved(event_id)`, and the one-line
-`reserve_and_mark(sku, event_id, quantity)`.
+`sqlite-inventory-v1` exposes an `InventoryStore` of the same shape, with its own names and its
+own subject: the effect runs the other way, the shelf goes down.
+
+| Call | What it commits | Reported as |
+| --- | --- | --- |
+| `store.reserved(event_id) -> bool` | nothing (a read) | not a commit |
+| `store.reserve(sku, event_id, quantity)` | the stock decrement and one reservation row | `reserve` |
+| `store.mark_reserved(event_id)` | the reserved marker | `mark_reserved` |
+| `store.reserve_and_mark(sku, event_id, quantity)` | decrement, reservation row, and marker together, skipped if the marker exists | `reserve_and_mark` |
+
+The one-line fix is `store.reserve_and_mark(...)`; the three-step form (`reserved` guard, `reserve`,
+`mark_reserved`) is where the bug lives, and `fixture:sqlite-inventory-v1/mark-first` is the patch
+that reorders the two commits and loses the reservation instead.
 
 ## Verdict contract
 
@@ -95,6 +105,10 @@ The inventory scenario's store has the same shape with its own names: `reserved(
 | `FIX_PROVEN_FOR_THIS_CAPSULE` | 0 | The exact candidate completed exactly once in every required world for this capsule only. |
 | `EVIDENCE_INCOMPLETE` | 2 | Required execution, mapping, integrity, or provenance evidence is missing or contradictory. |
 | `UNSUPPORTED_TARGET` | 2 | Deterministic preflight proves the scenario, catalog ID, adapter, or target shape is outside the alpha. |
+
+Two commands exit outside that table because neither emits a verdict. `nemisis redteam` exits `1`
+when any generated handler's verdict disagrees with the oracle and `0` when none does. `nemisis
+doctor` exits `2` when its status is anything but `READY`, and `0` when it is.
 
 Transport success is not execution success. Completed execution with invalid provenance is not a
 behavioral claim. Model prose cannot upgrade either case.

@@ -3,7 +3,7 @@
 from nemisis.crash_models import CrashCheckResult, CrashVerdict, ReproCapsule
 from nemisis.crashcheck import accept_contract, check, initialize, replay
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "CrashCheckResult",

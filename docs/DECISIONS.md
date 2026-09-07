@@ -277,3 +277,150 @@ says `FIX_PROVEN`, while `../side.txt` outlives a delete that reaches only the c
 world-detection op is a canary: every world is named by an opaque id, so the op is a no-op today,
 and the day an engine change leaks a role into a path or an environment variable the nightly
 sweep disagrees with the oracle. A third scenario adds a `Vocabulary`, not a grammar.
+
+## Every wall-clock wait names what did not happen (2026-09-07)
+
+The kernel had one budget, ten seconds, re-armed for each phase of each world, and every expiry
+said "worker IPC timed out": the same five words for a hello that never came, a first delivery
+that never reached its commit, and a replay that never finished. A base world that timed out was
+reported as "the originating base did not reproduce in five fresh worlds", which is false, and
+the one flaky observation on record could not be diagnosed from what it printed. The budget is
+now a documented knob, `NEMISIS_WORKER_TIMEOUT_SECONDS`, read once before any world runs and
+refused outside 1 to 600 seconds (a typo must not widen a wait silently); every expiry names the
+phase, the commits seen so far, the budget, and the knob; a base hunt or confirmation whose
+worlds did not complete says so, and a base that completes exactly once is told to pass the tree
+that still has the bug. The default did not move. A `Soak` workflow repeats the kernel's slow
+tests N times on GitHub's Linux, with the knob as an input, so the next flake is found there.
+
+## The judge's first five minutes (2026-09-07)
+
+`init` drafted a contract for any target string and any base tree; the judge learned that the
+target could not bind only at `check`, after accepting a digest, and a wrong target was refused
+with a sentence that did not say which target the scenario binds. Now `init` binds the audited
+target against the base tree before it writes anything and refuses, in `check`'s own words,
+with the one change that would make it bind: a target other than the scenario's names the one
+to pass; a tree without a top-level `def apply_credit(store, event)` in `app/credits.py` is told
+to add it; a handler with the wrong shape is told the shape. `check` keeps its own anchor
+receipt path for a config that arrived by other means, and that path now carries the same
+remedy. Three refusals that only said what happened say why and what to do: the no-crash
+control reports what the base did with no kill at all (a bug on the plain path is one for an
+ordinary test); the corrected control reports what the known-good tree did and that the
+candidate's verdict does not depend on it; and the eighteen clauses that make five worlds "not
+one observation" each have a sentence, so "Execution completed without one stable supported
+observation" never stands alone. Worker stdout and stderr stay hashed and unpersisted: a
+handler's output could carry a secret into committed evidence, and the test that pins the
+decision was kept.
+
+## What a third scenario would need the seam to say (2026-09-07)
+
+Two scenarios kill "one fixture"; a third of a different class would kill "two look-alikes".
+The two classes the map named were tried on paper against the receipts before any code, and
+the receipts refused one of them.
+
+**A conservation invariant (a transfer between two accounts)** cannot be said honestly by the
+four-field `StateSnapshot` and `classify_final`, in any of the three encodings. Subject as the
+conserved sum with a zero delta is refused by three validators (an attempt, a census, and a
+capsule must each "expect a nonzero effect"). Subject as the destination balance leaves the
+debit invisible to the rule: a handler that credits the destination and never debits the source
+reads `(+X, 1 row, +X, marked)`, which is `EXACTLY_ONCE`, and after a sweep that is
+`FIX_PROVEN_FOR_THIS_CAPSULE` for money created from nothing, the exact failure conservation
+exists to catch. Counting both rows as the effect makes a correct transfer `(X, 2, 0)`, which
+matches neither shape, so the base can never reproduce and the run ends without a witness.
+Attribution would see every row (`apply` predicts the debit, the credit, the ledger row, and the
+marker in one commit), but attribution refuses only *unpredicted* change; two legitimate store
+calls that both credit the destination are predicted, and no rule reads the source. The
+hypothesis catalog compounds it: two boundaries, one or two trusted operations, while a
+transfer is a debit, a credit, and a marker. Building it would mean a second subject total (or
+a conserved total) in the snapshot, a rule that reads it, and a wider catalog; those are trusted
+engine bytes, and `test_the_four_field_rule_cannot_see_a_second_subject` pins the limit so the
+next person does not discover it by writing the scenario.
+
+**An outbox (a row that stands for an email; the bug is the double send)** fits the seam as it
+is: the subject is the recipient's send count read from the outbox rows, the effect delta is one
+send, the marker is a separate table, and `classify_final` is unchanged. Two caveats decide
+whether it is a third class or a renamed credit. The receipt proves the row, never the email:
+a handler that calls SMTP twice and writes one row reads exactly once, which is the same
+contract the ledger row already makes and must be written down as such. And the seam demands a
+positive audited scalar the model must reproduce (`scalar_name`, `audited_scalar > 0`); an
+outbox event has no natural integer, so either the seam learns that a scenario may have none or
+the event carries a contrived one.
+
+Decision: no third scenario tonight. The conservation class needs the seam widened first, and
+the outbox class is one seam change (an optional scalar) away from honest. A design that
+prevents a wrong day of work outranks a fixture that decorates.
+
+## The third hostile round (2026-09-07)
+
+Six reviewers with six lenses (the diff, SQLite internals, the process and filesystem, the store
+object and its IPC, the second scenario, the verdict logic) wrote fifty-seven handlers against
+the engine of `d7677d0`; forty-four were claimed as findings and thirty-seven were confirmed by
+independent re-runs. Nearly all were one of four root causes. The probe read the database
+through SQLite and never the file: `PRAGMA default_cache_size` (header bytes 48 to 51), the
+twenty reserved header bytes, and bytes past the last page were durable and invisible. The world
+scan compared paths and never metadata: a file flag, an extended attribute (the guard was inert
+on macOS, where CPython has no `os.listxattr`), the mode or modification time of HOME or TMPDIR,
+a HOME removed or replaced by a FIFO, and a directory made unlistable so `rglob` reported nothing.
+The scratch-tree whitelist was built from names: any 32-hex directory the handler made was
+expected by construction, and a file inside the base tree's copy was watched by nothing once the
+base phase ended. And the trusted store could be patched at import, so the handler body was the
+textbook one-liner while the store under-reported its commits.
+
+All four are closed: every probe reads the file's raw header (masked for the three fields a
+commit rewrites) and requires the file to be exactly its stated page count long; every world's
+directories and database are recorded with mode, flags, attributes, and mtime when the kernel
+makes them and re-checked by the kernel's own walk, deepest first, which refuses a directory it
+cannot list; the run root admits only what the kernel recorded and re-checks every source copy
+and finished phase entry by entry; and the worker compares the store's code objects before and
+after importing the handler. Thirteen shapes are pinned end to end and four became grammar ops.
+Three findings were kept as decisions: a handler that reads the shelf level instead of its marker
+earns a capsule-scoped pass, which is what the verdict's name says; a corrected control that fails
+still withholds the candidate's verdict, and now says why and that omitting `--corrected` restores
+it; and the split-schedule sentence asserts only what it saw. Three channels were added to the
+boundary list instead of closed: a write reverted before the next commit (attribution samples at
+commits), counting sibling worlds through the shared scratch tree (the answer is a mount
+namespace, designed below), and a store patched below the class the worker checks. The
+corrected-tree distinctness rule compares resolved trees, so a byte-identical copy at another
+path is refused as the same tree.
+
+## Enforcing "nothing outside the world": a design, not code (2026-09-07)
+
+Local mode assumes a trusted checkout and reads what it can. Two boundaries the third hostile
+round named are not readable at all from inside the process: durable state kept by absolute path
+elsewhere on the machine, and a handler that reads CrashCheck's shared scratch tree to count the
+worlds of its phase. Both are the same fact: the worker shares a filesystem with the controller
+and with its sibling worlds. The honest fix is to stop sharing it, and that is an operating-system
+boundary, not a probe.
+
+On Linux the shape is a private mount namespace per worker. With `bwrap` (or `unshare -m` plus a
+few binds) the worker gets the interpreter and the bound tree read-only, its world bind-mounted
+as the only writable path, an empty `tmpfs` at `/tmp`, `/var/tmp`, and `/dev/shm`, no view of the
+run root or of any sibling, and no network (`--unshare-all --die-with-parent`). GitHub's
+`ubuntu-latest` runners allow unprivileged user namespaces, so this is a CI leg, not a privilege.
+What it would prove: absolute-path state and sibling counting become impossible rather than
+undetected, the scratch-tree scans become belt and braces, and "the worker can only write its own
+world" turns from a claim the kernel checks after the fact into one the kernel never has to check.
+What it would not prove: anything about the store object in the worker's hands (the in-process
+boundary stays), the WAL sidecar oracle (the world still contains the database), the wall clock,
+or a handler that patches the interpreter below the store. The kill and the probes are unchanged,
+because the controller keeps the world mounted on its own side. On macOS there is no equivalent
+that is both supported and unprivileged: `sandbox-exec` profiles can deny writes outside one
+directory but the tool is deprecated and undocumented, so the macOS answer is the documented
+boundary, and the Linux leg is where the enforced claim would live. Estimated size: a
+`WorkerIsolation` seam in the runner with two implementations (none, `bwrap`), one CI leg that
+runs the zoo under it, and a sentence in SECURITY that says which claim holds on which platform.
+
+The ConTree transport for CrashCheck (`--mode live`) is the same design one level up, and it was
+scoped before any code for the same reason `live.py` was for `verify`. What the kernel needs from
+a provider: spawn a worker inside an immutable image with the bound tree and a seeded database,
+a channel that carries the store's commit reports and the controller's continues with the same
+framing the socket pair uses today (a guest-side supervisor must own the socket, because the pair
+cannot cross the sandbox), a process-group kill that lands while the worker is paused inside a
+commit report and returns the exit status, and a read-only read of the whole database file after
+the kill and after the final message, byte-exact, which means the file itself must come back out
+or the probe must run inside and its result be attested. What it cannot get from the sandbox
+API as it stands: the drained stdout and stderr pipes that detect a surviving descendant, and the
+guarantee that the kill landed at the pause rather than a moment later. Until those two exist as
+provider-owned receipts, a live CrashCheck run cannot carry the same claims as a local one, and
+that is why `doctor` stays `BLOCKED` and no path from `BLOCKED` to a run is written: a
+fail-closed skeleton with an injected client is honest, a transport that reports `LIVE` with
+weaker receipts is not.

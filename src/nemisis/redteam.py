@@ -53,6 +53,12 @@ class Op(StrEnum):
     TABLE = "table"  # CREATE TABLE inside the store's own database file
     PRAGMA = "pragma"  # PRAGMA user_version inside the store's own database file
     REPOINT = "repoint"  # UPDATE this event's effect rows to another subject
+    HEADER_FLAG = (
+        "header_flag"  # PRAGMA default_cache_size: a header field no store commit rewrites
+    )
+    TAIL_BYTES = "tail_bytes"  # bytes appended past the database file's last page
+    HOME_CHMOD = "home_chmod"  # the permission bits of the world's HOME directory
+    HOME_RMDIR = "home_rmdir"  # the world's HOME directory, removed
     # A world-detection attempt: return early if the world looks like a census or a sweep.
     DETECT = "detect"
 
@@ -68,11 +74,20 @@ HAZARD_OPS = (
     Op.TABLE,
     Op.PRAGMA,
     Op.REPOINT,
+    Op.HEADER_FLAG,
+    Op.TAIL_BYTES,
+    Op.HOME_CHMOD,
+    Op.HOME_RMDIR,
     Op.DETECT,
 )
-_SQL_OPS = frozenset({Op.RAW_SQL, Op.TABLE, Op.PRAGMA, Op.REPOINT})
-_OS_OPS = frozenset({Op.PARENT_FILE, Op.HOME_FILE, Op.DELETE_FILE, Op.DETECT})
+_SQL_OPS = frozenset({Op.RAW_SQL, Op.TABLE, Op.PRAGMA, Op.REPOINT, Op.HEADER_FLAG})
+_OS_OPS = frozenset(
+    {Op.PARENT_FILE, Op.HOME_FILE, Op.DELETE_FILE, Op.HOME_CHMOD, Op.HOME_RMDIR, Op.DETECT}
+)
+# Writes the world scan sees: a file (the one beside the database can be tidied away) or a
+# change to a directory the kernel pinned (which cannot).
 _FILE_OPS = frozenset({Op.RAW_FILE, Op.PARENT_FILE, Op.HOME_FILE, Op.TMP_FILE})
+_WORLD_OPS = frozenset({Op.HOME_CHMOD, Op.HOME_RMDIR})
 # Words a leaky engine might put in a world's path or environment. Every world is named by an
 # opaque id, so this condition is always false; if it ever becomes true the checker and the
 # oracle disagree, which is the point.
@@ -218,6 +233,15 @@ def _statements(v: Vocabulary) -> dict[Op, str]:
             "    with sqlite3.connect(store._database, isolation_level=None) as connection:\n"
             f"        connection.execute({v.repoint_sql[0]!r}, {v.repoint_sql[1]})\n"
         ),
+        Op.HEADER_FLAG: (
+            "    with sqlite3.connect(store._database, isolation_level=None) as connection:\n"
+            '        connection.execute("PRAGMA default_cache_size = 7")\n'
+        ),
+        Op.TAIL_BYTES: (
+            '    with open(store._database, "ab") as tail:\n        tail.write(b"\\x5a" * 16)\n'
+        ),
+        Op.HOME_CHMOD: '    os.chmod(os.path.expanduser("~"), 0o750)\n',
+        Op.HOME_RMDIR: '    os.rmdir(os.path.expanduser("~"))\n',
         Op.DETECT: (
             "    here = os.getcwd() + os.path.abspath(__file__)\n"
             f"    if any(word in here for word in {_WORLD_WORDS!r}) or any(\n"
@@ -340,14 +364,14 @@ def _deliver(world: _World, ops: Sequence[Op], *, kill_after_commit: int | None)
                 world.effects += 1
                 world.marker = 1
                 commit()
-            elif op in _FILE_OPS:
+            elif op in _FILE_OPS or op in _WORLD_OPS:
                 world.files.add(op.value)
             elif op is Op.DELETE_FILE:
                 world.files.discard(Op.RAW_FILE.value)
             elif op is Op.RAW_SQL:
                 world.effects += 1
                 world.raw_db = True
-            elif op in {Op.TABLE, Op.PRAGMA}:
+            elif op in {Op.TABLE, Op.PRAGMA, Op.HEADER_FLAG, Op.TAIL_BYTES}:
                 world.raw_db = True
             elif op is Op.REPOINT:
                 if world.effects:

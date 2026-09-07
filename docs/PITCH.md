@@ -14,9 +14,9 @@ patch, and the crash is frozen into a capsule that the next patch has to beat to
 
 The 30-second recording of exactly that is
 [`docs/assets/screenshots/crashcheck-demo.gif`](assets/screenshots/crashcheck-demo.gif); the
-90-second spoken version is [DEMO.md](DEMO.md).
+two-and-a-half-minute spoken version is [DEMO.md](DEMO.md).
 
-## The 90-second story
+## The story in three beats
 
 A bug report says: "a timeout followed by a retry occasionally credits the same order twice."
 A coding agent patches `apply_credit`. Its test passes. A plain "call it twice" check passes too.

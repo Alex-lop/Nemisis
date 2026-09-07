@@ -9,6 +9,7 @@ from typing import cast
 
 import pytest
 
+import nemisis
 import nemisis.cli as cli
 from nemisis import CrashCheckResult, CrashVerdict, replay
 from nemisis.benchmark import BenchmarkError, BenchmarkResult
@@ -398,3 +399,22 @@ def test_action_example_pins_a_real_release_and_bounds_runtime() -> None:
     assert "github.event.pull_request.head.repo.full_name != github.repository" in workflow
     assert "persist-credentials: false" in workflow
     assert "permissions:\n  contents: read" in workflow
+
+
+def test_version_and_the_redteam_out_remedy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(sys, "argv", ["nemisis", "--version"])
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main()
+    assert exit_info.value.code == 0
+    assert capsys.readouterr().out.strip() == f"nemisis {nemisis.__version__}"
+
+    (tmp_path / "rt").mkdir()
+    monkeypatch.setattr(sys, "argv", ["nemisis", "redteam", "--out", str(tmp_path / "rt")])
+    with pytest.raises(SystemExit) as exit_info:
+        cli.main()
+    assert exit_info.value.code == 2
+    error = capsys.readouterr().err
+    assert "output directory already exists" in error
+    assert "delete it or pass --out" in error
