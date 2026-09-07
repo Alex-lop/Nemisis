@@ -29,6 +29,8 @@ plumbing. Unreleased until a `v0.2.0` tag is pushed.
 
 - One `Scenario` object owns every scenario-specific point, and receipts carry four generic fields
   with the capsule carrying its own event. Neither refactor changed behavior.
+- The composite action reports `verdict`, `summary`, and `manifest-path` as outputs, and writes one
+  GitHub annotation on the handler file so the verdict is visible outside the log.
 - CI runs the whole gate on CPython 3.12, 3.13, and 3.14, and the verify job is bounded at 30
   minutes.
 - Pages deploys only when the repository's Pages source is a workflow, so a branch publisher and
