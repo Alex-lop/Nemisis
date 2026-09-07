@@ -25,7 +25,8 @@ SUMMARY = "leftover credit at the marker boundary"
 def _case(verdict: str) -> Case:
     return Case(
         index=1,
-        ops=(Op.CREDIT, Op.MARK),
+        ops=(Op.EFFECT, Op.MARK),
+        helper=False,
         expected=Expected.PROVEN,
         reason=REASON,
         verdict=verdict,
@@ -34,7 +35,7 @@ def _case(verdict: str) -> Case:
 
 
 def _redteam(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, case: Case) -> None:
-    def run(cases: int, seed: int, out: Path) -> list[Case]:
+    def run(cases: int, seed: int, out: Path, scenario_id: str) -> list[Case]:
         return [case]
 
     monkeypatch.setattr(redteam, "run", run)

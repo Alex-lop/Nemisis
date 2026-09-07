@@ -259,3 +259,21 @@ bytes) and a flag at the sidecar names the store owns. A kill world whose commit
 of the census's is refused outright, because that is what hidden state looks like from outside.
 The lesson the night leaves behind: in-process instrumentation can attribute everything it can
 read; the honest sentence is the list of what it reads.
+
+## The grammar speaks what the reviewers wrote by hand (2026-09-07)
+
+Yesterday's generator could not express a single shape of the eleven the two hostile reviews
+found, so its three hundred agreeing cases said nothing about the attribution fix. Every one of
+those shapes is now an operation of the grammar, in either scenario's vocabulary: a table or a
+pragma inside the store's file, a file beside the database, one directory up, under `HOME` or
+under `TMPDIR`, a file tidied away before returning, a re-pointed effect row, a marker inside
+`try`/`except` (a second marker is swallowed instead of raised), a retry loop, a helper function
+the bound handler calls, and a world-detection attempt that returns early if the world's path or
+environment names a census, a sweep, or a role. The oracle learned the two facts the kernel's
+probes have: a write inside the database file is seen at the next commit probe, a file in the
+world only at a scan, which happens after the kill and after a completed delivery. So a file
+written and deleted between two commits was never durable state at a kill point and the oracle
+says `FIX_PROVEN`, while `../side.txt` outlives a delete that reaches only the cwd. The
+world-detection op is a canary: every world is named by an opaque id, so the op is a no-op today,
+and the day an engine change leaks a role into a path or an environment variable the nightly
+sweep disagrees with the oracle. A third scenario adds a `Vocabulary`, not a grammar.
