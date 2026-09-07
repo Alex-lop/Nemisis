@@ -66,6 +66,7 @@ from nemisis.sqlite_runner import (
     execute_no_fault_replay,
     initial_database_digest,
     runner_environment_digest,
+    worker_timeout_seconds,
 )
 
 CONFIRMATIONS = REQUIRED_CONFIRMATIONS
@@ -230,6 +231,7 @@ def check(
     """Hunt on the base, freeze one capsule, then evaluate the candidate unchanged."""
     started_at = datetime.now(UTC)
     run_id = _run_id(mode)
+    _worker_timeout()  # refuse a bad NEMISIS_WORKER_TIMEOUT_SECONDS before any world runs
     with tempfile.TemporaryDirectory(prefix="nemisis-check-") as temporary:
         root = Path(temporary)
         base_source = _materialize_source(base, root / "source-base")
@@ -287,7 +289,7 @@ def check(
             root / uuid.uuid4().hex,
         )
         if not _hunt_is_conclusive(hypothesis_receipts):
-            detail = "The two base-only crash-boundary hypotheses did not yield one witness."
+            detail = _hunt_summary(hypothesis_receipts)
             attempt = _failed_attempt(
                 capsule, base_binding, WorldRole.BASE, TruthLabel.LOCAL, detail
             )
@@ -344,7 +346,7 @@ def check(
                 (base_binding,),
                 base_attempts,
                 CrashVerdict.EVIDENCE_INCOMPLETE,
-                "The originating base did not reproduce in five fresh worlds.",
+                _base_summary(base_attempts),
                 hypothesis_receipts=hypothesis_receipts,
                 minimization_receipts=minimization_receipts,
             )
@@ -524,6 +526,7 @@ def replay(
 ) -> CrashCheckResult:
     """Replay only the immutable event, fault intent, schedule, and predicates in a capsule."""
     started_at = datetime.now(UTC)
+    _worker_timeout()
     capsule_path = None if isinstance(capsule, ReproCapsule) else Path(capsule)
     sealed = _load_capsule(capsule)
     contract = _contract_for_capsule(
@@ -898,16 +901,9 @@ def _unsupported_observation_summary(
             "Every world completed, but the final durable state matched neither exactly-once nor "
             "the capsule's duplicate shape: the invariant failed, so nothing is proven."
         )
-    failures = [attempt.failure_detail for attempt in attempts if attempt.failure_detail]
-    if failures:
-        detail, count = max(
-            ((item, failures.count(item)) for item in set(failures)), key=lambda x: x[1]
-        )
-        role = attempts[0].role.value
-        return (
-            f"{count} of {len(attempts)} {role} worlds did not complete: {detail}. "
-            "No verdict is issued from incomplete or contradictory evidence."
-        )
+    incomplete = _incomplete_worlds(attempts, attempts[0].role.value if attempts else "")
+    if incomplete:
+        return f"{incomplete}. No verdict is issued from incomplete or contradictory evidence."
     seen = sorted({attempt.observation for attempt in attempts}, key=lambda item: item.value)
     if len(seen) > 1:
         tally = ", ".join(
@@ -920,6 +916,43 @@ def _unsupported_observation_summary(
             "reports unanimity or nothing."
         )
     return "Execution completed without one stable supported observation."
+
+
+def _incomplete_worlds(attempts: tuple[AttemptReceipt, ...], what: str) -> str | None:
+    """How many worlds did not complete and the most common reason, or None if all did.
+
+    Ties break on the sorted text so the sentence is the same on every run.
+    """
+    failures = [attempt.failure_detail for attempt in attempts if attempt.failure_detail]
+    if not failures:
+        return None
+    detail, count = max(
+        ((item, failures.count(item)) for item in sorted(set(failures))), key=lambda x: x[1]
+    )
+    others = len(failures) - count
+    tail = f" (and {others} for {'another reason' if others == 1 else 'other reasons'})"
+    return f"{len(failures)} of {len(attempts)} {what} worlds did not complete: {detail}" + (
+        tail if others else ""
+    )
+
+
+def _base_summary(attempts: tuple[AttemptReceipt, ...]) -> str:
+    """Why five fresh base worlds were not a witness: a world that did not complete says so."""
+    completed = all(
+        attempt.execution_status is ExecutionStatus.COMPLETED
+        and attempt.integrity_status is IntegrityStatus.VALID
+        for attempt in attempts
+    )
+    observations = {attempt.observation for attempt in attempts}
+    if not completed or len(observations) > 1:
+        return _unsupported_observation_summary(CrashObservation.NOT_OBSERVED, attempts)
+    if observations == {CrashObservation.EXACTLY_ONCE}:
+        return (
+            "The originating base did not reproduce in five fresh worlds; every world ended "
+            "exactly once, so this tree does not show the bug the contract describes. Pass the "
+            "tree that still has the bug as --base."
+        )
+    return "The originating base did not reproduce in five fresh worlds."
 
 
 def _invariant_summary(attempts: tuple[AttemptReceipt, ...], capsule: ReproCapsule) -> str:
@@ -996,6 +1029,7 @@ def _hunt_hypotheses(
                 work_dir=work_root / uuid.uuid4().hex,
                 role=WorldRole.BASE,
                 execution_nonce=nonce,
+                timeout_seconds=_worker_timeout(),
             )
         except Exception as error:  # Preserve a bounded fail-closed hunt receipt.
             attempt = _failed_attempt(
@@ -1045,6 +1079,34 @@ def _hunt_hypotheses(
     )
     capsule = _seal_capsule(contract, selected_boundary)
     return receipts, capsule
+
+
+def _worker_timeout() -> float:
+    """The per-phase worker budget, validated once before any world runs."""
+    try:
+        return worker_timeout_seconds()
+    except ValueError as error:
+        raise CrashCheckError(str(error)) from None
+
+
+def _hunt_summary(receipts: tuple[HypothesisReceipt, ...]) -> str:
+    """Why the two base-only hypotheses yielded no witness, in the words of what happened."""
+    lead = "The two base-only crash-boundary hypotheses did not yield one witness"
+    attempts = tuple(receipt.attempt for receipt in receipts)
+    incomplete = _incomplete_worlds(attempts, "base hunt")
+    if incomplete:
+        return f"{lead}: {incomplete}. No verdict is issued from incomplete evidence."
+    if receipts and not any(receipt.reproduced for receipt in receipts):
+        seen = ", ".join(
+            f"{receipt.hypothesis_id} ended {receipt.attempt.observation.value}"
+            for receipt in receipts
+        )
+        return (
+            f"{lead}: the base did not duplicate at either boundary ({seen}), so this tree does "
+            "not show the bug the contract describes. Pass the tree that still has the bug as "
+            "--base."
+        )
+    return f"{lead}."
 
 
 def _hunt_is_conclusive(receipts: tuple[HypothesisReceipt, ...]) -> bool:
@@ -1097,6 +1159,7 @@ def _minimize_witness(
                 source_tree=source,
                 work_dir=work_root / uuid.uuid4().hex,
                 execution_nonce=nonce,
+                timeout_seconds=_worker_timeout(),
             )
         except Exception as error:  # Preserve fail-closed minimization evidence.
             now = datetime.now(UTC)
@@ -1245,6 +1308,7 @@ def _execute_confirmations(
                 work_dir=worlds[index - 1],
                 role=role,
                 execution_nonce=nonce,
+                timeout_seconds=_worker_timeout(),
             )
         except Exception as error:  # Preserve a bounded fail-closed receipt at the deep seam.
             return _failed_attempt(
@@ -1283,6 +1347,7 @@ def _execute_sweep(
             work_dir=census_world,
             execution_nonce=nonce,
             role=role,
+            timeout_seconds=_worker_timeout(),
         )
     except Exception as error:  # Preserve a fail-closed census receipt.
         census = _failed_census(capsule, binding, role, nonce, type(error).__name__)
@@ -1306,6 +1371,7 @@ def _execute_sweep(
                     role=role,
                     execution_nonce=attempt_nonce,
                     kill_after_commit=index,
+                    timeout_seconds=_worker_timeout(),
                 )
             except Exception as error:  # Preserve a fail-closed sweep receipt.
                 return _failed_attempt(

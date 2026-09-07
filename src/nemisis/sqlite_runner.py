@@ -58,10 +58,36 @@ from nemisis.models import TruthLabel
 from nemisis.safety import safe_relative_path
 from nemisis.scenario import MAX_MESSAGE_BYTES, Event, Scenario, StoreBase, Tables, worker_send
 from nemisis.scenarios import scenario_for
-from nemisis.scenarios.sqlite_credit_v1 import STORE_REMEDY, CreditStore
 
 RUNNER_ID = "sqlite-runner-v2"
 RUNNER_VERSION = "2"
+WORKER_TIMEOUT_VARIABLE = "NEMISIS_WORKER_TIMEOUT_SECONDS"
+DEFAULT_WORKER_TIMEOUT_SECONDS = 10.0
+_WORKER_TIMEOUT_BOUNDS = (1.0, 600.0)
+
+
+def worker_timeout_seconds() -> float:
+    """The budget one worker gets for each phase: its hello, reaching a commit, finishing.
+
+    Ten seconds by default, re-armed for every phase of every world. A slow or loaded machine
+    raises it through ``NEMISIS_WORKER_TIMEOUT_SECONDS`` (seconds, between 1 and 600). No
+    receipt depends on the value: it decides whether evidence completes, never what it says. A
+    value outside the range is refused, not clamped, so a typo cannot silently widen the wait.
+    """
+    raw = os.environ.get(WORKER_TIMEOUT_VARIABLE)
+    if raw is None:
+        return DEFAULT_WORKER_TIMEOUT_SECONDS
+    try:
+        value = float(raw.strip())
+    except ValueError:
+        value = float("nan")
+    low, high = _WORKER_TIMEOUT_BOUNDS
+    if not low <= value <= high:
+        raise ValueError(
+            f"{WORKER_TIMEOUT_VARIABLE} must be a number of seconds between {low:g} and "
+            f"{high:g}, not {raw!r}"
+        )
+    return value
 
 
 class _AttemptFailure(RuntimeError):
@@ -980,7 +1006,16 @@ def _spawn_worker(
 def _expect_hello(
     spawn: _Spawn, capsule: ReproCapsule, execution_nonce: str, timeout_seconds: float
 ) -> None:
-    message = _receive(spawn.channel, spawn.receive_buffer, timeout_seconds)
+    message = _receive(
+        spawn.channel,
+        spawn.receive_buffer,
+        timeout_seconds,
+        what=(
+            f"the {spawn.phase} worker's hello (its interpreter starts and the handler module "
+            "and its imports load before it)"
+        ),
+        budget=timeout_seconds,
+    )
     expected = {
         "event_digest": capsule.event_digest,
         "execution_nonce": execution_nonce,
@@ -1006,6 +1041,12 @@ def _expect_hello(
         )
 
 
+def _next_message(spawn: _Spawn) -> str:
+    """What the controller is waiting for, for a timeout that can be diagnosed."""
+    commits = ", ".join(spawn.operations) or "none"
+    return f"the {spawn.phase} delivery's next store commit or its end (commits so far: {commits})"
+
+
 def _wait_for_checkpoint(
     scenario: Scenario,
     spawn: _Spawn,
@@ -1020,7 +1061,13 @@ def _wait_for_checkpoint(
     normalized = scenario.normalize_event(event)
     deadline = monotonic() + timeout_seconds
     while True:
-        message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
+        message = _receive(
+            spawn.channel,
+            spawn.receive_buffer,
+            max(0.001, deadline - monotonic()),
+            what=_next_message(spawn),
+            budget=timeout_seconds,
+        )
         kind = message.get("type")
         if kind == "commit":
             ledger.take(_attributed_probe(scenario, database, event, ledger, message))
@@ -1092,7 +1139,10 @@ def _kill_and_wait(spawn: _Spawn, timeout_seconds: float) -> None:
     try:
         return_code = spawn.process.wait(timeout=timeout_seconds)
     except subprocess.TimeoutExpired as error:
-        raise _AttemptFailure(ExecutionStatus.WAIT_ERROR, "killed worker was not reaped") from error
+        raise _AttemptFailure(
+            ExecutionStatus.WAIT_ERROR,
+            f"the killed worker was not reaped within {timeout_seconds:g} s",
+        ) from error
     if return_code != -signal.SIGKILL:
         raise _AttemptFailure(ExecutionStatus.WAIT_ERROR, "worker did not exit from SIGKILL")
     _collect(spawn)
@@ -1112,7 +1162,13 @@ def _finish_replay(
     """Drive one worker to completion; every durable change must be a store commit it reported."""
     deadline = monotonic() + timeout_seconds
     while True:
-        message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
+        message = _receive(
+            spawn.channel,
+            spawn.receive_buffer,
+            max(0.001, deadline - monotonic()),
+            what=_next_message(spawn),
+            budget=timeout_seconds,
+        )
         kind = message.get("type")
         if kind == "commit":
             ledger.take(_attributed_probe(scenario, database, event, ledger, message))
@@ -1138,8 +1194,8 @@ def _finish_replay(
     except subprocess.TimeoutExpired as error:
         raise _AttemptFailure(
             ExecutionStatus.TIMEOUT,
-            f"the {spawn.phase} delivery worker reported done but did not exit; a non-daemon "
-            "thread or child kept it alive",
+            f"the {spawn.phase} delivery worker reported done but did not exit within "
+            f"{timeout_seconds:g} s; a non-daemon thread or child kept it alive",
         ) from error
     _collect(spawn)
     if return_code != 0:
@@ -1215,8 +1271,22 @@ def _attributed_probe(
     )
 
 
+def _timed_out(what: str, budget: float) -> _AttemptFailure:
+    """A timeout that says what did not happen and which knob a slow machine turns."""
+    return _AttemptFailure(
+        ExecutionStatus.TIMEOUT,
+        f"{what} did not arrive within {budget:g} s; {WORKER_TIMEOUT_VARIABLE} raises the "
+        "budget on a slow machine",
+    )
+
+
 def _receive(
-    channel: socket.socket, buffer: bytearray, timeout_seconds: float
+    channel: socket.socket,
+    buffer: bytearray,
+    timeout_seconds: float,
+    *,
+    what: str,
+    budget: float,
 ) -> dict[str, object]:
     deadline = monotonic() + timeout_seconds
     try:
@@ -1227,14 +1297,14 @@ def _receive(
                 )
             remaining = deadline - monotonic()
             if remaining <= 0:
-                raise _AttemptFailure(ExecutionStatus.TIMEOUT, "worker IPC timed out")
+                raise _timed_out(what, budget)
             channel.settimeout(remaining)
             chunk = channel.recv(min(1024, MAX_MESSAGE_BYTES + 1 - len(buffer)))
             if not chunk:
                 raise _AttemptFailure(ExecutionStatus.IPC_ERROR, "worker closed IPC unexpectedly")
             buffer.extend(chunk)
     except TimeoutError as error:
-        raise _AttemptFailure(ExecutionStatus.TIMEOUT, "worker IPC timed out") from error
+        raise _timed_out(what, budget) from error
     if newline > MAX_MESSAGE_BYTES:
         raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "worker message was oversized")
     data = bytes(buffer[:newline])
@@ -1299,8 +1369,9 @@ def _collect(spawn: _Spawn) -> None:
                         stream.close()
             raise _AttemptFailure(
                 ExecutionStatus.CLEANUP_ERROR,
-                "a child process inherited the worker's stdout/stderr and outlived the kill; "
-                "detached helpers must not share the worker's pipes",
+                "a child process inherited the worker's stdout/stderr and outlived the kill "
+                "(the pipes stayed open for 3 s after the worker died); detached helpers must "
+                "not share the worker's pipes",
             )
     if spawn.process.poll() is None:
         try:
@@ -1315,8 +1386,9 @@ def _collect(spawn: _Spawn) -> None:
     if descendants_survived:
         raise _AttemptFailure(
             ExecutionStatus.CLEANUP_ERROR,
-            "worker descendants survived their supervisor and were killed; a fire-and-forget "
-            "child that shares the worker's stdout/stderr is not exactly-once evidence",
+            "worker descendants survived their supervisor and were killed (the pipes stayed open "
+            "for more than 1 s after the worker died); a fire-and-forget child that shares the "
+            "worker's stdout/stderr is not exactly-once evidence",
         )
 
 
@@ -1430,16 +1502,17 @@ if __name__ == "__main__":
 
 
 __all__ = [
+    "DEFAULT_WORKER_TIMEOUT_SECONDS",
+    "WORKER_TIMEOUT_VARIABLE",
     "MAX_MESSAGE_BYTES",
     "RUNNER_ID",
     "RUNNER_VERSION",
-    "STORE_REMEDY",
     "AnchorResolutionError",
-    "CreditStore",
     "bind_anchor",
     "capsule_event",
     "execute_attempt",
     "execute_no_fault_replay",
     "initial_database_digest",
     "runner_environment_digest",
+    "worker_timeout_seconds",
 ]
