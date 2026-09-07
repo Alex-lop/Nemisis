@@ -130,6 +130,20 @@ THREE_ARGUMENT = """def apply_credit(store, event, extra=None):
 """
 
 
+SPINS_AFTER_MARKING = """def apply_credit(store, event):
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+    while True:
+        pass
+"""
+
+SPINS_BEFORE_MARKING = """def apply_credit(store, event):
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    while True:
+        pass
+"""
+
+
 def _tree(tmp_path: Path, name: str, handler_source: str) -> Path:
     root = tmp_path / name
     (root / "app").mkdir(parents=True)
@@ -1339,3 +1353,89 @@ def test_a_flag_written_into_the_scratch_tree_stops_the_run_without_a_verdict(
 
     with pytest.raises(CrashCheckError, match="wrote outside its world into CrashCheck's scratch"):
         check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+
+def test_a_handler_that_never_returns_is_told_which_phase_ran_out_of_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The budget is a documented knob; its expiry says what did not happen and where.
+
+    The first delivery is killed at the credit; the replay credits, marks, and never returns, so
+    the replay phase runs out. The message names the phase, the commits seen, the budget, and
+    the variable a slow machine turns, instead of the bare "worker IPC timed out" of before.
+    """
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("NEMISIS_WORKER_TIMEOUT_SECONDS", "2")
+    candidate = _tree(tmp_path, "spins", SPINS_AFTER_MARKING)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert (
+        "5 of 5 candidate worlds did not complete: the replay delivery's next store commit or "
+        "its end (commits so far: credit, mark_processed) did not arrive within 2 s; "
+        "NEMISIS_WORKER_TIMEOUT_SECONDS raises the budget on a slow machine."
+    ) in result.summary, result.summary
+    worlds = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
+    assert {a.execution_status for a in worlds} == {ExecutionStatus.TIMEOUT}
+    assert cli._exit_code(result.verdict) == 2
+
+
+def test_a_base_that_never_returns_is_told_so_by_the_hunt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A base whose worlds do not complete is not "a base that did not reproduce"."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("NEMISIS_WORKER_TIMEOUT_SECONDS", "2")
+    base = _tree(tmp_path, "spinning-base", SPINS_BEFORE_MARKING)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+    issue = workspace / "issue.md"
+    issue.write_text(load_issue() + "\nLocal contract.\n", encoding="utf-8")
+    config = initialize(issue, TARGET, base, SCENARIO_ID)
+    accept_contract(json.loads(config.read_bytes())["contract"]["digest"], config)
+
+    result = check(base, ATOMIC_REF, config, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    # The effect-commit hypothesis kills at the credit and its replay spins; the marker-commit
+    # hypothesis never reaches its checkpoint because the first delivery spins. Two worlds,
+    # two phases, one honest count.
+    assert result.summary == (
+        "The two base-only crash-boundary hypotheses did not yield one witness: 2 of 2 base "
+        "hunt worlds did not complete: the first delivery's next store commit or its end "
+        "(commits so far: credit) did not arrive within 2 s; NEMISIS_WORKER_TIMEOUT_SECONDS "
+        "raises the budget on a slow machine (and 1 for another reason). No verdict is issued "
+        "from incomplete evidence."
+    ), result.summary
+
+
+def test_a_fixed_tree_as_base_is_told_to_pass_the_buggy_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+    issue = workspace / "issue.md"
+    issue.write_text(load_issue() + "\nLocal contract.\n", encoding="utf-8")
+    config = initialize(issue, TARGET, ATOMIC_REF, SCENARIO_ID)
+    accept_contract(json.loads(config.read_bytes())["contract"]["digest"], config)
+
+    result = check(ATOMIC_REF, MISLEADING_GREEN_REF, config, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert "the base did not duplicate at either boundary" in result.summary, result.summary
+    assert "Pass the tree that still has the bug as --base." in result.summary
+
+
+def test_an_invalid_timeout_knob_is_refused_before_any_world_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("NEMISIS_WORKER_TIMEOUT_SECONDS", "0")
+
+    with pytest.raises(CrashCheckError, match="NEMISIS_WORKER_TIMEOUT_SECONDS must be a number"):
+        check(BUGGY_REF, MISLEADING_GREEN_REF, SCENARIO_ID, mode="local")
+    assert not (tmp_path / "artifacts").exists()

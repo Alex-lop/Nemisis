@@ -277,3 +277,17 @@ says `FIX_PROVEN`, while `../side.txt` outlives a delete that reaches only the c
 world-detection op is a canary: every world is named by an opaque id, so the op is a no-op today,
 and the day an engine change leaks a role into a path or an environment variable the nightly
 sweep disagrees with the oracle. A third scenario adds a `Vocabulary`, not a grammar.
+
+## Every wall-clock wait names what did not happen (2026-09-07)
+
+The kernel had one budget, ten seconds, re-armed for each phase of each world, and every expiry
+said "worker IPC timed out": the same five words for a hello that never came, a first delivery
+that never reached its commit, and a replay that never finished. A base world that timed out was
+reported as "the originating base did not reproduce in five fresh worlds", which is false, and
+the one flaky observation on record could not be diagnosed from what it printed. The budget is
+now a documented knob, `NEMISIS_WORKER_TIMEOUT_SECONDS`, read once before any world runs and
+refused outside 1 to 600 seconds (a typo must not widen a wait silently); every expiry names the
+phase, the commits seen so far, the budget, and the knob; a base hunt or confirmation whose
+worlds did not complete says so, and a base that completes exactly once is told to pass the tree
+that still has the bug. The default did not move. A `Soak` workflow repeats the kernel's slow
+tests N times on GitHub's Linux, with the knob as an input, so the next flake is found there.
