@@ -10,11 +10,16 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    # A hung worker would otherwise hold a runner for the six-hour default.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        # 3.12 is the pinned, measured interpreter; 3.13 proves the suite is not tied to it.
-        python: ["3.12", "3.13"]
+        # 3.12 is the pinned, measured interpreter. 3.13 and 3.14 prove the suite is not tied to
+        # it: 3.14 is the current release, so a green column there says the frozen lock still
+        # resolves, the strict type check still passes, and every test still runs on the newest
+        # CPython, not only on the one the benchmark was measured against.
+        python: ["3.12", "3.13", "3.14"]
     name: verify (${{ matrix.python }})
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
