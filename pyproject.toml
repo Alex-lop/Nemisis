@@ -40,6 +40,22 @@ dev = [
   "ruff>=0.12,<1",
 ]
 
+[tool.hatch.build.targets.sdist]
+# A published sdist is the package and its paperwork, not a copy of the repository. The default
+# shipped docs/, tests/, site/, benchmarks/, .github/, and whatever untracked Markdown happened to
+# be in the working tree when someone ran `uv build`. Everything left out lives in Git, where it
+# can be read against the commit that produced it.
+#
+# Hatchling force-includes two more files no config can drop: PKG-INFO, and the VCS ignore file
+# (`SdistBuilder.get_default_build_data`, hatchling 1.32.0). tests/test_release.py allows exactly
+# those two and fails on anything else.
+include = [
+  "/src/nemisis",
+  "/README.md",
+  "/LICENSE",
+  "/pyproject.toml",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/nemisis"]
 
