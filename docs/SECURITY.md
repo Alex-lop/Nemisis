@@ -78,8 +78,9 @@ no longer be trusted to sit where the money moved. If it makes no store commit a
 what the textbook atomic fix written as one raw transaction does, there is no kill point to place:
 the run is `CHECKPOINT_NOT_REACHED`, the verdict is `EVIDENCE_INCOMPLETE`, and the summary names the
 write it saw and the store call that expresses the same fix. Two hostile reviews on 2026-09-06
-found eleven such channels that an earlier engine blessed; each is pinned in
-`tests/test_verdict_paths.py`. What the controller cannot read, it does not claim: a flag the
+found eleven such channels that an earlier engine blessed. Closing them left fifteen shapes pinned
+in `tests/test_verdict_paths.py` — seven in the first review's parametrized batch, eight in the
+second's — plus `fixture:sqlite-credit-v1/shadow-table`, which carries its own pinned refusal. What the controller cannot read, it does not claim: a flag the
 store's own next commit overwrites (the file's modification time, the bytes of the WAL sidecar) and
 a flag written at the sidecar names the store owns (`<database>-wal`, `<database>-shm`) stay
 outside what local mode can see. A handler that also forges the IPC message on the store's private
