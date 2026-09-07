@@ -16,7 +16,7 @@ Committed hero evidence (regenerated 2026-09-06 at engine `14cd428`):
 
 Current tree:
 
-- engine code digest: `2647b09453078364c29c86d1c0c6ec9b880a99e06999a6d3b619286b2e2991c8`
+- engine code digest: `29205c5be25169f0ec17faccddd824e2b931ef0efbcaadae23b6f38c7217e94d`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
@@ -69,7 +69,14 @@ New since 2026-09-05, from `overnight/hardening` and the `overnight2/*` branches
   free-page count, a re-pointed row, a renamed table, files and directories beside, above, under
   `~`, under `TMPDIR`, in the bound tree, deleted on exit). Each is pinned in
   `tests/test_verdict_paths.py`; the table one ships as `fixture:sqlite-credit-v1/shadow-table`.
-  Two channels stay outside local mode's sight and are named in `docs/SECURITY.md`.
+  A third review on 2026-09-07 confirmed thirty-seven more (a header field the probe never read,
+  the reserved header bytes, bytes past the last page, a file flag, an extended attribute on the
+  platform where the guard was inert, the mode and mtime of the world's own directories, HOME
+  removed or replaced, a directory made unlistable, a scratch-tree whitelist built from names, the
+  store patched at import); the probe now reads the file's raw header and length, the world scan
+  pins every entry's metadata and refuses what it cannot list, the scratch root is known by
+  recorded identity, and the worker refuses a patched store. Thirteen shapes are pinned; the
+  channels that remain are listed in `docs/SECURITY.md`.
 - Three red-team handlers ship as `fixture:sqlite-credit-v1/{mark-first,leftover-credit,never-marks}`,
   and `fixture:sqlite-credit-v1/raw-sql` is the textbook fix written as one raw SQL transaction:
   it gets no verdict and a one-line remedy, because a write the store did not make has no kill
@@ -101,7 +108,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 508 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 528 tests, and package build: pass locally on
   Python 3.12.13; CI runs the same gate on CPython 3.12 and 3.13
   ([run 34011484455](https://github.com/Alex-lop/Nemisis/actions/runs/34011484455), both legs green);
 - CI passed on the older commits these links were written for, every one of them earlier than the

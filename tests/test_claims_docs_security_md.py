@@ -24,12 +24,12 @@ def _module_source(module: ModuleType) -> str:
 def test_the_candidate_is_materialized_only_after_the_base_witness_is_frozen() -> None:
     """docs/SECURITY.md: the candidate is not materialized until the witness is frozen."""
     source = inspect.getsource(check)
-    assert source.count("_materialize_source(candidate") == 1
+    assert source.count("scratch.source(candidate") == 1
     order = [
         source.index("_hunt_hypotheses("),
         source.index("_minimize_witness("),
         source.index("base_attempts = _execute_confirmations("),
-        source.index("_materialize_source(candidate"),
+        source.index("scratch.source(candidate"),
     ]
     assert order == sorted(order)
 

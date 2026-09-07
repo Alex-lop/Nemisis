@@ -13,7 +13,7 @@ import tempfile
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from functools import partial
 from importlib import resources
@@ -61,6 +61,7 @@ from nemisis.sqlite_runner import (
     RUNNER_ID,
     RUNNER_VERSION,
     AnchorResolutionError,
+    _tree_state,
     bind_anchor,
     capsule_event,
     execute_attempt,
@@ -261,7 +262,8 @@ def check(
     _worker_timeout()  # refuse a bad NEMISIS_WORKER_TIMEOUT_SECONDS before any world runs
     with tempfile.TemporaryDirectory(prefix="nemisis-check-") as temporary:
         root = Path(temporary)
-        base_source = _materialize_source(base, root / "source-base")
+        scratch = _Scratch(root)
+        base_source = scratch.source(base, "source-base")
         contract = _contract_for_check(scenario, base_source)
         proposal = _proposal_for_check(scenario, contract)
         publish = partial(_publish, proposal=proposal)
@@ -313,8 +315,9 @@ def check(
             contract,
             base_binding,
             base_source.path,
-            root / uuid.uuid4().hex,
+            scratch.phase(),
         )
+        scratch.settle(scratch.root / "source-base")
         if not _hunt_is_conclusive(hypothesis_receipts):
             detail = _hunt_summary(hypothesis_receipts)
             attempt = _failed_attempt(
@@ -337,8 +340,9 @@ def check(
             capsule,
             base_binding,
             base_source.path,
-            root / uuid.uuid4().hex,
+            scratch.phase(),
         )
+        scratch.settle(scratch.root / "source-base")
         minimization_receipts = (minimization_receipt,)
         if not minimization_receipt.sole_fault_action_necessary_for_fixture:
             detail = _minimization_summary(minimization_receipt)
@@ -359,8 +363,9 @@ def check(
             )
 
         base_attempts = _execute_confirmations(
-            capsule, base_binding, base_source.path, root / uuid.uuid4().hex, WorldRole.BASE
+            capsule, base_binding, base_source.path, scratch.phase(), WorldRole.BASE
         )
+        scratch.settle(scratch.root / "source-base")
         if _confirmed_observation(base_attempts, capsule) is not CrashObservation.DUPLICATE_EFFECT:
             return publish(
                 run_id,
@@ -396,7 +401,7 @@ def check(
             )
 
         # Candidate materialization deliberately begins only after the base witness is frozen.
-        candidate_source = _materialize_source(candidate, root / "source-candidate")
+        candidate_source = scratch.source(candidate, "source-candidate")
         candidate_anchor = _bind_anchor(
             contract,
             candidate_source,
@@ -427,9 +432,10 @@ def check(
             capsule,
             candidate_binding,
             candidate_source.path,
-            root / uuid.uuid4().hex,
+            scratch.phase(),
             WorldRole.CANDIDATE,
         )
+        scratch.settle(scratch.root / "source-candidate")
         bindings = [base_binding, candidate_binding]
         attempts = [*base_attempts, *candidate_attempts]
         sweeps: list[CommitSweepReceipt] = []
@@ -443,10 +449,11 @@ def check(
                         capsule,
                         candidate_binding,
                         candidate_source.path,
-                        root / uuid.uuid4().hex,
+                        scratch.phase(),
                         WorldRole.CANDIDATE,
                     )
                 )
+                scratch.settle(scratch.root / "source-candidate")
             return publish(
                 run_id,
                 started_at,
@@ -466,15 +473,16 @@ def check(
                 capsule,
                 candidate_binding,
                 candidate_source.path,
-                root / uuid.uuid4().hex,
+                scratch.phase(),
                 WorldRole.CANDIDATE,
             )
+            scratch.settle(scratch.root / "source-candidate")
             sweeps.append(candidate_sweep)
             candidate_observation = candidate_sweep.observation
         corrected_observation: CrashObservation | None = None
         corrected_sweep: CommitSweepReceipt | None = None
         if corrected is not None:
-            corrected_source = _materialize_source(corrected, root / "source-corrected")
+            corrected_source = scratch.source(corrected, "source-corrected")
             corrected_anchor = _bind_anchor(
                 contract,
                 corrected_source,
@@ -504,9 +512,10 @@ def check(
                 capsule,
                 corrected_binding,
                 corrected_source.path,
-                root / uuid.uuid4().hex,
+                scratch.phase(),
                 WorldRole.CORRECTED,
             )
+            scratch.settle(scratch.root / "source-corrected")
             bindings.append(corrected_binding)
             attempts.extend(corrected_attempts)
             corrected_observation = _confirmed_observation(corrected_attempts, capsule)
@@ -515,9 +524,10 @@ def check(
                     capsule,
                     corrected_binding,
                     corrected_source.path,
-                    root / uuid.uuid4().hex,
+                    scratch.phase(),
                     WorldRole.CORRECTED,
                 )
+                scratch.settle(scratch.root / "source-corrected")
                 sweeps.append(corrected_sweep)
                 corrected_observation = corrected_sweep.observation
 
@@ -570,7 +580,8 @@ def replay(
     run_id = _run_id(mode)
     with tempfile.TemporaryDirectory(prefix="nemisis-replay-") as temporary:
         root = Path(temporary)
-        materialized = _materialize_source(source, root / "source")
+        scratch = _Scratch(root)
+        materialized = scratch.source(source, "source")
         if mode not in {"local", "live"}:
             raise CrashCheckError("mode must be 'local' or 'live'")
         requested_transport = TruthLabel.LIVE if mode == "live" else TruthLabel.LOCAL
@@ -608,8 +619,9 @@ def replay(
             verdict = CrashVerdict.EVIDENCE_INCOMPLETE
         elif mode == "local":
             attempts = _execute_confirmations(
-                sealed, binding, materialized.path, root / uuid.uuid4().hex, world_role
+                sealed, binding, materialized.path, scratch.phase(), world_role
             )
+            scratch.settle(scratch.root / "source")
             observation = _confirmed_observation(attempts, sealed)
             if world_role is WorldRole.BASE:
                 if observation is CrashObservation.DUPLICATE_EFFECT:
@@ -627,8 +639,9 @@ def replay(
             else:
                 if observation is CrashObservation.EXACTLY_ONCE:
                     sweep = _execute_sweep(
-                        sealed, binding, materialized.path, root / uuid.uuid4().hex, world_role
+                        sealed, binding, materialized.path, scratch.phase(), world_role
                     )
+                    scratch.settle(scratch.root / "source")
                     sweeps = (sweep,)
                     observation = sweep.observation
                 verdict, detail = _claimed_fix_verdict(observation, attempts, sweep, sealed)
@@ -916,10 +929,11 @@ def _bind_anchor(
 def _require_distinct_binding(
     binding: AnchorBinding, earlier: tuple[AnchorBinding, ...], role: WorldRole
 ) -> None:
-    if any(binding.digest == other.digest for other in earlier):
+    if any(binding.tree_digest == other.tree_digest for other in earlier):
         raise CrashCheckError(
-            f"{role.value} resolves to the same source ref and tree as an earlier role; "
-            "supply a different ref"
+            f"{role.value} resolves to the same tree as an earlier role (byte-identical source, "
+            "whatever ref or path named it); a control that is the candidate proves nothing, so "
+            "supply a different tree"
         )
 
 
@@ -1362,7 +1376,7 @@ def _load_capsule(value: str | Path | ReproCapsule) -> ReproCapsule:
 
 
 def _require_scratch_untouched(root: Path, expected: set[Path]) -> None:
-    """Nothing but CrashCheck's own directories may appear in the run's scratch tree.
+    """Nothing but CrashCheck's own directories may appear in a phase's root.
 
     A handler that climbs out of its world with ``../../..`` lands here, in a directory every
     sibling world shares; that is durable state no store commit made and a channel between
@@ -1379,18 +1393,66 @@ def _require_scratch_untouched(root: Path, expected: set[Path]) -> None:
         )
 
 
-def _expected_run_entries(run_root: Path) -> set[Path]:
-    """The run's temporary root holds only the source copies and the phase roots it created."""
-    return {
-        path
-        for path in run_root.iterdir()
-        if path.name in {"source-base", "source-candidate", "source-corrected", "source"}
-        or (
-            path.is_dir()
-            and len(path.name) == 32
-            and all(c in "0123456789abcdef" for c in path.name)
-        )
-    }
+@dataclass
+class _Scratch:
+    """The run's temporary root and everything the kernel itself put there, by identity.
+
+    A hostile review found two holes in a whitelist built from names: a directory the handler
+    made with a 32-hex name was "expected" by construction, and a file written inside the
+    materialized base tree (a sibling of the candidate's) was watched by nothing once the base
+    phase ended. Now every source copy and every finished phase is recorded by its entry-by-entry
+    state when the kernel is done with it, and every later phase end re-checks all of them and
+    admits nothing else at the root.
+    """
+
+    root: Path
+    sources: dict[Path, str] = field(default_factory=dict)
+    finished: dict[Path, str] = field(default_factory=dict)
+    active: set[Path] = field(default_factory=set)
+
+    def source(self, value: str | Path, name: str) -> _Source:
+        source = _materialize_source(value, self.root / name)
+        # Keyed by the entry under the root (the materialized path may be resolved through a
+        # symlinked temp directory); the state is the tree's entry-by-entry identity.
+        self.sources[self.root / name] = _tree_state(self.root / name)
+        return source
+
+    def phase(self) -> Path:
+        path = self.root / uuid.uuid4().hex
+        self.active.add(path)
+        return path
+
+    def settle(self, bound: Path) -> None:
+        """Verify the root, then record every active phase as finished; phases are sequential.
+
+        ``bound`` is the source copy the phase ran against: a handler that writes into its own
+        bound tree is refused by the attempt itself (with the sentence that names it), so that
+        copy's state is re-recorded here rather than raised a second time. Every other source
+        copy and every finished phase must be untouched.
+        """
+        self.verify(bound)
+        self.sources[bound] = _tree_state(bound)
+        for phase in sorted(self.active):
+            self.active.discard(phase)
+            self.finished[phase] = _tree_state(phase) if phase.exists() else ""
+
+    def verify(self, bound: Path | None = None) -> None:
+        expected = set(self.sources) | set(self.finished) | self.active
+        _require_scratch_untouched(self.root, expected)
+        for path, state in self.sources.items():
+            if path != bound and _tree_state(path) != state:
+                raise CrashCheckError(
+                    f"the handler wrote into CrashCheck's copy of a source tree ({path.name}); "
+                    "kill points are store commits, so no crash window around that state can be "
+                    "reached and no verdict is issued"
+                )
+        for path, state in self.finished.items():
+            if (_tree_state(path) if path.exists() else "") != state:
+                raise CrashCheckError(
+                    "the handler wrote into the worlds of a phase CrashCheck had finished "
+                    f"({path.name}); kill points are store commits, so no crash window around "
+                    "that state can be reached and no verdict is issued"
+                )
 
 
 def _worlds(work_root: Path, count: int) -> list[Path]:
@@ -1433,7 +1495,6 @@ def _execute_confirmations(
         futures = [executor.submit(one, index) for index in range(1, CONFIRMATIONS + 1)]
         attempts = tuple(future.result() for future in futures)
     _require_scratch_untouched(work_root, set(worlds))
-    _require_scratch_untouched(work_root.parent, _expected_run_entries(work_root.parent))
     return attempts
 
 
@@ -1500,7 +1561,6 @@ def _execute_sweep(
     _require_scratch_untouched(
         work_root, {census_world, *(work_root / name for name in sweep_worlds)}
     )
-    _require_scratch_untouched(work_root.parent, _expected_run_entries(work_root.parent))
     return CommitSweepReceipt.with_digest(
         role=role,
         capsule_digest=capsule.digest,
@@ -1555,8 +1615,9 @@ def _schedule_split(
             return (
                 f"a kill world committed {', '.join(own) or 'nothing'} where the census committed "
                 f"{', '.join(census) or 'nothing'}: the handler's commit schedule differs between "
-                "worlds, so it depends on state CrashCheck cannot see and no kill point can be "
-                "trusted. No verdict is issued."
+                "worlds that started from the same seed, so the sweep's kill points were derived "
+                "from a schedule the kill worlds did not run and none of them can be trusted. "
+                "CrashCheck cannot tell why the schedule moved. No verdict is issued."
             )
     return None
 

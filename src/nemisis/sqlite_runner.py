@@ -9,6 +9,7 @@ read-only connections. Everything about *which* database, store, event, and rule
 from __future__ import annotations
 
 import ast
+import ctypes
 import hashlib
 import importlib.util
 import inspect
@@ -337,8 +338,9 @@ def execute_attempt(
         _preflight(
             scenario, capsule, binding, root, work_dir.resolve(), execution_nonce, timeout_seconds
         )
-        _make_sandbox(work_dir)
+        world = _make_sandbox(work_dir)
         initial_file_digest = _seed_database(scenario, database, event)
+        world = world.with_database(database)
         tree_before = _tree_state(root)
         timeline.append(_entry(TimelineState.DATABASE_SEEDED, database_id))
         ledger = _ledger(scenario, database, event)
@@ -377,8 +379,16 @@ def execute_attempt(
         post_kill = _require_unchanged(
             scenario, database, event, ledger, "durable checkpoint changed after worker death"
         )
-        # The crashed world is scanned now, before the replay can tidy a flag away.
-        _require_only_the_store_wrote(work_dir, database)
+        # The crashed world and the bound tree are checked now, before the replay can tidy a
+        # flag away (a third hostile review noted the tree was compared only at the end).
+        _require_only_the_store_wrote(world, database)
+        if _tree_state(root) != tree_before:
+            raise _AttemptFailure(
+                ExecutionStatus.INTEGRITY_ERROR,
+                "source tree changed during trusted execution (a file, a bytecode cache, or a "
+                "directory the handler wrote into its own tree before the kill)",
+                integrity=IntegrityStatus.INVALID,
+            )
         timeline.append(_entry(TimelineState.POST_KILL_PROBED, post_kill.digest))
 
         replay_worker = _spawn_worker(
@@ -415,7 +425,7 @@ def execute_attempt(
                 "directory the handler wrote into its own tree)",
                 integrity=IntegrityStatus.INVALID,
             )
-        _require_only_the_store_wrote(work_dir, database)
+        _require_only_the_store_wrote(world, database)
         observation = classify_final(
             final, scenario.effect_delta(event), scenario.initial_total(event)
         )
@@ -507,8 +517,9 @@ def execute_no_fault_replay(
         _preflight(
             scenario, capsule, binding, root, work_dir.resolve(), execution_nonce, timeout_seconds
         )
-        _make_sandbox(work_dir)
+        world = _make_sandbox(work_dir)
         initial_file_digest = _seed_database(scenario, database, event)
+        world = world.with_database(database)
         tree_before = _tree_state(root)
         ledger = _ledger(scenario, database, event)
         initial = ledger.snapshot
@@ -535,7 +546,7 @@ def execute_no_fault_replay(
             event=event,
             ledger=ledger,
         )
-        _require_only_the_store_wrote(work_dir, database)
+        _require_only_the_store_wrote(world, database)
 
         replay_worker = _spawn_worker(
             scenario=scenario,
@@ -567,7 +578,7 @@ def execute_no_fault_replay(
                 "directory the handler wrote into its own tree)",
                 integrity=IntegrityStatus.INVALID,
             )
-        _require_only_the_store_wrote(work_dir, database)
+        _require_only_the_store_wrote(world, database)
         observation = classify_delivery(
             first_delivery, final, scenario.effect_delta(event), scenario.initial_total(event)
         )
@@ -629,36 +640,134 @@ def _sandbox_cwd(work_dir: Path) -> Path:
     return work_dir.resolve() / "sandbox" / "cwd"
 
 
-def _make_sandbox(work_dir: Path) -> None:
+@dataclass(frozen=True)
+class _Entry:
+    """What one entry of a world is allowed to be: its kind and the metadata a crash keeps."""
+
+    kind: str
+    mode: int
+    flags: int
+    xattrs: tuple[str, ...]
+    mtime_ns: int | None  # pinned only where nothing legitimate ever writes
+
+
+@dataclass(frozen=True)
+class _World:
+    """One world's directory and every entry it may hold, with the metadata the kernel gave it.
+
+    The worker's cwd is the one directory whose modification time moves for a legitimate reason
+    (SQLite creates and removes the WAL sidecars there), so it is the one not pinned.
+    """
+
+    root: Path
+    expected: dict[Path, _Entry]
+
+    def with_database(self, database: Path) -> _World:
+        return _World(self.root, {**self.expected, database: _stat_entry(database, False)})
+
+
+def _make_sandbox(work_dir: Path) -> _World:
     """One directory per world: the worker's cwd, its HOME, and its TMPDIR, all inside it."""
     root = work_dir.resolve()
     root.mkdir(parents=True, exist_ok=False)
     for relative in ("sandbox/cwd", "home", "tmp"):
         (root / relative).mkdir(parents=True, exist_ok=False)
+    expected = {
+        path: _stat_entry(path, pin_mtime=path != root / "sandbox" / "cwd")
+        for path in (root, root / "sandbox", root / "sandbox" / "cwd", root / "home", root / "tmp")
+    }
+    return _World(root, expected)
 
 
-def _require_only_the_store_wrote(work_dir: Path, database: Path) -> None:
+def _stat_entry(path: Path, pin_mtime: bool) -> _Entry:
+    status = path.lstat()
+    kind = (
+        "dir"
+        if stat.S_ISDIR(status.st_mode)
+        else "file"
+        if stat.S_ISREG(status.st_mode)
+        else "other"
+    )
+    return _Entry(
+        kind=kind,
+        mode=stat.S_IMODE(status.st_mode),
+        flags=int(getattr(status, "st_flags", 0)),
+        xattrs=tuple(_xattrs(path)),
+        mtime_ns=status.st_mtime_ns if pin_mtime else None,
+    )
+
+
+def _metadata_difference(expected: _Entry, observed: _Entry) -> str:
+    parts = []
+    if observed.kind != expected.kind:
+        names = {
+            "dir": "a directory",
+            "file": "a regular file",
+            "other": "neither a regular file nor a directory",
+        }
+        parts.append(f"it is now {names[observed.kind]}, not {names[expected.kind]}")
+    if observed.mode != expected.mode:
+        parts.append(f"permission bits {observed.mode:o} instead of {expected.mode:o}")
+    if observed.flags != expected.flags:
+        parts.append(f"file flags {observed.flags:#x} instead of {expected.flags:#x}")
+    if observed.xattrs != expected.xattrs:
+        parts.append(
+            f"extended attributes {list(observed.xattrs)} instead of {list(expected.xattrs)}"
+        )
+    if observed.mtime_ns != expected.mtime_ns:
+        parts.append("its modification time moved")
+    return ", ".join(parts) or "its metadata changed"
+
+
+def _world_entries(root: Path) -> list[Path]:
+    """Every entry under the world, listed by the kernel itself; a directory that cannot be listed
+    is a refusal, not an empty directory."""
+    found: list[Path] = []
+    stack = [root]
+    while stack:
+        directory = stack.pop()
+        try:
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    path = Path(entry.path)
+                    found.append(path)
+                    if entry.is_dir(follow_symlinks=False):
+                        stack.append(path)
+        except OSError as error:
+            relative = directory.relative_to(root).as_posix() or "."
+            raise _AttemptFailure(
+                ExecutionStatus.UNSUPPORTED,
+                f"the handler made {relative}/ in its world unlistable ({type(error).__name__}); "
+                "a directory the kernel cannot read is durable state no store commit made, so no "
+                "verdict is issued",
+            ) from error
+    return found
+
+
+def _require_only_the_store_wrote(world: _World, database: Path) -> None:
     """Refuse handlers that keep durable state anywhere in their world but the store.
 
-    Kill points are store commits. A dedup file, a journal, or an empty directory written in the
-    worker's cwd, its parents inside the world, its HOME, or its TMPDIR has crash windows the sweep
-    cannot reach, so such a handler cannot earn a verdict. Writes elsewhere on the machine are
-    outside what local mode can see and are a documented boundary.
+    Kill points are store commits. A dedup file, a journal, an empty directory, a removed or
+    replaced directory, a permission bit, a file flag, an extended attribute, or a directory's
+    modification time, anywhere in the worker's cwd, its parents inside the world, its HOME, or
+    its TMPDIR, has crash windows the sweep cannot reach, so such a handler cannot earn a
+    verdict. Writes elsewhere on the machine are outside what local mode can see and are a
+    documented boundary. Extra entries are named first, because they are the sentence a judge
+    can act on; the metadata pins come after.
     """
-    root = work_dir.resolve()
-    expected = {
-        root / "sandbox",
-        root / "sandbox" / "cwd",
-        root / "home",
-        root / "tmp",
-        database,
+    root = world.root
+
+    def relative(path: Path) -> str:
+        return path.relative_to(root).as_posix() or "."
+
+    sidecars = {
         database.with_name(f"{database.name}-wal"),
         database.with_name(f"{database.name}-shm"),
     }
     extra = sorted(
-        path.relative_to(root).as_posix() + ("/" if path.is_dir() else "")
-        for path in root.rglob("*")
-        if path not in expected
+        relative(path) + ("/" if path.is_dir() and not path.is_symlink() else "")
+        for path in _world_entries(root)
+        if path not in world.expected and path not in sidecars
     )
     if extra:
         shown = ", ".join(extra[:5]) + (", …" if len(extra) > 5 else "")
@@ -668,34 +777,74 @@ def _require_only_the_store_wrote(work_dir: Path, database: Path) -> None:
             "store commits, so crash windows around that state cannot be reached and no verdict "
             "is issued",
         )
-    status = database.stat()
-    if stat.S_IMODE(status.st_mode) != _SEED_MODE or _xattrs(database):
-        raise _AttemptFailure(
-            ExecutionStatus.UNSUPPORTED,
-            "the handler changed the database file's permission bits or extended attributes; "
-            "that is durable state no store commit made, so no verdict is issued",
-        )
+    # Deepest first, so a removed or replaced HOME is named before the root whose mtime it moved.
+    for path in sorted(world.expected, key=lambda item: (-len(item.parts), str(item))):
+        expected = world.expected[path]
+        try:
+            observed = _stat_entry(path, pin_mtime=expected.mtime_ns is not None)
+        except FileNotFoundError as error:
+            raise _AttemptFailure(
+                ExecutionStatus.UNSUPPORTED,
+                f"the handler removed {relative(path)} from its world; that is durable state no "
+                "store commit made, so no verdict is issued",
+            ) from error
+        if observed != expected:
+            raise _AttemptFailure(
+                ExecutionStatus.UNSUPPORTED,
+                f"the handler changed the metadata of {relative(path)} in its world "
+                f"({_metadata_difference(expected, observed)}); that is durable state no store "
+                "commit made, so no verdict is issued",
+            )
+    for sidecar in sidecars:
+        # The sidecars are the store's own; the kernel pins their kind and nothing else, because
+        # a flag at the sidecar names is a channel local mode names and does not claim.
+        if sidecar.exists() and _stat_entry(sidecar, False).kind != "file":
+            raise _AttemptFailure(
+                ExecutionStatus.UNSUPPORTED,
+                f"the handler replaced {relative(sidecar)} with something that is not a regular "
+                "file; that is durable state no store commit made, so no verdict is issued",
+            )
 
 
 _SEED_MODE = 0o600
+_XATTR_NOFOLLOW = 0x0001
 
 
 def _xattrs(path: Path) -> list[str]:
+    """The names of the extended attributes on ``path``, on Linux and on macOS.
+
+    CPython builds ``os.listxattr`` only on Linux; on macOS the same libc call is reached through
+    ctypes, because an inert guard is worse than none (a hostile review found it inert).
+    """
     listxattr = getattr(os, "listxattr", None)
-    if listxattr is None:
+    if listxattr is not None:
+        return sorted(str(name) for name in listxattr(path, follow_symlinks=False))
+    if sys.platform != "darwin":
         return []
-    try:
-        return sorted(listxattr(path))
-    except OSError:
+    libc = ctypes.CDLL(None, use_errno=True)
+    call = libc.listxattr
+    call.restype = ctypes.c_ssize_t
+    call.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int]
+    encoded = os.fsencode(path)
+    size = call(encoded, None, 0, _XATTR_NOFOLLOW)
+    if size < 0:
+        raise OSError(ctypes.get_errno(), f"listxattr failed for {path}")
+    if size == 0:
         return []
+    buffer = ctypes.create_string_buffer(size)
+    got = call(encoded, buffer, size, _XATTR_NOFOLLOW)
+    if got < 0:
+        raise OSError(ctypes.get_errno(), f"listxattr failed for {path}")
+    return sorted(name.decode("utf-8", "replace") for name in buffer.raw[:got].split(b"\0") if name)
 
 
 def _tree_state(root: Path) -> str:
     """Every entry in the bound tree, of any kind, with file bytes: the integrity comparison.
 
     The binding digest ignores ``__pycache__`` and non-files so an identity is stable; the
-    integrity check ignores nothing, because a handler that stores a flag as a bytecode-cache
-    file or an empty directory in its own tree has durable state no store commit made.
+    integrity check keeps every path and kind and every regular file's bytes, because a handler
+    that stores a flag as a bytecode-cache file or an empty directory in its own tree has durable
+    state no store commit made. Metadata (modes, attributes, times) is not part of it.
     """
     entries: list[list[object]] = []
     for path in sorted(root.rglob("*")):
@@ -827,9 +976,33 @@ class _Ledger:
         self.content, self.snapshot = other.content, other.snapshot
 
 
+def _file_identity(path: Path) -> dict[str, object]:
+    """The bytes of the database file that SQLite carries but never reads back for a commit.
+
+    The 100-byte header is compared whole, except the three fields a commit rewrites (the change
+    counter, the page count, and the version-valid-for number); the file must be exactly as many
+    pages long as its own header says. A flag in a header field the store never rewrites
+    (``default_cache_size``, the twenty reserved bytes), or in bytes past the last page, is
+    durable, invisible to every PRAGMA and every row, and caught here.
+    """
+    with open(path, "rb") as handle:
+        header = bytearray(handle.read(100))
+        size = os.fstat(handle.fileno()).st_size
+    if len(header) < 100 or header[:16] != b"SQLite format 3\0":
+        raise sqlite3.DatabaseError("the database file has no SQLite header")
+    page_size = int.from_bytes(header[16:18], "big")
+    page_size = 65_536 if page_size == 1 else page_size
+    pages = int.from_bytes(header[28:32], "big")
+    header[24:32] = bytes(8)
+    header[92:96] = bytes(4)
+    return {"header": header.hex(), "bytes_beyond_pages": size - pages * page_size}
+
+
 def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -> dict[str, object]:
-    """Everything durable in the file: the schema, the header pragmas, every row of every table."""
+    """Everything durable in the file: the schema, the header pragmas, every row of every table,
+    and the raw header and length of the file itself."""
     try:
+        identity = _file_identity(path)
         # ``closing``: a sqlite3 connection's own context manager ends the transaction and
         # leaves the handle open, and an open reader holds the WAL lock the worker needs.
         with closing(_read_only(path)) as connection:
@@ -846,11 +1019,11 @@ def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -
                 name: [[_json_safe(value) for value in row] for row in rows]
                 for name, rows in scenario.tables(connection).items()
             }
-    except sqlite3.Error as error:
+    except (sqlite3.Error, OSError) as error:
         raise _AttemptFailure(
             ExecutionStatus.PROBE_ERROR, f"read-only state probe failed ({error})"
         ) from error
-    return {"header": header, "schema": schema, "tables": tables}
+    return {"file": identity, "header": header, "schema": schema, "tables": tables}
 
 
 # Every durable header field a handler can set and a store commit never changes: the journal
@@ -860,6 +1033,7 @@ def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -
 _HEADER_PRAGMAS = (
     "application_id",
     "auto_vacuum",
+    "default_cache_size",
     "encoding",
     "freelist_count",
     "journal_mode",
@@ -900,7 +1074,15 @@ def _content_difference(
     if observed["schema"] != expected["schema"]:
         parts.append("the schema changed (a table, index, or trigger this scenario did not seed)")
     if observed["header"] != expected["header"]:
-        parts.append("the database header changed (PRAGMA user_version or application_id)")
+        parts.append(
+            "the database header changed (PRAGMA user_version, application_id, or "
+            "default_cache_size)"
+        )
+    if observed.get("file") != expected.get("file"):
+        parts.append(
+            "the database file's bytes changed outside SQLite's content (a header field no store "
+            "commit rewrites, or bytes past the last page)"
+        )
     expected_tables = cast(Tables, expected["tables"])
     observed_tables = cast(Tables, observed["tables"])
     differing = sorted(
@@ -1238,6 +1420,7 @@ def _attributed_probe(
         )
     predicted_tables = scenario.apply(cast(Tables, ledger.content["tables"]), operation, normalized)
     predicted = {
+        "file": ledger.content["file"],
         "header": ledger.content["header"],
         "schema": ledger.content["schema"],
         "tables": predicted_tables,
@@ -1448,7 +1631,9 @@ def _worker(argv: list[str]) -> int:
                 "worker_nonce": nonce,
             },
         )
+        trusted = _trusted_code(scenario)
         handler = _load_handler(Path(source), handler_path, symbol)
+        _require_trusted_code(scenario, trusted)
         store = scenario.store_class(Path(database), channel, event)
         handler(store, event)
         worker_send(
@@ -1462,6 +1647,39 @@ def _worker(argv: list[str]) -> int:
         return 3
     finally:
         channel.close()
+
+
+class TrustedStorePatched(RuntimeError):
+    """The handler module rebound a trusted store or protocol function when it was imported."""
+
+
+def _trusted_code(scenario: Scenario) -> dict[str, object]:
+    """The code objects the store and its protocol run with, captured before any candidate code.
+
+    A handler module is imported before the store is built, so module-level code could rebind
+    ``CreditStore.credit_and_mark`` to a version that makes two commits and reports one; the
+    handler body would then be the textbook one-liner and the store would under-report itself.
+    Comparing code objects before and after the import catches that; a candidate that patches
+    deeper (the socket, the interpreter) is hostile code, which local mode names as its boundary.
+    """
+    import nemisis.scenario as protocol
+
+    trusted: dict[str, object] = {}
+    for klass in (scenario.store_class, *scenario.store_class.__mro__[1:]):
+        for name, value in vars(klass).items():
+            if callable(value) and hasattr(value, "__code__"):
+                trusted.setdefault(f"{klass.__name__}.{name}", value.__code__)
+    for name in ("connect", "worker_send", "worker_receive"):
+        trusted[f"scenario.{name}"] = getattr(protocol, name).__code__
+    return trusted
+
+
+def _require_trusted_code(scenario: Scenario, trusted: dict[str, object]) -> None:
+    if _trusted_code(scenario) != trusted:
+        changed = sorted(
+            name for name, code in _trusted_code(scenario).items() if trusted.get(name) is not code
+        )
+        raise TrustedStorePatched(", ".join(changed) or "trusted code")
 
 
 def _load_handler(

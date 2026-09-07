@@ -348,3 +348,36 @@ the event carries a contrived one.
 Decision: no third scenario tonight. The conservation class needs the seam widened first, and
 the outbox class is one seam change (an optional scalar) away from honest. A design that
 prevents a wrong day of work outranks a fixture that decorates.
+
+## The third hostile round (2026-09-07)
+
+Six reviewers with six lenses (the diff, SQLite internals, the process and filesystem, the store
+object and its IPC, the second scenario, the verdict logic) wrote fifty-seven handlers against
+the engine of `d7677d0`; forty-four were claimed as findings and thirty-seven were confirmed by
+independent re-runs. Nearly all were one of four root causes. The probe read the database
+through SQLite and never the file: `PRAGMA default_cache_size` (header bytes 48 to 51), the
+twenty reserved header bytes, and bytes past the last page were durable and invisible. The world
+scan compared paths and never metadata: a file flag, an extended attribute (the guard was inert
+on macOS, where CPython has no `os.listxattr`), the mode or modification time of HOME or TMPDIR,
+a HOME removed or replaced by a FIFO, and a directory made unlistable so `rglob` reported nothing.
+The scratch-tree whitelist was built from names: any 32-hex directory the handler made was
+expected by construction, and a file inside the base tree's copy was watched by nothing once the
+base phase ended. And the trusted store could be patched at import, so the handler body was the
+textbook one-liner while the store under-reported its commits.
+
+All four are closed: every probe reads the file's raw header (masked for the three fields a
+commit rewrites) and requires the file to be exactly its stated page count long; every world's
+directories and database are recorded with mode, flags, attributes, and mtime when the kernel
+makes them and re-checked by the kernel's own walk, deepest first, which refuses a directory it
+cannot list; the run root admits only what the kernel recorded and re-checks every source copy
+and finished phase entry by entry; and the worker compares the store's code objects before and
+after importing the handler. Thirteen shapes are pinned end to end and four became grammar ops.
+Three findings were kept as decisions: a handler that reads the shelf level instead of its marker
+earns a capsule-scoped pass, which is what the verdict's name says; a corrected control that fails
+still withholds the candidate's verdict, and now says why and that omitting `--corrected` restores
+it; and the split-schedule sentence asserts only what it saw. Three channels were added to the
+boundary list instead of closed: a write reverted before the next commit (attribution samples at
+commits), counting sibling worlds through the shared scratch tree (the answer is a mount
+namespace, designed below), and a store patched below the class the worker checks. The
+corrected-tree distinctness rule compares resolved trees, so a byte-identical copy at another
+path is refused as the same tree.

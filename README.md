@@ -128,9 +128,11 @@ flag in a table it creates inside the store's own database: an earlier engine bl
 crash between that write and the credit left the customer unpaid forever. Attribution now reads the
 whole database file (schema, the header fields a commit never changes, every row with its rowid)
 and the whole world the worker runs in (its working directory and the two above it, `HOME`,
-`TMPDIR`, the bound tree entry by entry), before and after every delivery; eleven hidden-flag
-handlers from two hostile reviews are pinned as refusals. What it cannot read it does not claim;
-[the boundary](docs/SECURITY.md) names the two channels that remain.
+`TMPDIR`, the bound tree entry by entry, with every entry's permission bits, flags, attributes,
+and modification time), before and after every delivery, and the raw header and length of the
+database file itself. Three hostile reviews found forty-eight handlers an earlier engine blessed;
+twenty-eight of those shapes are pinned as refusals. What it cannot read it does not claim;
+[the boundary](docs/SECURITY.md) lists the channels that remain.
 
 ## Let Nemotron write the patch
 
