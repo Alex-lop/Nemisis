@@ -79,12 +79,15 @@ the process could die.
 ## Try to fool it
 
 The checker was red-teamed by hand until it stopped losing, and CI now red-teams it on every run:
-`nemisis redteam` renders handlers from a small grammar over store operations (guard, credit, mark,
-the atomic call, a raw write beside the database, a raw SQL write, in any order), runs `check` on
-each, and compares the verdict with an oracle computed from the operation sequence alone. Ten
-fixed-seed cases run in the normal suite; a nightly workflow runs three hundred. Three hand-written
-handlers that fooled an earlier engine ship as fixture refs, so the claim above is one flag away
-for anyone:
+`nemisis redteam` renders handlers from a grammar over store operations (guard, credit, mark, the
+atomic call, the same calls inside `try`/`except` or a retry loop, and the writes around the store
+that hostile reviews wrote by hand: a file beside, above, under `~` or `$TMPDIR`, a file tidied
+away before returning, a raw SQL write, a table, a pragma, a re-pointed row, a world-detection
+attempt; a quarter of them through a helper function), runs `check` on each, and compares the
+verdict with an oracle computed from the operation sequence alone, in either scenario's
+vocabulary (`--scenario`). Ten fixed-seed cases run in the normal suite; a nightly workflow runs
+three hundred per scenario. Three hand-written handlers that fooled an earlier engine ship as
+fixture refs, so the claim above is one flag away for anyone:
 
 | Candidate | Unit test | Called twice | Kill + retry | Verdict |
 | --- | :-: | :-: | --- | --- |

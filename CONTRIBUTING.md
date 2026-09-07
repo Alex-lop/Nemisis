@@ -28,10 +28,14 @@ composite action and an installed-wheel smoke test.
 ## Red-teaming the checker
 
 `uv run nemisis redteam --cases 100 --seed 1 --out ./redteam` renders a hundred handlers from a
-grammar over store operations, runs `check` on each, and compares the verdict with an oracle
-computed from the operation sequence alone. It exits `1` on any disagreement and leaves every
-handler and its evidence under `./redteam`. A disagreement is either a checker false pass or false
-fail or an oracle bug; either is worth an issue with the case's ops and summary.
+grammar over store operations and the writes around the store that hostile reviews have written
+by hand (`Op` in `src/nemisis/redteam.py` is the whole list), runs `check` on each, and compares
+the verdict with an oracle computed from the operation sequence alone; `--scenario
+sqlite-inventory-v1` speaks the second scenario's vocabulary. It exits `1` on any disagreement and
+leaves every handler and its evidence under `./redteam`. A disagreement is either a checker false
+pass or false fail or an oracle bug; either is worth an issue with the case's ops and summary. A
+new hostile shape belongs in the grammar as an `Op` with its oracle rule, so the nightly sweep
+keeps writing it.
 
 ## Adding a candidate to the zoo
 

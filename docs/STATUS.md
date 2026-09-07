@@ -53,8 +53,14 @@ New since 2026-09-05, from `overnight/hardening` and the `overnight2/*` branches
 - `nemisis propose-patch`: Nemotron plays the coding agent, checker-blind; its module is shape
   checked, becomes an ordinary candidate, and is named as the author in the report. `MOCKED` in
   tests; `LIVE` needs `NEBIUS_API_KEY`, absent here.
-- `nemisis redteam` generates handlers from a grammar over store operations and compares every
-  verdict with an oracle; ten cases run in the normal suite, three hundred nightly.
+- `nemisis redteam` generates handlers from a grammar over store operations and the writes
+  around the store that two hostile reviews wrote by hand (a table, a pragma, files beside, above,
+  under `HOME` and `TMPDIR`, a file tidied away before returning, a re-pointed row, a swallowed
+  second marker, a retry loop, a helper function, a world-detection attempt) and compares every
+  verdict with an oracle, in either scenario's vocabulary; ten cases run in the normal suite,
+  three hundred per scenario nightly. The nightly's first GitHub run is
+  [34086693284](https://github.com/Alex-lop/Nemisis/actions/runs/34086693284) (300 handlers, seed
+  20260907, 0 disagreements, on the engine before this grammar).
 - Attribution reads the whole database file (schema, every durable header field a commit never
   changes, every row with its rowid) and the whole per-world directory (cwd, its two parents,
   `HOME`, `TMPDIR`, the bound tree entry by entry) after the kill, between the census deliveries,
@@ -90,7 +96,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 453 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 482 tests, and package build: pass locally on
   Python 3.12.13; CI runs the same gate on CPython 3.12 and 3.13
   ([run 34011484455](https://github.com/Alex-lop/Nemisis/actions/runs/34011484455), both legs green);
 - CI passed on the older commits these links were written for, every one of them earlier than the
