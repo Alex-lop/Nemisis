@@ -22,6 +22,12 @@ jobs:
   redteam:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        # One sweep per audited scenario; the grammar speaks each one's vocabulary.
+        scenario: ["sqlite-credit-v1", "sqlite-inventory-v1"]
+    name: redteam (${{ matrix.scenario }})
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -36,10 +42,12 @@ jobs:
         env:
           CASES: ${{ inputs.cases || '300' }}
           SEED: ${{ inputs.seed || github.run_id }}
+          SCENARIO: ${{ matrix.scenario }}
         run: |
-          uv run nemisis redteam --cases "$CASES" --seed "$SEED" --out "$RUNNER_TEMP/redteam" | tee redteam.txt
+          uv run nemisis redteam --cases "$CASES" --seed "$SEED" --scenario "$SCENARIO" \
+            --out "$RUNNER_TEMP/redteam" | tee redteam.txt
           {
-            echo "## Nightly red team"
+            echo "## Nightly red team ($SCENARIO)"
             echo
             echo '```'
             tail -n 5 redteam.txt
@@ -49,7 +57,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: redteam-${{ github.run_id }}
+          name: redteam-${{ matrix.scenario }}-${{ github.run_id }}
           path: ${{ runner.temp }}/redteam
           if-no-files-found: warn
           retention-days: 14
