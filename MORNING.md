@@ -6,7 +6,7 @@ the kernel now says what did not happen, `init` refuses at draft time what `chec
 the generator writes every shape the reviewers wrote by hand in both scenarios, the hero is
 measured on two machines with one verdict, and no `LIVE` receipt exists, because no key does.
 
-Eight PRs, `main` untouched, in merge order (each stacked on the one above it):
+Nine PRs, `main` untouched, in merge order (each stacked on the one above it):
 
 | PR | Title | Head | CI on that head | Merge |
 | -- | ----- | ---- | --------------- | ----: |
@@ -17,7 +17,8 @@ Eight PRs, `main` untouched, in merge order (each stacked on the one above it):
 | #19 | fix(kernel): close the four root causes the third hostile review found | `2e8aee6` | [34093890874](https://github.com/Alex-lop/Nemisis/actions/runs/34093890874) green | 5 |
 | #20 | ci+release: CPython 3.14, a Linux hero on demand, a tag-driven release, a Dockerfile | `8382c38` | [34094345512](https://github.com/Alex-lop/Nemisis/actions/runs/34094345512) green | 6 |
 | #21 | docs(story): demo scripts, PRODUCT, and the site brought to the engine that exists | `c339aa9` | [34094580768](https://github.com/Alex-lop/Nemisis/actions/runs/34094580768) green | 7 |
-| #22 | docs+evidence: hero at the final engine, the design entries, this report | tip of `overnight3/morning` (this file is in it) | [34094921411](https://github.com/Alex-lop/Nemisis/actions/runs/34094921411) green on `b126610`, the commit before this line | 8 |
+| #22 | docs+evidence: hero at the final engine, the design entries, this report | `6c3512f` | [34094921411](https://github.com/Alex-lop/Nemisis/actions/runs/34094921411) green on `b126610` and re-run on `6c3512f` | 8 |
+| #23 | tools+docs: the mutation ledger of the kernel's refusals | tip of `overnight3/mutation-ledger` (this file is in it) | [branch runs](https://github.com/Alex-lop/Nemisis/actions?query=branch%3Aovernight3%2Fmutation-ledger) | 9 |
 
 Merge each with "delete branch"; GitHub retargets the next PR by itself. Every PR body is a
 mini-ledger. The subagent branches (#20, #21) carry a merge commit from the PR below them rather
@@ -46,13 +47,11 @@ than a rebase, because they had been pushed and the rule is never to rewrite the
 | 17 | The site's hero terminal is the command's real stdout | #21 | PASS | the fabricated `sweep:` line is gone; every non-dim line is verbatim from `nemisis check … misleading-green`; the proof strip cites run 34086693284 |
 | 18 | README H1 equals the proven level | #22 | PASS | unchanged H1; rows 6–9 are the proof, and the boundary list in SECURITY is longer and truer than yesterday's |
 | 19 | `LIVE` receipt | – | FAIL | `printenv NEBIUS_API_KEY \| wc -c` → 0; nothing is `LIVE`; `BLOCKED` stays |
-| 20 | Mutation ledger of the kernel's refusals | – | UNKNOWN | the runner (`tools/mutants.py`) is written and its sweep was still running in its worktree when this was written; nothing pushed, no counts claimed (see negatives) |
+| 20 | Mutation ledger of the kernel's refusals | #23 | PASS | `docs/reports/2026-09-07-mutation-ledger.md`: 222 mutants enumerated over 13 targets, 222 run, 179 killed, 43 survived, 0 timed out, at the engine before #19's fix; of the survivors, 10 are provably equivalent and 33 are holes, each named with the test it is owed; regenerate with the command in the ledger |
 | 21 | Nightly at the final engine on GitHub | – | UNKNOWN | the dispatch was declined by this session's permission layer twice; row 5's local sweeps at the post-fix engine stand in until the 06:17 UTC cron runs on `main` |
 
 ## Explicit negatives
-- **The mutation ledger did not land.** The subagent wrote and committed `tools/mutants.py`
-  locally and was mid-sweep (a mutant in place in its worktree) at the end; no ledger, no counts,
-  nothing pushed. The branch `overnight3/mutation-ledger` exists only locally.
+- **The mutation ledger is published but its holes are not closed.** The runner's sweep ran beside the whole night's other work (its subagent died on a network error while wrapping up; the runner kept going and restored every file); the ledger names 33 untested refusal branches, and no test was written for them tonight. The exit -9 confirmation in `_kill_and_wait` is among them.
 - **Three channels were named, not closed** (SECURITY lists them): a write through a private
   connection reverted before the next store commit; counting sibling worlds through the shared
   scratch tree; patching below the store class. The mount-namespace design that closes the first
@@ -95,7 +94,7 @@ than a rebase, because they had been pushed and the rule is never to rewrite the
 - **The two old morning reports are under `docs/reports/`** (2026-09-05 and 2026-09-06).
 
 ## Needs your hands
-1. Merge #15 through #22 in order, each with "delete branch".
+1. Merge #15 through #23 in order, each with "delete branch".
 2. After the last merge: set the action pin in `.github/examples/crashcheck.yml` and STATUS's
    "reviewed action pin" to the new `main` SHA (`tests/test_docs_identity.py` refuses drift).
 3. `gh workflow run nightly.yml --ref main -f cases=300 -f seed=20260907` (or wait for the
@@ -112,7 +111,7 @@ than a rebase, because they had been pushed and the rule is never to rewrite the
    tonight's timings were taken beside a mutation sweep and BENCHMARK says so.
 
 ## Alex's ten-minute grading pass
-1. `for n in 15 16 17 18 19 20 21 22; do gh pr checks $n; done` — every head green.
+1. `for n in 15 16 17 18 19 20 21 22 23; do gh pr checks $n; done` — every head green.
 2. `git fetch origin && git checkout overnight3/morning && uv sync --frozen --dev && uv run pytest -q` → 530 passed.
 3. `uv run pytest -q tests/test_verdict_paths.py -k third_hostile_review` → 13 passed: each of
    the shapes that earned `FIX_PROVEN` at 02:00 is refused with the sentence that names it.
@@ -126,8 +125,8 @@ than a rebase, because they had been pushed and the rule is never to rewrite the
 10. Read `docs/SECURITY.md`'s "What the controller cannot read" paragraph, then row 6.
 
 ## What I would do next
-1. Finish and publish the mutation ledger: the runner exists; run it on the final engine, close
-   every hole it finds with a test, and put the table in `docs/reports/`.
+1. Close the mutation ledger's holes: one test per untested refusal branch, the exit -9
+   confirmation first, then rerun `tools/mutants.py` at the final engine and republish.
 2. The Linux mount-namespace leg from DECISIONS: `bwrap` around the worker in CI, so "nothing
    outside the world" is enforced there and two named boundaries become impossible.
 3. The outbox scenario after one seam change (an optional audited scalar), then Stage A2b with
