@@ -794,7 +794,12 @@ def test_failed_corrected_control_withholds_the_verdict(
     result = check(BUGGY_REF, ATOMIC_REF, SCENARIO_ID, corrected=MISLEADING_GREEN_REF, mode="local")
 
     assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
-    assert "corrected control did not prove" in result.summary
+    assert result.summary == (
+        "The known-good corrected control did not prove the capsule invariant: the corrected "
+        "tree duplicated the effect under the capsule's kill. Pass a tree that survives this "
+        "capsule as --corrected, or omit --corrected: the candidate's verdict does not depend "
+        "on it."
+    ), result.summary
     by_role = {
         role: {a.observation for a in result.attempts if a.role is role} for role in WorldRole
     }
@@ -1439,3 +1444,19 @@ def test_an_invalid_timeout_knob_is_refused_before_any_world_runs(
     with pytest.raises(CrashCheckError, match="NEMISIS_WORKER_TIMEOUT_SECONDS must be a number"):
         check(BUGGY_REF, MISLEADING_GREEN_REF, SCENARIO_ID, mode="local")
     assert not (tmp_path / "artifacts").exists()
+
+
+def test_a_candidate_without_the_handler_is_told_the_one_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "no-def", "def something_else(store, event):\n    pass\n")
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert (
+        "Put a top-level `def apply_credit(store, event)` in `app/credits.py` at the root of the "
+        "tree (an alias, a re-export, or a method is not a binding). No unbound source was "
+        "executed."
+    ) in result.summary, result.summary
