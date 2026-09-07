@@ -101,7 +101,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 507 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 508 tests, and package build: pass locally on
   Python 3.12.13; CI runs the same gate on CPython 3.12 and 3.13
   ([run 34011484455](https://github.com/Alex-lop/Nemisis/actions/runs/34011484455), both legs green);
 - CI passed on the older commits these links were written for, every one of them earlier than the
