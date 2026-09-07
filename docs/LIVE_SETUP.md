@@ -127,6 +127,12 @@ the same receipt. Failures: `NEMOTRON PATCH REJECTED: NEBIUS_API_KEY is required
 tree written), or `NEMOTRON PATCH REJECTED: model module import is not allowed: sqlite3` and the
 like, when the model stepped outside the store API. Nothing is written on rejection.
 
+The same beat runs on the second scenario: `uv run nemisis propose-patch --help` lists
+`--scenario {sqlite-credit-v1,sqlite-inventory-v1}`, so `--issue
+src/nemisis/fixtures/sqlite_inventory_v1/issue.md --base fixture:sqlite-inventory-v1/buggy
+--scenario sqlite-inventory-v1` asks Nemotron for the stock-reservation fix instead, and `check`
+crash-tests it the same way.
+
 ### A3. Carry the receipt into a real CrashCheck run
 
 ```bash
