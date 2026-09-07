@@ -381,3 +381,46 @@ commits), counting sibling worlds through the shared scratch tree (the answer is
 namespace, designed below), and a store patched below the class the worker checks. The
 corrected-tree distinctness rule compares resolved trees, so a byte-identical copy at another
 path is refused as the same tree.
+
+## Enforcing "nothing outside the world": a design, not code (2026-09-07)
+
+Local mode assumes a trusted checkout and reads what it can. Two boundaries the third hostile
+round named are not readable at all from inside the process: durable state kept by absolute path
+elsewhere on the machine, and a handler that reads CrashCheck's shared scratch tree to count the
+worlds of its phase. Both are the same fact: the worker shares a filesystem with the controller
+and with its sibling worlds. The honest fix is to stop sharing it, and that is an operating-system
+boundary, not a probe.
+
+On Linux the shape is a private mount namespace per worker. With `bwrap` (or `unshare -m` plus a
+few binds) the worker gets the interpreter and the bound tree read-only, its world bind-mounted
+as the only writable path, an empty `tmpfs` at `/tmp`, `/var/tmp`, and `/dev/shm`, no view of the
+run root or of any sibling, and no network (`--unshare-all --die-with-parent`). GitHub's
+`ubuntu-latest` runners allow unprivileged user namespaces, so this is a CI leg, not a privilege.
+What it would prove: absolute-path state and sibling counting become impossible rather than
+undetected, the scratch-tree scans become belt and braces, and "the worker can only write its own
+world" turns from a claim the kernel checks after the fact into one the kernel never has to check.
+What it would not prove: anything about the store object in the worker's hands (the in-process
+boundary stays), the WAL sidecar oracle (the world still contains the database), the wall clock,
+or a handler that patches the interpreter below the store. The kill and the probes are unchanged,
+because the controller keeps the world mounted on its own side. On macOS there is no equivalent
+that is both supported and unprivileged: `sandbox-exec` profiles can deny writes outside one
+directory but the tool is deprecated and undocumented, so the macOS answer is the documented
+boundary, and the Linux leg is where the enforced claim would live. Estimated size: a
+`WorkerIsolation` seam in the runner with two implementations (none, `bwrap`), one CI leg that
+runs the zoo under it, and a sentence in SECURITY that says which claim holds on which platform.
+
+The ConTree transport for CrashCheck (`--mode live`) is the same design one level up, and it was
+scoped before any code for the same reason `live.py` was for `verify`. What the kernel needs from
+a provider: spawn a worker inside an immutable image with the bound tree and a seeded database,
+a channel that carries the store's commit reports and the controller's continues with the same
+framing the socket pair uses today (a guest-side supervisor must own the socket, because the pair
+cannot cross the sandbox), a process-group kill that lands while the worker is paused inside a
+commit report and returns the exit status, and a read-only read of the whole database file after
+the kill and after the final message, byte-exact, which means the file itself must come back out
+or the probe must run inside and its result be attested. What it cannot get from the sandbox
+API as it stands: the drained stdout and stderr pipes that detect a surviving descendant, and the
+guarantee that the kill landed at the pause rather than a moment later. Until those two exist as
+provider-owned receipts, a live CrashCheck run cannot carry the same claims as a local one, and
+that is why `doctor` stays `BLOCKED` and no path from `BLOCKED` to a run is written: a
+fail-closed skeleton with an injected client is honest, a transport that reports `LIVE` with
+weaker receipts is not.
