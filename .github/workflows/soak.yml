@@ -1,0 +1,76 @@
+# Soak: the kernel's slow tests, N times in a row on GitHub's Linux, so the next flaky run is
+# found here and not in a demo. Every failure is uploaded with its full pytest output; the job
+# stops at the first red repetition and names it.
+name: Soak
+
+on:
+  workflow_dispatch:
+    inputs:
+      repetitions:
+        description: How many times to run the kernel's slow tests
+        default: "5"
+      timeout:
+        description: NEMISIS_WORKER_TIMEOUT_SECONDS for the run (blank keeps the default 10)
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.29"
+          python-version: "3.12"
+      - run: uv sync --frozen --dev
+      - name: Repeat the kernel tests
+        shell: bash
+        env:
+          REPETITIONS: ${{ inputs.repetitions || '5' }}
+          TIMEOUT: ${{ inputs.timeout }}
+        run: |
+          if [[ -n "$TIMEOUT" ]]; then
+            export NEMISIS_WORKER_TIMEOUT_SECONDS="$TIMEOUT"
+          fi
+          mkdir -p soak
+          for ((i = 1; i <= REPETITIONS; i++)); do
+            echo "::group::repetition $i of $REPETITIONS"
+            if uv run pytest -q -p no:cacheprovider \
+                tests/test_verdict_paths.py tests/test_inventory_scenario.py \
+                tests/test_crashcheck.py tests/test_redteam.py tests/test_sqlite_runner.py \
+                2>&1 | tee "soak/repetition-$i.txt"; then
+              echo "::endgroup::"
+            else
+              echo "::endgroup::"
+              echo "repetition $i failed; its output is soak/repetition-$i.txt" >&2
+              {
+                echo "## Soak"
+                echo
+                echo "Repetition $i of $REPETITIONS failed (NEMISIS_WORKER_TIMEOUT_SECONDS=${TIMEOUT:-default})."
+                echo
+                echo '```'
+                grep -E "FAILED|Error|passed|failed" "soak/repetition-$i.txt" | tail -n 20
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          done
+          {
+            echo "## Soak"
+            echo
+            echo "$REPETITIONS repetitions green (NEMISIS_WORKER_TIMEOUT_SECONDS=${TIMEOUT:-default})."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload every repetition's output
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: soak-${{ github.run_id }}
+          path: soak
+          if-no-files-found: warn
+          retention-days: 14

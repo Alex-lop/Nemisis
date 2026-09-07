@@ -13,7 +13,7 @@ import tempfile
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from functools import partial
 from importlib import resources
@@ -26,6 +26,7 @@ from nemisis.crash_models import (
     REQUIRED_CONFIRMATIONS,
     AnchorBinding,
     AnchorResolutionReceipt,
+    AnchorResolutionStatus,
     AttemptReceipt,
     CommitSweepReceipt,
     ContractProposal,
@@ -60,12 +61,14 @@ from nemisis.sqlite_runner import (
     RUNNER_ID,
     RUNNER_VERSION,
     AnchorResolutionError,
+    _tree_state,
     bind_anchor,
     capsule_event,
     execute_attempt,
     execute_no_fault_replay,
     initial_database_digest,
     runner_environment_digest,
+    worker_timeout_seconds,
 )
 
 CONFIRMATIONS = REQUIRED_CONFIRMATIONS
@@ -155,6 +158,7 @@ def initialize(issue: str | Path, target: str, base: str | Path, scenario_id: st
     with tempfile.TemporaryDirectory(prefix="nemisis-init-") as temporary:
         source = _materialize_source(base, Path(temporary) / "base")
         audited = _audited_contract(scenario)
+        _require_bindable(audited, target, source)
         accepted = (
             target == audited.target
             and source.ref == audited.originating_base_ref
@@ -199,6 +203,31 @@ def initialize(issue: str | Path, target: str, base: str | Path, scenario_id: st
     return path
 
 
+def _require_bindable(audited: RetryContract, target: str, source: _Source) -> None:
+    """Refuse at draft time what ``check`` would refuse after the digest was accepted.
+
+    Every accepted contract binds the scenario's one audited target, so a different target can
+    never earn evidence; a base tree without a top-level ``def <symbol>(store, event)`` cannot
+    either. Both are said now, in the words ``check`` would use, instead of after ``init
+    --accept-contract``.
+    """
+    if target != audited.target:
+        raise CrashCheckError(
+            f"UNSUPPORTED_TARGET: retry contract uses an unsupported trusted catalog binding; "
+            f"{audited.scenario_id} binds {audited.target}, so pass --target {audited.target}"
+        )
+    try:
+        bind_anchor(audited, source.path, source_ref=source.ref)
+    except AnchorResolutionError as error:
+        module, _, symbol = target.partition(":")
+        raise CrashCheckError(
+            f"the base target mapping for {target} was {error.status.value} in {source.ref} "
+            f"(resolved {source.resolved_identity[:16]}): {error}. "
+            f"{_anchor_remedy(error.status, module, symbol, error.matched_paths)} Nothing was "
+            "drafted."
+        ) from None
+
+
 def accept_contract(digest: str, path: Path = CONFIG_PATH) -> RetryContract:
     """Accept only the exact draft digest previously printed to the user."""
     payload, draft = _load_config(path)
@@ -230,9 +259,11 @@ def check(
     """Hunt on the base, freeze one capsule, then evaluate the candidate unchanged."""
     started_at = datetime.now(UTC)
     run_id = _run_id(mode)
+    _worker_timeout()  # refuse a bad NEMISIS_WORKER_TIMEOUT_SECONDS before any world runs
     with tempfile.TemporaryDirectory(prefix="nemisis-check-") as temporary:
         root = Path(temporary)
-        base_source = _materialize_source(base, root / "source-base")
+        scratch = _Scratch(root)
+        base_source = scratch.source(base, "source-base")
         contract = _contract_for_check(scenario, base_source)
         proposal = _proposal_for_check(scenario, contract)
         publish = partial(_publish, proposal=proposal)
@@ -284,10 +315,11 @@ def check(
             contract,
             base_binding,
             base_source.path,
-            root / uuid.uuid4().hex,
+            scratch.phase(),
         )
+        scratch.settle(scratch.root / "source-base")
         if not _hunt_is_conclusive(hypothesis_receipts):
-            detail = "The two base-only crash-boundary hypotheses did not yield one witness."
+            detail = _hunt_summary(hypothesis_receipts)
             attempt = _failed_attempt(
                 capsule, base_binding, WorldRole.BASE, TruthLabel.LOCAL, detail
             )
@@ -308,14 +340,12 @@ def check(
             capsule,
             base_binding,
             base_source.path,
-            root / uuid.uuid4().hex,
+            scratch.phase(),
         )
+        scratch.settle(scratch.root / "source-base")
         minimization_receipts = (minimization_receipt,)
         if not minimization_receipt.sole_fault_action_necessary_for_fixture:
-            detail = (
-                "The fixture-scoped one-action deletion check did not establish necessity in two "
-                "fresh base worlds."
-            )
+            detail = _minimization_summary(minimization_receipt)
             attempt = _failed_attempt(
                 capsule, base_binding, WorldRole.BASE, TruthLabel.LOCAL, detail
             )
@@ -333,8 +363,9 @@ def check(
             )
 
         base_attempts = _execute_confirmations(
-            capsule, base_binding, base_source.path, root / uuid.uuid4().hex, WorldRole.BASE
+            capsule, base_binding, base_source.path, scratch.phase(), WorldRole.BASE
         )
+        scratch.settle(scratch.root / "source-base")
         if _confirmed_observation(base_attempts, capsule) is not CrashObservation.DUPLICATE_EFFECT:
             return publish(
                 run_id,
@@ -344,7 +375,7 @@ def check(
                 (base_binding,),
                 base_attempts,
                 CrashVerdict.EVIDENCE_INCOMPLETE,
-                "The originating base did not reproduce in five fresh worlds.",
+                _base_summary(base_attempts, capsule),
                 hypothesis_receipts=hypothesis_receipts,
                 minimization_receipts=minimization_receipts,
             )
@@ -370,7 +401,7 @@ def check(
             )
 
         # Candidate materialization deliberately begins only after the base witness is frozen.
-        candidate_source = _materialize_source(candidate, root / "source-candidate")
+        candidate_source = scratch.source(candidate, "source-candidate")
         candidate_anchor = _bind_anchor(
             contract,
             candidate_source,
@@ -401,9 +432,10 @@ def check(
             capsule,
             candidate_binding,
             candidate_source.path,
-            root / uuid.uuid4().hex,
+            scratch.phase(),
             WorldRole.CANDIDATE,
         )
+        scratch.settle(scratch.root / "source-candidate")
         bindings = [base_binding, candidate_binding]
         attempts = [*base_attempts, *candidate_attempts]
         sweeps: list[CommitSweepReceipt] = []
@@ -417,10 +449,11 @@ def check(
                         capsule,
                         candidate_binding,
                         candidate_source.path,
-                        root / uuid.uuid4().hex,
+                        scratch.phase(),
                         WorldRole.CANDIDATE,
                     )
                 )
+                scratch.settle(scratch.root / "source-candidate")
             return publish(
                 run_id,
                 started_at,
@@ -440,14 +473,16 @@ def check(
                 capsule,
                 candidate_binding,
                 candidate_source.path,
-                root / uuid.uuid4().hex,
+                scratch.phase(),
                 WorldRole.CANDIDATE,
             )
+            scratch.settle(scratch.root / "source-candidate")
             sweeps.append(candidate_sweep)
             candidate_observation = candidate_sweep.observation
         corrected_observation: CrashObservation | None = None
+        corrected_sweep: CommitSweepReceipt | None = None
         if corrected is not None:
-            corrected_source = _materialize_source(corrected, root / "source-corrected")
+            corrected_source = scratch.source(corrected, "source-corrected")
             corrected_anchor = _bind_anchor(
                 contract,
                 corrected_source,
@@ -477,9 +512,10 @@ def check(
                 capsule,
                 corrected_binding,
                 corrected_source.path,
-                root / uuid.uuid4().hex,
+                scratch.phase(),
                 WorldRole.CORRECTED,
             )
+            scratch.settle(scratch.root / "source-corrected")
             bindings.append(corrected_binding)
             attempts.extend(corrected_attempts)
             corrected_observation = _confirmed_observation(corrected_attempts, capsule)
@@ -488,15 +524,21 @@ def check(
                     capsule,
                     corrected_binding,
                     corrected_source.path,
-                    root / uuid.uuid4().hex,
+                    scratch.phase(),
                     WorldRole.CORRECTED,
                 )
+                scratch.settle(scratch.root / "source-corrected")
                 sweeps.append(corrected_sweep)
                 corrected_observation = corrected_sweep.observation
 
         if corrected is not None and corrected_observation is not CrashObservation.EXACTLY_ONCE:
             verdict = CrashVerdict.EVIDENCE_INCOMPLETE
-            summary = "The known-good corrected control did not prove the capsule invariant."
+            summary = _corrected_summary(
+                corrected_observation or CrashObservation.NOT_OBSERVED,
+                corrected_attempts,
+                corrected_sweep,
+                capsule,
+            )
         else:
             verdict, summary = _claimed_fix_verdict(
                 candidate_observation, candidate_attempts, candidate_sweep, capsule
@@ -524,6 +566,7 @@ def replay(
 ) -> CrashCheckResult:
     """Replay only the immutable event, fault intent, schedule, and predicates in a capsule."""
     started_at = datetime.now(UTC)
+    _worker_timeout()
     capsule_path = None if isinstance(capsule, ReproCapsule) else Path(capsule)
     sealed = _load_capsule(capsule)
     contract = _contract_for_capsule(
@@ -537,7 +580,8 @@ def replay(
     run_id = _run_id(mode)
     with tempfile.TemporaryDirectory(prefix="nemisis-replay-") as temporary:
         root = Path(temporary)
-        materialized = _materialize_source(source, root / "source")
+        scratch = _Scratch(root)
+        materialized = scratch.source(source, "source")
         if mode not in {"local", "live"}:
             raise CrashCheckError("mode must be 'local' or 'live'")
         requested_transport = TruthLabel.LIVE if mode == "live" else TruthLabel.LOCAL
@@ -575,8 +619,9 @@ def replay(
             verdict = CrashVerdict.EVIDENCE_INCOMPLETE
         elif mode == "local":
             attempts = _execute_confirmations(
-                sealed, binding, materialized.path, root / uuid.uuid4().hex, world_role
+                sealed, binding, materialized.path, scratch.phase(), world_role
             )
+            scratch.settle(scratch.root / "source")
             observation = _confirmed_observation(attempts, sealed)
             if world_role is WorldRole.BASE:
                 if observation is CrashObservation.DUPLICATE_EFFECT:
@@ -594,8 +639,9 @@ def replay(
             else:
                 if observation is CrashObservation.EXACTLY_ONCE:
                     sweep = _execute_sweep(
-                        sealed, binding, materialized.path, root / uuid.uuid4().hex, world_role
+                        sealed, binding, materialized.path, scratch.phase(), world_role
                     )
+                    scratch.settle(scratch.root / "source")
                     sweeps = (sweep,)
                     observation = sweep.observation
                 verdict, detail = _claimed_fix_verdict(observation, attempts, sweep, sealed)
@@ -883,31 +929,27 @@ def _bind_anchor(
 def _require_distinct_binding(
     binding: AnchorBinding, earlier: tuple[AnchorBinding, ...], role: WorldRole
 ) -> None:
-    if any(binding.digest == other.digest for other in earlier):
+    if any(binding.tree_digest == other.tree_digest for other in earlier):
         raise CrashCheckError(
-            f"{role.value} resolves to the same source ref and tree as an earlier role; "
-            "supply a different ref"
+            f"{role.value} resolves to the same tree as an earlier role (byte-identical source, "
+            "whatever ref or path named it); a control that is the candidate proves nothing, so "
+            "supply a different tree"
         )
 
 
 def _unsupported_observation_summary(
-    observation: CrashObservation, attempts: tuple[AttemptReceipt, ...] = ()
+    observation: CrashObservation,
+    attempts: tuple[AttemptReceipt, ...] = (),
+    capsule: ReproCapsule | None = None,
 ) -> str:
     if observation is CrashObservation.INVARIANT_FAILED:
         return (
             "Every world completed, but the final durable state matched neither exactly-once nor "
             "the capsule's duplicate shape: the invariant failed, so nothing is proven."
         )
-    failures = [attempt.failure_detail for attempt in attempts if attempt.failure_detail]
-    if failures:
-        detail, count = max(
-            ((item, failures.count(item)) for item in set(failures)), key=lambda x: x[1]
-        )
-        role = attempts[0].role.value
-        return (
-            f"{count} of {len(attempts)} {role} worlds did not complete: {detail}. "
-            "No verdict is issued from incomplete or contradictory evidence."
-        )
+    incomplete = _incomplete_worlds(attempts, attempts[0].role.value if attempts else "")
+    if incomplete:
+        return f"{incomplete}. No verdict is issued from incomplete or contradictory evidence."
     seen = sorted({attempt.observation for attempt in attempts}, key=lambda item: item.value)
     if len(seen) > 1:
         tally = ", ".join(
@@ -919,7 +961,79 @@ def _unsupported_observation_summary(
             "handler is nondeterministic under the same kill, so no verdict is issued. CrashCheck "
             "reports unanimity or nothing."
         )
+    reason = _unconfirmed_reason(attempts, capsule) if capsule is not None and attempts else None
+    if reason:
+        return (
+            f"Execution completed without one stable supported observation: {reason}. No "
+            "verdict is issued from evidence that does not cohere."
+        )
     return "Execution completed without one stable supported observation."
+
+
+def _incomplete_worlds(attempts: tuple[AttemptReceipt, ...], what: str) -> str | None:
+    """How many worlds did not complete and the most common reason, or None if all did.
+
+    Ties break on the sorted text so the sentence is the same on every run.
+    """
+    failures = [attempt.failure_detail for attempt in attempts if attempt.failure_detail]
+    if not failures:
+        return None
+    detail, count = max(
+        ((item, failures.count(item)) for item in sorted(set(failures))), key=lambda x: x[1]
+    )
+    others = len(failures) - count
+    tail = f" (and {others} for {'another reason' if others == 1 else 'other reasons'})"
+    return f"{len(failures)} of {len(attempts)} {what} worlds did not complete: {detail}" + (
+        tail if others else ""
+    )
+
+
+def _corrected_summary(
+    observation: CrashObservation,
+    attempts: tuple[AttemptReceipt, ...],
+    sweep: CommitSweepReceipt | None,
+    capsule: ReproCapsule,
+) -> str:
+    """The known-good tree did not survive this capsule: what it did, and that the candidate's
+    verdict does not depend on it."""
+    lead = "The known-good corrected control did not prove the capsule invariant"
+    if observation is CrashObservation.DUPLICATE_EFFECT:
+        what = "the corrected tree duplicated the effect under the capsule's kill"
+    elif observation is CrashObservation.INVARIANT_FAILED:
+        what = "the corrected tree ended in a state that is neither exactly-once nor the duplicate"
+    elif sweep is not None and sweep.observation is not CrashObservation.EXACTLY_ONCE:
+        what = f"its commit sweep ended {sweep.observation.value}"
+    else:
+        what = _unsupported_observation_summary(observation, attempts, capsule).rstrip(".")
+    return (
+        f"{lead}: {what}. Pass a tree that survives this capsule as --corrected, or omit "
+        "--corrected: the candidate's verdict does not depend on it."
+    )
+
+
+def _base_summary(attempts: tuple[AttemptReceipt, ...], capsule: ReproCapsule) -> str:
+    """Why five fresh base worlds were not a witness: a world that did not complete says so."""
+    completed = all(
+        attempt.execution_status is ExecutionStatus.COMPLETED
+        and attempt.integrity_status is IntegrityStatus.VALID
+        for attempt in attempts
+    )
+    observations = {attempt.observation for attempt in attempts}
+    if not completed or len(observations) > 1:
+        return _unsupported_observation_summary(CrashObservation.NOT_OBSERVED, attempts, capsule)
+    if observations == {CrashObservation.EXACTLY_ONCE}:
+        return (
+            "The originating base did not reproduce in five fresh worlds; every world ended "
+            "exactly once, so this tree does not show the bug the contract describes. Pass the "
+            "tree that still has the bug as --base."
+        )
+    reason = _unconfirmed_reason(attempts, capsule)
+    if reason:
+        return (
+            f"The originating base duplicated in five fresh worlds, but the evidence did not "
+            f"cohere: {reason}. No verdict is issued."
+        )
+    return "The originating base did not reproduce in five fresh worlds."
 
 
 def _invariant_summary(attempts: tuple[AttemptReceipt, ...], capsule: ReproCapsule) -> str:
@@ -933,11 +1047,28 @@ def _invariant_summary(attempts: tuple[AttemptReceipt, ...], capsule: ReproCapsu
     )
 
 
+def _anchor_remedy(
+    status: AnchorResolutionStatus, module: str, symbol: str, matched: tuple[str, ...]
+) -> str:
+    """The one change that makes the target bind."""
+    path = "/".join(module.split(".")) + ".py"
+    if status is AnchorResolutionStatus.ZERO_MATCHES:
+        return (
+            f"Put a top-level `def {symbol}(store, event)` in `{path}` at the root of the tree "
+            "(an alias, a re-export, or a method is not a binding)."
+        )
+    if status is AnchorResolutionStatus.MULTIPLE_MATCHES:
+        return f"Keep exactly one of {', '.join(f'`{item}`' for item in matched)}."
+    return f"Make it a plain synchronous `def {symbol}(store, event)` with no other parameters."
+
+
 def _anchor_failure_summary(receipt: AnchorResolutionReceipt) -> str:
+    module, _, symbol = receipt.target.partition(":")
     return (
         f"The accepted {receipt.role.value} target mapping for {receipt.target} was "
         f"{receipt.status.value} in {receipt.source_ref} "
         f"(resolved {receipt.resolved_source_identity[:16]}): {receipt.detail}. "
+        f"{_anchor_remedy(receipt.status, module, symbol, receipt.matched_paths)} "
         "No unbound source was executed."
     )
 
@@ -996,6 +1127,7 @@ def _hunt_hypotheses(
                 work_dir=work_root / uuid.uuid4().hex,
                 role=WorldRole.BASE,
                 execution_nonce=nonce,
+                timeout_seconds=_worker_timeout(),
             )
         except Exception as error:  # Preserve a bounded fail-closed hunt receipt.
             attempt = _failed_attempt(
@@ -1045,6 +1177,59 @@ def _hunt_hypotheses(
     )
     capsule = _seal_capsule(contract, selected_boundary)
     return receipts, capsule
+
+
+def _worker_timeout() -> float:
+    """The per-phase worker budget, validated once before any world runs."""
+    try:
+        return worker_timeout_seconds()
+    except ValueError as error:
+        raise CrashCheckError(str(error)) from None
+
+
+def _minimization_summary(receipt: MinimizationReceipt) -> str:
+    """Why the no-crash control failed: the base misbehaves without a crash, or a world died."""
+    lead = (
+        "The fixture-scoped one-action deletion check did not establish necessity in two fresh "
+        "base worlds"
+    )
+    worlds = receipt.confirmations
+    failed = [world for world in worlds if world.execution_status is not ExecutionStatus.COMPLETED]
+    if failed:
+        details = sorted({world.failure_detail or "no detail" for world in failed})
+        return (
+            f"{lead}: {len(failed)} of {len(worlds)} no-crash worlds did not complete: "
+            f"{details[0]}. No verdict is issued from incomplete evidence."
+        )
+    observations = {world.observation for world in worlds}
+    seen = ", ".join(sorted(item.value for item in observations))
+    if observations <= {CrashObservation.DUPLICATE_EFFECT, CrashObservation.INVARIANT_FAILED}:
+        return (
+            f"{lead}: with no kill at all the base ended {seen}, so the crash is not what makes "
+            "this bug appear. CrashCheck judges crash windows only; a bug on the plain path is "
+            "one for an ordinary test."
+        )
+    return f"{lead}: the two no-crash worlds ended {seen}, which does not decide necessity."
+
+
+def _hunt_summary(receipts: tuple[HypothesisReceipt, ...]) -> str:
+    """Why the two base-only hypotheses yielded no witness, in the words of what happened."""
+    lead = "The two base-only crash-boundary hypotheses did not yield one witness"
+    attempts = tuple(receipt.attempt for receipt in receipts)
+    incomplete = _incomplete_worlds(attempts, "base hunt")
+    if incomplete:
+        return f"{lead}: {incomplete}. No verdict is issued from incomplete evidence."
+    if receipts and not any(receipt.reproduced for receipt in receipts):
+        seen = ", ".join(
+            f"{receipt.hypothesis_id} ended {receipt.attempt.observation.value}"
+            for receipt in receipts
+        )
+        return (
+            f"{lead}: the base did not duplicate at either boundary ({seen}), so this tree does "
+            "not show the bug the contract describes. Pass the tree that still has the bug as "
+            "--base."
+        )
+    return f"{lead}."
 
 
 def _hunt_is_conclusive(receipts: tuple[HypothesisReceipt, ...]) -> bool:
@@ -1097,6 +1282,7 @@ def _minimize_witness(
                 source_tree=source,
                 work_dir=work_root / uuid.uuid4().hex,
                 execution_nonce=nonce,
+                timeout_seconds=_worker_timeout(),
             )
         except Exception as error:  # Preserve fail-closed minimization evidence.
             now = datetime.now(UTC)
@@ -1190,7 +1376,7 @@ def _load_capsule(value: str | Path | ReproCapsule) -> ReproCapsule:
 
 
 def _require_scratch_untouched(root: Path, expected: set[Path]) -> None:
-    """Nothing but CrashCheck's own directories may appear in the run's scratch tree.
+    """Nothing but CrashCheck's own directories may appear in a phase's root.
 
     A handler that climbs out of its world with ``../../..`` lands here, in a directory every
     sibling world shares; that is durable state no store commit made and a channel between
@@ -1207,18 +1393,66 @@ def _require_scratch_untouched(root: Path, expected: set[Path]) -> None:
         )
 
 
-def _expected_run_entries(run_root: Path) -> set[Path]:
-    """The run's temporary root holds only the source copies and the phase roots it created."""
-    return {
-        path
-        for path in run_root.iterdir()
-        if path.name in {"source-base", "source-candidate", "source-corrected", "source"}
-        or (
-            path.is_dir()
-            and len(path.name) == 32
-            and all(c in "0123456789abcdef" for c in path.name)
-        )
-    }
+@dataclass
+class _Scratch:
+    """The run's temporary root and everything the kernel itself put there, by identity.
+
+    A hostile review found two holes in a whitelist built from names: a directory the handler
+    made with a 32-hex name was "expected" by construction, and a file written inside the
+    materialized base tree (a sibling of the candidate's) was watched by nothing once the base
+    phase ended. Now every source copy and every finished phase is recorded by its entry-by-entry
+    state when the kernel is done with it, and every later phase end re-checks all of them and
+    admits nothing else at the root.
+    """
+
+    root: Path
+    sources: dict[Path, str] = field(default_factory=dict)
+    finished: dict[Path, str] = field(default_factory=dict)
+    active: set[Path] = field(default_factory=set)
+
+    def source(self, value: str | Path, name: str) -> _Source:
+        source = _materialize_source(value, self.root / name)
+        # Keyed by the entry under the root (the materialized path may be resolved through a
+        # symlinked temp directory); the state is the tree's entry-by-entry identity.
+        self.sources[self.root / name] = _tree_state(self.root / name)
+        return source
+
+    def phase(self) -> Path:
+        path = self.root / uuid.uuid4().hex
+        self.active.add(path)
+        return path
+
+    def settle(self, bound: Path) -> None:
+        """Verify the root, then record every active phase as finished; phases are sequential.
+
+        ``bound`` is the source copy the phase ran against: a handler that writes into its own
+        bound tree is refused by the attempt itself (with the sentence that names it), so that
+        copy's state is re-recorded here rather than raised a second time. Every other source
+        copy and every finished phase must be untouched.
+        """
+        self.verify(bound)
+        self.sources[bound] = _tree_state(bound)
+        for phase in sorted(self.active):
+            self.active.discard(phase)
+            self.finished[phase] = _tree_state(phase) if phase.exists() else ""
+
+    def verify(self, bound: Path | None = None) -> None:
+        expected = set(self.sources) | set(self.finished) | self.active
+        _require_scratch_untouched(self.root, expected)
+        for path, state in self.sources.items():
+            if path != bound and _tree_state(path) != state:
+                raise CrashCheckError(
+                    f"the handler wrote into CrashCheck's copy of a source tree ({path.name}); "
+                    "kill points are store commits, so no crash window around that state can be "
+                    "reached and no verdict is issued"
+                )
+        for path, state in self.finished.items():
+            if (_tree_state(path) if path.exists() else "") != state:
+                raise CrashCheckError(
+                    "the handler wrote into the worlds of a phase CrashCheck had finished "
+                    f"({path.name}); kill points are store commits, so no crash window around "
+                    "that state can be reached and no verdict is issued"
+                )
 
 
 def _worlds(work_root: Path, count: int) -> list[Path]:
@@ -1245,6 +1479,7 @@ def _execute_confirmations(
                 work_dir=worlds[index - 1],
                 role=role,
                 execution_nonce=nonce,
+                timeout_seconds=_worker_timeout(),
             )
         except Exception as error:  # Preserve a bounded fail-closed receipt at the deep seam.
             return _failed_attempt(
@@ -1260,7 +1495,6 @@ def _execute_confirmations(
         futures = [executor.submit(one, index) for index in range(1, CONFIRMATIONS + 1)]
         attempts = tuple(future.result() for future in futures)
     _require_scratch_untouched(work_root, set(worlds))
-    _require_scratch_untouched(work_root.parent, _expected_run_entries(work_root.parent))
     return attempts
 
 
@@ -1283,6 +1517,7 @@ def _execute_sweep(
             work_dir=census_world,
             execution_nonce=nonce,
             role=role,
+            timeout_seconds=_worker_timeout(),
         )
     except Exception as error:  # Preserve a fail-closed census receipt.
         census = _failed_census(capsule, binding, role, nonce, type(error).__name__)
@@ -1306,6 +1541,7 @@ def _execute_sweep(
                     role=role,
                     execution_nonce=attempt_nonce,
                     kill_after_commit=index,
+                    timeout_seconds=_worker_timeout(),
                 )
             except Exception as error:  # Preserve a fail-closed sweep receipt.
                 return _failed_attempt(
@@ -1325,7 +1561,6 @@ def _execute_sweep(
     _require_scratch_untouched(
         work_root, {census_world, *(work_root / name for name in sweep_worlds)}
     )
-    _require_scratch_untouched(work_root.parent, _expected_run_entries(work_root.parent))
     return CommitSweepReceipt.with_digest(
         role=role,
         capsule_digest=capsule.digest,
@@ -1380,8 +1615,9 @@ def _schedule_split(
             return (
                 f"a kill world committed {', '.join(own) or 'nothing'} where the census committed "
                 f"{', '.join(census) or 'nothing'}: the handler's commit schedule differs between "
-                "worlds, so it depends on state CrashCheck cannot see and no kill point can be "
-                "trusted. No verdict is issued."
+                "worlds that started from the same seed, so the sweep's kill points were derived "
+                "from a schedule the kill worlds did not run and none of them can be trusted. "
+                "CrashCheck cannot tell why the schedule moved. No verdict is issued."
             )
     return None
 
@@ -1506,16 +1742,26 @@ def _describe_final(final: StateSnapshot, capsule: ReproCapsule) -> str:
 def _confirmed_observation(
     attempts: tuple[AttemptReceipt, ...], capsule: ReproCapsule
 ) -> CrashObservation:
-    if len(attempts) != CONFIRMATIONS:
+    if _unconfirmed_reason(attempts, capsule) is not None:
         return CrashObservation.NOT_OBSERVED
+    return attempts[0].observation
+
+
+def _unconfirmed_reason(attempts: tuple[AttemptReceipt, ...], capsule: ReproCapsule) -> str | None:
+    """Why five worlds are not one observation, or None when they are.
+
+    Every clause is a boundary the evidence must respect, not a fault of the handler, so the
+    sentence names what did not cohere instead of a remedy.
+    """
+    if len(attempts) != CONFIRMATIONS:
+        return f"{len(attempts)} worlds were recorded where {CONFIRMATIONS} were required"
     if (
         len({item.database_id for item in attempts}) != CONFIRMATIONS
         or len({item.execution_nonce for item in attempts}) != CONFIRMATIONS
     ):
-        return CrashObservation.NOT_OBSERVED
-    observations = {item.observation for item in attempts}
-    if len(observations) != 1:
-        return CrashObservation.NOT_OBSERVED
+        return "two worlds shared a database id or an execution nonce, so they were not fresh"
+    if len({item.observation for item in attempts}) != 1:
+        return "the worlds did not agree on one observation"
     scenario = _scenario(capsule.scenario_id)
     event = capsule_event(capsule)
     initial = scenario.initial_total(event)
@@ -1523,22 +1769,41 @@ def _confirmed_observation(
         if (
             attempt.execution_status is not ExecutionStatus.COMPLETED
             or attempt.integrity_status is not IntegrityStatus.VALID
-            or attempt.capsule_digest != capsule.digest
-            or attempt.event_digest != capsule.event_digest
-            or attempt.environment_digest != capsule.environment_digest
-            or attempt.pre_crash_snapshot is None
+        ):
+            return (
+                f"a world did not complete ({attempt.failure_detail or attempt.execution_status})"
+            )
+        if attempt.capsule_digest != capsule.digest:
+            return "a world's receipt is bound to a different capsule"
+        if attempt.event_digest != capsule.event_digest:
+            return "a world's receipt is bound to a different event"
+        if attempt.environment_digest != capsule.environment_digest:
+            return "a world ran in a different runner environment than the capsule names"
+        if (
+            attempt.pre_crash_snapshot is None
             or attempt.pre_crash_snapshot.subject_total != initial
-            or attempt.checkpoint_snapshot is None
+        ):
+            return "a world did not start from the seeded state"
+        if (
+            attempt.checkpoint_snapshot is None
             or attempt.checkpoint_snapshot.subject_total != initial + capsule.effect_delta
             or attempt.checkpoint_snapshot.event_effect_count != 1
-            or attempt.post_kill_snapshot is None
-            or attempt.post_kill_snapshot.digest != attempt.checkpoint_snapshot.digest
-            or len(attempt.spawns) != 2
-            or attempt.spawns[0].exit_code != -9
-            or attempt.spawns[0].event_digest != attempt.spawns[1].event_digest
         ):
-            return CrashObservation.NOT_OBSERVED
-    return next(iter(observations))
+            return "a world's kill point did not sit at exactly one durable effect"
+        if (
+            attempt.post_kill_snapshot is None
+            or attempt.post_kill_snapshot.digest != attempt.checkpoint_snapshot.digest
+        ):
+            return "the durable state changed between the kill and the post-kill probe"
+        if len(attempt.spawns) != 2:
+            return f"a world recorded {len(attempt.spawns)} workers where two were required"
+        if attempt.spawns[0].exit_code != -9:
+            return (
+                f"the first worker did not exit from SIGKILL (exit {attempt.spawns[0].exit_code})"
+            )
+        if attempt.spawns[0].event_digest != attempt.spawns[1].event_digest:
+            return "the two workers of one world did not deliver the same event"
+    return None
 
 
 def _failed_attempt(

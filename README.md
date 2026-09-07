@@ -128,9 +128,11 @@ flag in a table it creates inside the store's own database: an earlier engine bl
 crash between that write and the credit left the customer unpaid forever. Attribution now reads the
 whole database file (schema, the header fields a commit never changes, every row with its rowid)
 and the whole world the worker runs in (its working directory and the two above it, `HOME`,
-`TMPDIR`, the bound tree entry by entry), before and after every delivery; eleven hidden-flag
-handlers from two hostile reviews are pinned as refusals. What it cannot read it does not claim;
-[the boundary](docs/SECURITY.md) names the two channels that remain.
+`TMPDIR`, the bound tree entry by entry, with every entry's permission bits, flags, attributes,
+and modification time), before and after every delivery, and the raw header and length of the
+database file itself. Three hostile reviews found forty-eight handlers an earlier engine blessed;
+twenty-eight of those shapes are pinned as refusals. What it cannot read it does not claim;
+[the boundary](docs/SECURITY.md) lists the channels that remain.
 
 ## Let Nemotron write the patch
 
@@ -169,6 +171,12 @@ nemisis check --base main --candidate HEAD --scenario .nemisis/config.json
 Commit the accepted `.nemisis/config.json` on the base branch, then drop
 [the example workflow](.github/examples/crashcheck.yml) into `.github/workflows/` to run it on every
 pull request.
+
+Every wall-clock wait in the kernel is one budget, ten seconds re-armed for each phase of each
+world (the worker's hello, reaching the next store commit, finishing the delivery), and its expiry
+is an `EVIDENCE_INCOMPLETE` whose message names the phase, the commits seen so far, and the
+budget. On a slow or loaded machine, `NEMISIS_WORKER_TIMEOUT_SECONDS=30` raises it; no receipt
+depends on the value, and a value outside 1 to 600 is refused rather than clamped.
 
 ## Two scenarios, one kernel
 

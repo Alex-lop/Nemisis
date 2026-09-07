@@ -27,6 +27,7 @@ from nemisis.crashcheck import _audited_contract, _seal_capsule
 from nemisis.hashing import canonical_json, sha256_bytes
 from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
 from nemisis.sqlite_runner import (
+    WORKER_TIMEOUT_VARIABLE,
     AnchorResolutionError,
     _AttemptFailure,
     _attributed_probe,
@@ -40,6 +41,7 @@ from nemisis.sqlite_runner import (
     _spawn_receipt,
     bind_anchor,
     execute_attempt,
+    worker_timeout_seconds,
 )
 
 
@@ -150,7 +152,7 @@ def test_attributed_probe_accepts_only_the_delta_its_operation_explains(tmp_path
 
 
 def test_store_requires_exact_types_and_values(tmp_path: Path) -> None:
-    from nemisis.sqlite_runner import CreditStore
+    from nemisis.scenarios.sqlite_credit_v1 import CreditStore
 
     event: dict[str, str | int] = {
         "account_id": "acct_7",
@@ -195,12 +197,51 @@ def test_receive_preserves_a_coalesced_second_frame() -> None:
             canonical_json({"type": "hello"}) + b"\n" + canonical_json({"type": "commit"}) + b"\n"
         )
 
-        assert _receive(controller, buffer, 1) == {"type": "hello"}
-        assert _receive(controller, buffer, 1) == {"type": "commit"}
+        assert _receive(controller, buffer, 1, what="a frame", budget=1) == {"type": "hello"}
+        assert _receive(controller, buffer, 1, what="a frame", budget=1) == {"type": "commit"}
         assert not buffer
     finally:
         controller.close()
         worker.close()
+
+
+def test_a_timeout_names_what_did_not_arrive_and_the_knob() -> None:
+    """A flaky run must be diagnosable from its own message: which phase, which budget."""
+    controller, worker = socket.socketpair()
+    try:
+        with pytest.raises(_AttemptFailure) as failure:
+            _receive(controller, bytearray(), 0.05, what="the first worker's hello", budget=0.05)
+    finally:
+        controller.close()
+        worker.close()
+    assert failure.value.status is ExecutionStatus.TIMEOUT
+    assert failure.value.detail == (
+        "the first worker's hello did not arrive within 0.05 s; NEMISIS_WORKER_TIMEOUT_SECONDS "
+        "raises the budget on a slow machine"
+    )
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [(None, 10.0), ("30", 30.0), (" 2.5 ", 2.5), ("1", 1.0), ("600", 600.0)],
+)
+def test_worker_timeout_knob_accepts_seconds_between_one_and_six_hundred(
+    monkeypatch: pytest.MonkeyPatch, raw: str | None, expected: float
+) -> None:
+    if raw is None:
+        monkeypatch.delenv(WORKER_TIMEOUT_VARIABLE, raising=False)
+    else:
+        monkeypatch.setenv(WORKER_TIMEOUT_VARIABLE, raw)
+    assert worker_timeout_seconds() == expected
+
+
+@pytest.mark.parametrize("raw", ["0", "-1", "0.5", "601", "abc", "", "nan", "inf", "10s"])
+def test_worker_timeout_knob_refuses_instead_of_clamping(
+    monkeypatch: pytest.MonkeyPatch, raw: str
+) -> None:
+    monkeypatch.setenv(WORKER_TIMEOUT_VARIABLE, raw)
+    with pytest.raises(ValueError, match="NEMISIS_WORKER_TIMEOUT_SECONDS must be a number"):
+        worker_timeout_seconds()
 
 
 def _execute_fixture(

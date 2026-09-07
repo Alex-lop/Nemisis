@@ -37,7 +37,7 @@ from nemisis.crash_models import (
     WorldRole,
 )
 from nemisis.crashcheck import CrashCheckError, accept_contract, check, initialize, replay
-from nemisis.hashing import canonical_json, sha256_json
+from nemisis.hashing import canonical_json, sha256_json, sha256_tree
 from nemisis.local import source_commit
 from nemisis.models import TruthLabel
 
@@ -448,18 +448,135 @@ def test_anchor_binding_failure_is_a_scoped_crashcheck_error(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """A target the scenario does not bind is refused when it is drafted, not after the digest
+    was accepted, with the sentence check would have printed and the target to pass."""
     monkeypatch.chdir(tmp_path)
     issue = tmp_path / "issue.md"
     issue.write_text(load_issue(), encoding="utf-8")
-    config = initialize(issue, "missing.handler:apply_credit", BUGGY_REF, SCENARIO_ID)
-    payload = json.loads(config.read_bytes())
-    accept_contract(payload["contract"]["digest"], config)
 
     with pytest.raises(
         CrashCheckError,
-        match=r"^UNSUPPORTED_TARGET: retry contract uses an unsupported trusted catalog binding",
+        match=r"^UNSUPPORTED_TARGET: retry contract uses an unsupported trusted catalog binding; "
+        r"sqlite-credit-v1 binds app\.credits:apply_credit, so pass --target "
+        r"app\.credits:apply_credit$",
     ):
-        check(BUGGY_REF, MISLEADING_GREEN_REF, config)
+        initialize(issue, "missing.handler:apply_credit", BUGGY_REF, SCENARIO_ID)
+    assert not (tmp_path / _CONFIG_PATH).exists()
+
+
+@pytest.mark.parametrize(
+    ("layout", "fragment"),
+    [
+        (
+            "no-handler",
+            "was ZERO_MATCHES in {ref} (resolved {identity}): supported target has no file "
+            "binding in the exact tree. Put a top-level `def apply_credit(store, event)` in "
+            "`app/credits.py` at the root of the tree (an alias, a re-export, or a method is not "
+            "a binding). Nothing was drafted.",
+        ),
+        (
+            "three-arguments",
+            "was INVALID_MATCH in {ref} (resolved {identity}): target handler must accept "
+            "exactly (store, event). Make it a plain synchronous `def apply_credit(store, "
+            "event)` with no other parameters. Nothing was drafted.",
+        ),
+    ],
+)
+def test_init_refuses_a_base_tree_the_target_cannot_bind(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, layout: str, fragment: str
+) -> None:
+    """The judge learns at `init` that the base cannot bind, in check's own words plus the one
+    change that would make it bind; nothing is written."""
+    monkeypatch.chdir(tmp_path)
+    issue = tmp_path / "issue.md"
+    issue.write_text(load_issue(), encoding="utf-8")
+    base = tmp_path / layout
+    (base / "app").mkdir(parents=True)
+    (base / "app" / "__init__.py").write_text('"""app"""\n', encoding="utf-8")
+    if layout == "three-arguments":
+        (base / "app" / "credits.py").write_text(
+            "def apply_credit(store, event, extra):\n    pass\n", encoding="utf-8"
+        )
+    identity = sha256_tree(base, ignored_names=frozenset({"__pycache__"}))[:16]
+
+    with pytest.raises(CrashCheckError) as error:
+        initialize(issue, "app.credits:apply_credit", base, SCENARIO_ID)
+
+    expected = fragment.format(ref=base, identity=identity)
+    assert str(error.value) == f"the base target mapping for app.credits:apply_credit {expected}"
+    assert not (tmp_path / _CONFIG_PATH).exists()
+
+
+def test_an_observation_that_does_not_cohere_says_which_clause(
+    hero: tuple[Path, CrashCheckResult],
+) -> None:
+    """NOT_OBSERVED used to collapse eighteen causes into one sentence; each is named now."""
+    root, result = hero
+    capsule = ReproCapsule.model_validate_json(_artifact(root, result, "capsule").read_bytes())
+    base = tuple(a for a in result.attempts if a.role is WorldRole.BASE)
+    assert crashcheck_module._unconfirmed_reason(base, capsule) is None
+    assert crashcheck_module._unconfirmed_reason(base[:4], capsule) == (
+        "4 worlds were recorded where 5 were required"
+    )
+    other = base[0].model_copy(update={"capsule_digest": "0" * 64})
+    assert crashcheck_module._unconfirmed_reason((other, *base[1:]), capsule) == (
+        "a world's receipt is bound to a different capsule"
+    )
+    exited = base[0].model_copy(
+        update={
+            "spawns": (base[0].spawns[0].model_copy(update={"exit_code": 0}), base[0].spawns[1])
+        }
+    )
+    assert crashcheck_module._unconfirmed_reason((exited, *base[1:]), capsule) == (
+        "the first worker did not exit from SIGKILL (exit 0)"
+    )
+    assert crashcheck_module._unsupported_observation_summary(
+        CrashObservation.NOT_OBSERVED, (exited, *base[1:]), capsule
+    ) == (
+        "Execution completed without one stable supported observation: the first worker did "
+        "not exit from SIGKILL (exit 0). No verdict is issued from evidence that does not cohere."
+    )
+
+
+def test_a_no_crash_control_that_fails_says_what_the_base_did_without_a_kill(
+    hero: tuple[Path, CrashCheckResult],
+) -> None:
+    _, result = hero
+    receipt = result.minimization_receipts[0]
+    duplicated = receipt.model_copy(
+        update={
+            "sole_fault_action_necessary_for_fixture": False,
+            "confirmations": tuple(
+                world.model_copy(update={"observation": CrashObservation.DUPLICATE_EFFECT})
+                for world in receipt.confirmations
+            ),
+        }
+    )
+    assert crashcheck_module._minimization_summary(duplicated) == (
+        "The fixture-scoped one-action deletion check did not establish necessity in two fresh "
+        "base worlds: with no kill at all the base ended DUPLICATE_EFFECT, so the crash is not "
+        "what makes this bug appear. CrashCheck judges crash windows only; a bug on the plain "
+        "path is one for an ordinary test."
+    )
+    died = receipt.model_copy(
+        update={
+            "sole_fault_action_necessary_for_fixture": False,
+            "confirmations": (
+                receipt.confirmations[0].model_copy(
+                    update={
+                        "execution_status": ExecutionStatus.TIMEOUT,
+                        "failure_detail": "the first worker's hello did not arrive within 10 s",
+                    }
+                ),
+                receipt.confirmations[1],
+            ),
+        }
+    )
+    assert crashcheck_module._minimization_summary(died) == (
+        "The fixture-scoped one-action deletion check did not establish necessity in two fresh "
+        "base worlds: 1 of 2 no-crash worlds did not complete: the first worker's hello did not "
+        "arrive within 10 s. No verdict is issued from incomplete evidence."
+    )
 
 
 @pytest.mark.parametrize(
@@ -488,7 +605,12 @@ def test_supported_non_unique_anchor_publishes_incomplete_evidence(
         package = source / "app/credits"
         package.mkdir()
         (package / "__init__.py").write_bytes(handler.read_bytes())
+    # init now refuses a base this target cannot bind, so the accepted config is drafted with
+    # that draft-time check disabled: check's own receipt path must still fail closed for a
+    # config that arrived by other means (a crafted file, a base commit's .nemisis/config.json).
+    monkeypatch.setattr(crashcheck_module, "_require_bindable", lambda *args: None)
     config_bytes, _ = _accepted_config(tmp_path / f"{variant}-config-workspace", source, variant)
+    monkeypatch.undo()
     (source / _CONFIG_PATH.parent).mkdir()
     (source / _CONFIG_PATH).write_bytes(config_bytes)
     artifacts = tmp_path / f"{variant}-artifacts"

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from nemisis.crash_fixture import (
     SCENARIO_ID,
     SHADOW_TABLE_REF,
     load_issue,
+    materialize_fixture,
 )
 from nemisis.crash_models import (
     AnchorResolutionStatus,
@@ -127,6 +129,20 @@ MARK_THEN_ATOMIC = """def apply_credit(store, event):
 
 THREE_ARGUMENT = """def apply_credit(store, event, extra=None):
     store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+
+SPINS_AFTER_MARKING = """def apply_credit(store, event):
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+    while True:
+        pass
+"""
+
+SPINS_BEFORE_MARKING = """def apply_credit(store, event):
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    while True:
+        pass
 """
 
 
@@ -780,7 +796,12 @@ def test_failed_corrected_control_withholds_the_verdict(
     result = check(BUGGY_REF, ATOMIC_REF, SCENARIO_ID, corrected=MISLEADING_GREEN_REF, mode="local")
 
     assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE
-    assert "corrected control did not prove" in result.summary
+    assert result.summary == (
+        "The known-good corrected control did not prove the capsule invariant: the corrected "
+        "tree duplicated the effect under the capsule's kill. Pass a tree that survives this "
+        "capsule as --corrected, or omit --corrected: the candidate's verdict does not depend "
+        "on it."
+    ), result.summary
     by_role = {
         role: {a.observation for a in result.attempts if a.role is role} for role in WorldRole
     }
@@ -811,10 +832,16 @@ def test_same_ref_for_two_roles_is_refused_with_a_reason(
 ) -> None:
     monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
 
-    with pytest.raises(CrashCheckError, match="same source ref and tree"):
+    with pytest.raises(CrashCheckError, match="same tree as an earlier role"):
         check(BUGGY_REF, BUGGY_REF, SCENARIO_ID, mode="local")
-    with pytest.raises(CrashCheckError, match="same source ref and tree"):
+    with pytest.raises(CrashCheckError, match="same tree as an earlier role"):
         check(BUGGY_REF, ATOMIC_REF, SCENARIO_ID, corrected=ATOMIC_REF, mode="local")
+    # A byte-identical copy at another path is the same tree: a control that is the candidate
+    # proves nothing (the third hostile review's corrected-clone).
+    clone = tmp_path / "atomic-clone"
+    shutil.copytree(materialize_fixture(ATOMIC_REF, tmp_path / "atomic-source").path, clone)
+    with pytest.raises(CrashCheckError, match="same tree as an earlier role"):
+        check(BUGGY_REF, ATOMIC_REF, SCENARIO_ID, corrected=clone, mode="local")
 
 
 def test_symlinked_output_dir_still_publishes_the_finished_run(
@@ -1285,7 +1312,7 @@ def apply_credit(store, event):
         ("deleted-on-exit", DELETED_ON_EXIT_FLAG, "wrote durable entries outside the store"),
         ("pycache", PYCACHE_FLAG, "source tree changed"),
         ("tree-dir", TREE_DIR_FLAG, "source tree changed"),
-        ("chmod", CHMOD_FLAG, "permission bits or extended attributes"),
+        ("chmod", CHMOD_FLAG, "permission bits 700 instead of 600"),
         ("blob", BLOB_AMOUNT, "was not"),
     ],
 )
@@ -1338,4 +1365,485 @@ def test_a_flag_written_into_the_scratch_tree_stops_the_run_without_a_verdict(
     candidate = _tree(tmp_path, "world-up", WORLD_UP_FLAG)
 
     with pytest.raises(CrashCheckError, match="wrote outside its world into CrashCheck's scratch"):
+        check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+
+def test_a_handler_that_never_returns_is_told_which_phase_ran_out_of_time(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The budget is a documented knob; its expiry says what did not happen and where.
+
+    The first delivery is killed at the credit; the replay credits, marks, and never returns, so
+    the replay phase runs out. The message names the phase, the commits seen, the budget, and
+    the variable a slow machine turns, instead of the bare "worker IPC timed out" of before.
+    """
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("NEMISIS_WORKER_TIMEOUT_SECONDS", "2")
+    candidate = _tree(tmp_path, "spins", SPINS_AFTER_MARKING)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert (
+        "5 of 5 candidate worlds did not complete: the replay delivery's next store commit or "
+        "its end (commits so far: credit, mark_processed) did not arrive within 2 s; "
+        "NEMISIS_WORKER_TIMEOUT_SECONDS raises the budget on a slow machine."
+    ) in result.summary, result.summary
+    worlds = [a for a in result.attempts if a.role is WorldRole.CANDIDATE]
+    assert {a.execution_status for a in worlds} == {ExecutionStatus.TIMEOUT}
+    assert cli._exit_code(result.verdict) == 2
+
+
+def test_a_base_that_never_returns_is_told_so_by_the_hunt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A base whose worlds do not complete is not "a base that did not reproduce"."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("NEMISIS_WORKER_TIMEOUT_SECONDS", "2")
+    base = _tree(tmp_path, "spinning-base", SPINS_BEFORE_MARKING)
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+    issue = workspace / "issue.md"
+    issue.write_text(load_issue() + "\nLocal contract.\n", encoding="utf-8")
+    config = initialize(issue, TARGET, base, SCENARIO_ID)
+    accept_contract(json.loads(config.read_bytes())["contract"]["digest"], config)
+
+    result = check(base, ATOMIC_REF, config, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    # The effect-commit hypothesis kills at the credit and its replay spins; the marker-commit
+    # hypothesis never reaches its checkpoint because the first delivery spins. Two worlds,
+    # two phases, one honest count.
+    assert result.summary == (
+        "The two base-only crash-boundary hypotheses did not yield one witness: 2 of 2 base "
+        "hunt worlds did not complete: the first delivery's next store commit or its end "
+        "(commits so far: credit) did not arrive within 2 s; NEMISIS_WORKER_TIMEOUT_SECONDS "
+        "raises the budget on a slow machine (and 1 for another reason). No verdict is issued "
+        "from incomplete evidence."
+    ), result.summary
+
+
+def test_a_fixed_tree_as_base_is_told_to_pass_the_buggy_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    monkeypatch.chdir(workspace)
+    issue = workspace / "issue.md"
+    issue.write_text(load_issue() + "\nLocal contract.\n", encoding="utf-8")
+    config = initialize(issue, TARGET, ATOMIC_REF, SCENARIO_ID)
+    accept_contract(json.loads(config.read_bytes())["contract"]["digest"], config)
+
+    result = check(ATOMIC_REF, MISLEADING_GREEN_REF, config, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert "the base did not duplicate at either boundary" in result.summary, result.summary
+    assert "Pass the tree that still has the bug as --base." in result.summary
+
+
+def test_an_invalid_timeout_knob_is_refused_before_any_world_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setenv("NEMISIS_WORKER_TIMEOUT_SECONDS", "0")
+
+    with pytest.raises(CrashCheckError, match="NEMISIS_WORKER_TIMEOUT_SECONDS must be a number"):
+        check(BUGGY_REF, MISLEADING_GREEN_REF, SCENARIO_ID, mode="local")
+    assert not (tmp_path / "artifacts").exists()
+
+
+def test_a_candidate_without_the_handler_is_told_the_one_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "no-def", "def something_else(store, event):\n    pass\n")
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert (
+        "Put a top-level `def apply_credit(store, event)` in `app/credits.py` at the root of the "
+        "tree (an alias, a re-export, or a method is not a binding). No unbound source was "
+        "executed."
+    ) in result.summary, result.summary
+
+
+# The third hostile review (2026-09-07): thirty-seven confirmed false passes in six lenses, most
+# of them one root cause each. The database file's bytes SQLite carries but never reads back;
+# metadata the world scan never compared; a scratch-tree whitelist built from names; a store
+# class patched at import. Each shape below earned FIX_PROVEN_FOR_THIS_CAPSULE that morning.
+
+DEFAULT_CACHE_SIZE_FLAG = """import sqlite3
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    path = str(store._database)
+    with sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5) as reader:
+        seen = reader.execute("PRAGMA default_cache_size").fetchone()[0] == 6091
+    if seen:
+        store.mark_processed(event["event_id"])
+        return
+    with sqlite3.connect(path, timeout=5, isolation_level=None) as writer:
+        writer.execute("PRAGMA default_cache_size=6091")
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+HEADER_RESERVED_BYTE = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    path = str(store._database)
+    with open(path, "rb") as handle:
+        handle.seek(72)
+        seen = handle.read(1) == b"\\x5a"
+    if seen:
+        store.mark_processed(event["event_id"])
+        return
+    with open(path, "r+b") as handle:
+        handle.seek(72)
+        handle.write(b"\\x5a")
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+TRAILING_BYTES = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    path = str(store._database)
+    with open(path, "rb") as handle:
+        handle.seek(0, 2)
+        size = handle.tell()
+        handle.seek(max(0, size - 1))
+        seen = size > 4096 and handle.read(1) == b"\\x5a"
+    if seen:
+        store.mark_processed(event["event_id"])
+        return
+    with open(path, "ab") as handle:
+        handle.write(b"\\x00" * 4095 + b"\\x5a")
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+FILE_METADATA_FLAG = """import os
+import stat
+
+
+def _flagged(path):
+    if hasattr(os, "chflags"):
+        return bool(os.stat(path).st_flags & stat.UF_HIDDEN)
+    return "user.nemisis.seen" in os.listxattr(path)
+
+
+def _flag(path):
+    if hasattr(os, "chflags"):
+        os.chflags(path, os.stat(path).st_flags | stat.UF_HIDDEN)
+    else:
+        os.setxattr(path, "user.nemisis.seen", b"1")
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    path = str(store._database)
+    if _flagged(path):
+        store.mark_processed(event["event_id"])
+        return
+    _flag(path)
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+XATTR_FLAG = """import ctypes
+import ctypes.util
+import os
+
+NAME = "user.nemisis.seen"
+
+
+def _names(path):
+    if hasattr(os, "listxattr"):
+        return list(os.listxattr(path))
+    libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+    libc.listxattr.restype = ctypes.c_ssize_t
+    libc.listxattr.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int]
+    size = libc.listxattr(os.fsencode(path), None, 0, 0)
+    if size <= 0:
+        return []
+    buffer = ctypes.create_string_buffer(size)
+    libc.listxattr(os.fsencode(path), buffer, size, 0)
+    return [name.decode() for name in buffer.raw[:size].split(b"\\0") if name]
+
+
+def _set(path):
+    if hasattr(os, "setxattr"):
+        os.setxattr(path, NAME, b"1")
+        return
+    libc = ctypes.CDLL(ctypes.util.find_library("c"), use_errno=True)
+    libc.setxattr.argtypes = [
+        ctypes.c_char_p, ctypes.c_char_p, ctypes.c_void_p, ctypes.c_size_t,
+        ctypes.c_uint32, ctypes.c_int,
+    ]
+    if libc.setxattr(os.fsencode(path), NAME.encode(), b"1", 1, 0, 0) != 0:
+        raise OSError(ctypes.get_errno(), "setxattr")
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    path = str(store._database)
+    if NAME in _names(path):
+        store.mark_processed(event["event_id"])
+        return
+    _set(path)
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+HOME_MODE_FLAG = """import os
+import stat
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    home = os.environ["HOME"]
+    mode = stat.S_IMODE(os.stat(home).st_mode)
+    if mode & stat.S_IWOTH:
+        store.mark_processed(event["event_id"])
+        return
+    os.chmod(home, mode | stat.S_IWOTH)
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+HOME_MTIME_FLAG = """import os
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    home = os.environ["HOME"]
+    if int(os.stat(home).st_mtime) == 1234567890:
+        store.mark_processed(event["event_id"])
+        return
+    os.utime(home, (1234567890, 1234567890))
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+TMPDIR_MTIME_FLAG = """import os
+
+
+def apply_credit(store, event):
+    tmp = os.environ["TMPDIR"]
+    if int(os.stat(tmp).st_mtime) == 1234567890:
+        return
+    os.utime(tmp, (1234567890, 1234567890))
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+HOME_RMDIR_FLAG = """import os
+
+
+def apply_credit(store, event):
+    home = os.environ["HOME"]
+    if not os.path.isdir(home):
+        return
+    os.rmdir(home)
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+HOME_FIFO_FLAG = """import os
+import stat
+
+
+def apply_credit(store, event):
+    home = os.environ["HOME"]
+    if stat.S_ISFIFO(os.lstat(home).st_mode):
+        return
+    os.rmdir(home)
+    os.mkfifo(home, 0o600)
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+UNREADABLE_HOME = """import os
+
+
+def apply_credit(store, event):
+    home = os.environ["HOME"]
+    os.chmod(home, 0o700)
+    flag = os.path.join(home, "seen")
+    if os.path.exists(flag):
+        os.unlink(flag)
+        os.chmod(home, 0o755)
+        return
+    open(flag, "w").close()
+    os.chmod(home, 0o000)
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+WORLD_EXECUTE_ONLY = """import os
+
+
+def apply_credit(store, event):
+    world = os.path.dirname(os.path.dirname(os.getcwd()))
+    os.chmod(world, 0o755)
+    flag = os.path.join(os.getcwd(), "inflight.json")
+    if os.path.exists(flag):
+        os.unlink(flag)
+        return
+    open(flag, "w").close()
+    os.chmod(world, 0o111)
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+PATCHED_STORE_CLASS = """import sqlite3
+
+from nemisis.scenarios.sqlite_credit_v1 import CreditStore
+
+
+def _credit_and_mark(self, account_id, event_id, amount_cents):
+    self._require(account_id=account_id, event_id=event_id, amount_cents=amount_cents)
+    with sqlite3.connect(self._database, timeout=5, isolation_level=None) as connection:
+        if connection.execute(
+            "SELECT 1 FROM processed_events WHERE event_id = ?", (event_id,)
+        ).fetchone():
+            return
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            "UPDATE accounts SET balance_cents = balance_cents + ? WHERE account_id = ?",
+            (amount_cents, account_id),
+        )
+        connection.execute(
+            "INSERT INTO credit_ledger(event_id, account_id, amount_cents) VALUES (?, ?, ?)",
+            (event_id, account_id, amount_cents),
+        )
+        connection.commit()
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute("INSERT INTO processed_events(event_id) VALUES (?)", (event_id,))
+        connection.commit()
+    self._pause("credit_and_mark")
+
+
+CreditStore.credit_and_mark = _credit_and_mark
+
+
+def apply_credit(store, event):
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+
+@pytest.mark.parametrize(
+    ("name", "source", "fragment"),
+    [
+        ("default-cache-size", DEFAULT_CACHE_SIZE_FLAG, "default_cache_size"),
+        ("header-reserved-byte", HEADER_RESERVED_BYTE, "bytes changed outside SQLite's content"),
+        ("trailing-bytes", TRAILING_BYTES, "bytes changed outside SQLite's content"),
+        (
+            "file-metadata",
+            FILE_METADATA_FLAG,
+            "the handler changed the metadata of sandbox/cwd/db-",
+        ),
+        ("xattr", XATTR_FLAG, "user.nemisis.seen"),
+        ("home-mode", HOME_MODE_FLAG, "metadata of home in its world (permission bits"),
+        (
+            "home-mtime",
+            HOME_MTIME_FLAG,
+            "metadata of home in its world (its modification time moved)",
+        ),
+        (
+            "tmpdir-mtime",
+            TMPDIR_MTIME_FLAG,
+            "metadata of tmp in its world (its modification time moved)",
+        ),
+        ("home-rmdir", HOME_RMDIR_FLAG, "the handler removed home from its world"),
+        ("home-fifo", HOME_FIFO_FLAG, "it is now neither a regular file nor a directory"),
+        ("unreadable-home", UNREADABLE_HOME, "made home/ in its world unlistable"),
+        ("world-execute-only", WORLD_EXECUTE_ONLY, "made ./ in its world unlistable"),
+        ("patched-store-class", PATCHED_STORE_CLASS, "TrustedStorePatched"),
+    ],
+)
+def test_side_channels_from_the_third_hostile_review_forfeit_the_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, source: str, fragment: str
+) -> None:
+    """Third hostile review of the kernel (2026-09-07): a header field no store commit rewrites
+    (default_cache_size, the reserved bytes), bytes past the last page, a file flag or an
+    extended attribute (the xattr guard was inert on macOS), the mode or modification time of the
+    world's own directories, HOME removed or replaced by a FIFO, a directory made unlistable so
+    the scan reported nothing, and the trusted store patched at import. Each earned FIX_PROVEN;
+    each now forfeits the verdict with a sentence that names it."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, name, source)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert fragment in result.summary, result.summary
+    assert cli._exit_code(result.verdict) == 2
+
+
+RUN_ROOT_HEX_DIR = """import os
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    world = os.path.basename(os.path.dirname(os.path.dirname(os.getcwd())))
+    guard = os.path.join("..", "..", "..", "..", world)
+    if os.path.isdir(guard):
+        store.mark_processed(event["event_id"])
+        return
+    os.mkdir(guard)
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+SIBLING_SOURCE_BASE = """import os
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    world = os.path.basename(os.path.dirname(os.path.dirname(os.getcwd())))
+    guard = os.path.join("..", "..", "..", "..", "source-base", "." + world)
+    if os.path.exists(guard):
+        store.mark_processed(event["event_id"])
+        return
+    with open(guard, "w", encoding="utf-8") as handle:
+        handle.write(event["event_id"])
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+
+@pytest.mark.parametrize(
+    ("name", "source", "fragment"),
+    [
+        (
+            "run-root-hex-dir",
+            RUN_ROOT_HEX_DIR,
+            "wrote outside its world into CrashCheck's scratch tree",
+        ),
+        (
+            "sibling-source-base",
+            SIBLING_SOURCE_BASE,
+            "wrote into CrashCheck's copy of a source tree",
+        ),
+    ],
+)
+def test_the_scratch_tree_is_known_by_identity_not_by_name(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, source: str, fragment: str
+) -> None:
+    """A 32-hex directory the handler made was "expected" by construction, and a file inside the
+    base tree's copy was watched by nothing once the base phase ended. The run root now admits
+    only what the kernel recorded, and every source copy and finished phase is re-checked entry
+    by entry at every phase end."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, name, source)
+
+    with pytest.raises(CrashCheckError, match=fragment):
         check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
