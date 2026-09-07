@@ -1,6 +1,6 @@
-# Three-minute demo script
+# Four-minute demo script
 
-The 90-second cut, with pasted expected output and the screenshots that back each beat, is
+The two-and-a-half-minute cut, with pasted expected output and the screenshots that back each beat, is
 [DEMO.md](DEMO.md). This is the longer version, with the Nemotron beat and a fallback for every
 model and `check` beat. The last-resort fallback, playing the GIF, is in DEMO.md.
 
@@ -31,12 +31,22 @@ home-directory path appears in the recording. Have `docs/PITCH.md` open in a sec
 | 0:15 | `sed -n '/^def apply_credit/,$p' src/nemisis/fixtures/sqlite_credit_v1/trees/misleading-green/app/credits.py` | Just the handler: check marker, credit, mark processed | "Here is the agent's rewrite. Looks right: if we've seen the event, return; otherwise credit, then mark. Same shape as the original, and the crash window is still between those last two lines." |
 | 0:30 | `uv run nemisis propose-patch --issue issue.md --base fixture:sqlite-credit-v1/buggy --out ./nemotron-candidate` | `nemotron: nvidia/nemotron-3-super-120b-a12b · global · LIVE · schema valid · … ms · receipt …`, the model's one-paragraph rationale, and the exact `next:` command | "First, the agent. Nemotron on Nebius Token Factory gets the bug report and the buggy module. It does not get told how we kill or how we judge. It writes the fix. Our code checks the module's shape, imports, and attribute access, and writes it out as an ordinary candidate. Then we crash it exactly like everyone else's patch." |
 | on return | `uv run nemisis init --issue issue.md --target app.credits:apply_credit --base fixture:sqlite-credit-v1/buggy --scenario sqlite-credit-v1 --nemotron` | `nemotron: nvidia/nemotron-3-super-120b-a12b · global · LIVE · schema valid · … ms · receipt …` then `proposed: … selected fault intent first-credit-effect-commit-v1; amount_cents=2500 matches the audited event` | "First, Nemotron on Nebius Token Factory reads the bug report and the base handler, never the patch, and proposes the contract: which fault, and that one effect should be exactly twenty-five dollars. Our code checks that proposal against the audited catalog. The model proposes; it never decides." |
-| 1:00 | `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/misleading-green --corrected fixture:sqlite-credit-v1/atomic --scenario .nemisis/config.json --mode local` | ~2 s later: `verdict: PATCH_FAILED_STILL_REPRODUCES` and `timeline: $25.00 durable -> SIGKILL -> fresh worker -> $50.00` | "Now the real test. It starts a worker, waits for the twenty-five dollar credit to hit disk, sends SIGKILL to the process group, confirms the worker is dead, starts a brand-new worker, and replays the identical event. Fifty dollars. Five fresh worlds for the candidate, five for the buggy original, five for the atomic fix. Exit code one." |
-| 1:35 | `open .nemisis/runs/*/report.html` (macOS) or paste the printed `report:` path into a browser | Red hero: **Patch still duplicates the effect**, `$25.00 vs $50.00`; below it the Nemotron contract-proposal card and the fifteen attempt receipts, five worlds each for base, candidate, and corrected | "This is the artifact a reviewer gets. Expected twenty-five, observed fifty. Here is the model's proposal receipt with the truth label, and here are the process ids, the exit code minus nine, the two worker nonces, the database snapshots. No model confidence anywhere." |
+| 1:00 | `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/misleading-green --corrected fixture:sqlite-credit-v1/atomic --mode local` | ~4 s later: `verdict: PATCH_FAILED_STILL_REPRODUCES` and `timeline: $25.00 durable -> SIGKILL -> fresh worker -> $50.00` | "Now the real test. It starts a worker, waits for the twenty-five dollar credit to hit disk, sends SIGKILL to the process group, confirms the worker is dead, starts a brand-new worker, and replays the identical event. Fifty dollars. Five fresh worlds for the candidate, five for the buggy original, five for the atomic fix. Exit code one." |
+| 1:35 | `open .nemisis/runs/*/report.html` (macOS) or paste the printed `report:` path into a browser | Red hero: **Patch still duplicates the effect**, `$25.00 vs $50.00`; below it the fifteen attempt receipts (and the Nemotron contract-proposal card, if you passed `--scenario .nemisis/config.json`), five worlds each for base, candidate, and corrected | "This is the artifact a reviewer gets. Expected twenty-five, observed fifty. Here is the model's proposal receipt with the truth label, and here are the process ids, the exit code minus nine, the two worker nonces, the database snapshots. No model confidence anywhere." |
 | 2:05 | `uv run nemisis replay .nemisis/repros/double-credit/*/capsule.json --source fixture:sqlite-credit-v1/atomic --role corrected --mode local` | `verdict: FIX_PROVEN_FOR_THIS_CAPSULE`, exit `0` | "Same frozen capsule, same kill, against the atomic fix. Twenty-five dollars, one ledger row, one marker. This is the regression test that ships with the repro: the next patch has to beat the same crash." |
 | 2:20 | `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/mark-first --mode local` | `verdict: PATCH_FAILED_INVARIANT_BROKEN`, `timeline: $0.00 durable (after commit 1) -> SIGKILL -> fresh worker -> $0.00` | "One more. This patch passes the unit test, passes call-it-twice, and passes the same kill the original failed. So we kill it after every commit it makes. After the marker, before the credit: zero dollars, marked done. The customer never gets paid." |
-| 2:35 | (nothing) | Report still on screen | "What's proven is narrow on purpose: this exact tree beat this exact capsule. What's next is running that kill inside a Nebius Sandbox so untrusted pull requests can be checked too. Everything you saw is in the manifest, and nothing in it is labelled live unless a real receipt backs it." |
-| 2:55 | stop | | |
+| 2:35 | `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/raw-sql --mode local` | `execution: CHECKPOINT_NOT_REACHED`, `verdict: EVIDENCE_INCOMPLETE`, a summary naming `store.credit_and_mark(account_id, event_id, amount_cents)`, exit `2` | "Here is the textbook fix, written as one raw SQL transaction on the store's own database. It is correct. It still gets no verdict, because kill points are store commits and the store made none, so there is nowhere to put the crash. We name the write we saw and the store call that expresses the same fix. Exit two is the third answer: not a pass, not a fail." |
+| 2:50 | `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/shadow-table --mode local` | `execution: INTEGRITY_ERROR`, `integrity: INVALID`, `verdict: EVIDENCE_INCOMPLETE`, the summary says "the schema changed", exit `2` | "This one hides its dedup flag in a table it creates inside the store's own database. An earlier version of this engine blessed it, while a crash between that write and the credit left the customer unpaid forever. We now compare the whole database with what the reported commits predict, so the extra table is seen and the verdict is forfeited instead of guessed." |
+| 3:05 | `uv run nemisis check --base fixture:sqlite-inventory-v1/buggy --candidate fixture:sqlite-inventory-v1/mark-first --mode local` | `verdict: PATCH_FAILED_INVARIANT_BROKEN`, `summary: … 10 units on hand instead of 8 units …`, exit `1` | "None of this is about money. Same engine, second scenario: a stock reservation. Same reordering bug, killed after the marker, and the shelf reads ten units when the order was for two. Same kill, same sweep, same verdict vocabulary." |
+| 3:20 | `uv run nemisis redteam --cases 30 --seed 3 --out ./redteam` | Thirty rows scroll for about eighty seconds: ops, oracle verdict, checker verdict, `yes` | "Last thing. The checker is not trusted because we wrote it carefully. A grammar writes handlers it has never seen, and an oracle computed from the operation sequence alone grades the grades." |
+| 3:35 | (nothing, while it runs) | Rows still scrolling | "What's proven is narrow on purpose: this exact tree beat this exact capsule. What's next is running that kill inside a Nebius Sandbox so untrusted pull requests can be checked too. Everything you saw is in the manifest, and nothing in it is labelled live unless a real receipt backs it." |
+| 4:00 | (nothing) | `generated 30 handlers from seed 3; 0 disagreements`, then the absolute path of `./redteam`; exit `0` | "Thirty for thirty. One disagreement is exit one and an issue. The nightly runs three hundred per scenario." |
+| 4:10 | stop | | |
+
+The 1:00 command uses the packaged fixture contract, which is already accepted, so it runs with or
+without `NEBIUS_API_KEY`. If you did run `init --nemotron` and have an accepted
+`.nemisis/config.json`, add `--scenario .nemisis/config.json` to it and the report gains the
+**Contract proposal · LIVE Nemotron receipt** card; without the flag the run carries no proposal.
 
 ## Fallbacks
 
@@ -61,10 +71,17 @@ home-directory path appears in the recording. Have `docs/PITCH.md` open in a sec
 - **Browser will not open.** `uv run nemisis check ... 2>/dev/null | head -7` prints the verdict,
   the summary, and both digests; the report is optional.
 - **Wrong directory or stale `.nemisis/`.** `rm -rf .nemisis` and rerun from `init`.
+- **`redteam` refuses to start** (`ERROR: output directory already exists: redteam`, exit `2`). `rm -rf ./redteam`
+  and rerun, or pass a fresh `--out`.
+- **No time for the generator.** Skip the 3:20 beat and say that `.github/workflows/nightly.yml`
+  runs three hundred handlers per scenario; its first GitHub run
+  ([34086693284](https://github.com/Alex-lop/Nemisis/actions/runs/34086693284)) had zero
+  disagreements.
 
 ## Recording notes
 
 - One take per beat is fine; cut on the `clear`.
 - Keep the cursor still while output prints; the `timeline:` line is the money shot.
 - If a path with a username shows, re-run from `/tmp/crashcheck-demo`.
-- Under three minutes total; the judge may decide from the video alone.
+- Under four minutes total, and the last eighty seconds are the generator printing while you
+  talk; the judge may decide from the video alone.
