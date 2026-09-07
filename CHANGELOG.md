@@ -22,6 +22,8 @@ plumbing. Unreleased until a `v0.2.0` tag is pushed.
   change that makes it judgeable instead of being failed.
 - A landing page at the repository root and a Pages workflow that stages the evidence viewer with
   the relative layout it was recorded against.
+- A release workflow on `v*` tags: one build, attached to a GitHub release with this file's
+  section as its notes, and published to PyPI through a Trusted Publisher with no API token.
 
 ### Changed
 
