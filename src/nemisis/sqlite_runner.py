@@ -9,6 +9,7 @@ read-only connections. Everything about *which* database, store, event, and rule
 from __future__ import annotations
 
 import ast
+import ctypes
 import hashlib
 import importlib.util
 import inspect
@@ -58,10 +59,36 @@ from nemisis.models import TruthLabel
 from nemisis.safety import safe_relative_path
 from nemisis.scenario import MAX_MESSAGE_BYTES, Event, Scenario, StoreBase, Tables, worker_send
 from nemisis.scenarios import scenario_for
-from nemisis.scenarios.sqlite_credit_v1 import STORE_REMEDY, CreditStore
 
 RUNNER_ID = "sqlite-runner-v2"
 RUNNER_VERSION = "2"
+WORKER_TIMEOUT_VARIABLE = "NEMISIS_WORKER_TIMEOUT_SECONDS"
+DEFAULT_WORKER_TIMEOUT_SECONDS = 10.0
+_WORKER_TIMEOUT_BOUNDS = (1.0, 600.0)
+
+
+def worker_timeout_seconds() -> float:
+    """The budget one worker gets for each phase: its hello, reaching a commit, finishing.
+
+    Ten seconds by default, re-armed for every phase of every world. A slow or loaded machine
+    raises it through ``NEMISIS_WORKER_TIMEOUT_SECONDS`` (seconds, between 1 and 600). No
+    receipt depends on the value: it decides whether evidence completes, never what it says. A
+    value outside the range is refused, not clamped, so a typo cannot silently widen the wait.
+    """
+    raw = os.environ.get(WORKER_TIMEOUT_VARIABLE)
+    if raw is None:
+        return DEFAULT_WORKER_TIMEOUT_SECONDS
+    try:
+        value = float(raw.strip())
+    except ValueError:
+        value = float("nan")
+    low, high = _WORKER_TIMEOUT_BOUNDS
+    if not low <= value <= high:
+        raise ValueError(
+            f"{WORKER_TIMEOUT_VARIABLE} must be a number of seconds between {low:g} and "
+            f"{high:g}, not {raw!r}"
+        )
+    return value
 
 
 class _AttemptFailure(RuntimeError):
@@ -311,8 +338,9 @@ def execute_attempt(
         _preflight(
             scenario, capsule, binding, root, work_dir.resolve(), execution_nonce, timeout_seconds
         )
-        _make_sandbox(work_dir)
+        world = _make_sandbox(work_dir)
         initial_file_digest = _seed_database(scenario, database, event)
+        world = world.with_database(database)
         tree_before = _tree_state(root)
         timeline.append(_entry(TimelineState.DATABASE_SEEDED, database_id))
         ledger = _ledger(scenario, database, event)
@@ -351,8 +379,16 @@ def execute_attempt(
         post_kill = _require_unchanged(
             scenario, database, event, ledger, "durable checkpoint changed after worker death"
         )
-        # The crashed world is scanned now, before the replay can tidy a flag away.
-        _require_only_the_store_wrote(work_dir, database)
+        # The crashed world and the bound tree are checked now, before the replay can tidy a
+        # flag away (a third hostile review noted the tree was compared only at the end).
+        _require_only_the_store_wrote(world, database)
+        if _tree_state(root) != tree_before:
+            raise _AttemptFailure(
+                ExecutionStatus.INTEGRITY_ERROR,
+                "source tree changed during trusted execution (a file, a bytecode cache, or a "
+                "directory the handler wrote into its own tree before the kill)",
+                integrity=IntegrityStatus.INVALID,
+            )
         timeline.append(_entry(TimelineState.POST_KILL_PROBED, post_kill.digest))
 
         replay_worker = _spawn_worker(
@@ -389,7 +425,7 @@ def execute_attempt(
                 "directory the handler wrote into its own tree)",
                 integrity=IntegrityStatus.INVALID,
             )
-        _require_only_the_store_wrote(work_dir, database)
+        _require_only_the_store_wrote(world, database)
         observation = classify_final(
             final, scenario.effect_delta(event), scenario.initial_total(event)
         )
@@ -481,8 +517,9 @@ def execute_no_fault_replay(
         _preflight(
             scenario, capsule, binding, root, work_dir.resolve(), execution_nonce, timeout_seconds
         )
-        _make_sandbox(work_dir)
+        world = _make_sandbox(work_dir)
         initial_file_digest = _seed_database(scenario, database, event)
+        world = world.with_database(database)
         tree_before = _tree_state(root)
         ledger = _ledger(scenario, database, event)
         initial = ledger.snapshot
@@ -509,7 +546,7 @@ def execute_no_fault_replay(
             event=event,
             ledger=ledger,
         )
-        _require_only_the_store_wrote(work_dir, database)
+        _require_only_the_store_wrote(world, database)
 
         replay_worker = _spawn_worker(
             scenario=scenario,
@@ -541,7 +578,7 @@ def execute_no_fault_replay(
                 "directory the handler wrote into its own tree)",
                 integrity=IntegrityStatus.INVALID,
             )
-        _require_only_the_store_wrote(work_dir, database)
+        _require_only_the_store_wrote(world, database)
         observation = classify_delivery(
             first_delivery, final, scenario.effect_delta(event), scenario.initial_total(event)
         )
@@ -603,36 +640,134 @@ def _sandbox_cwd(work_dir: Path) -> Path:
     return work_dir.resolve() / "sandbox" / "cwd"
 
 
-def _make_sandbox(work_dir: Path) -> None:
+@dataclass(frozen=True)
+class _Entry:
+    """What one entry of a world is allowed to be: its kind and the metadata a crash keeps."""
+
+    kind: str
+    mode: int
+    flags: int
+    xattrs: tuple[str, ...]
+    mtime_ns: int | None  # pinned only where nothing legitimate ever writes
+
+
+@dataclass(frozen=True)
+class _World:
+    """One world's directory and every entry it may hold, with the metadata the kernel gave it.
+
+    The worker's cwd is the one directory whose modification time moves for a legitimate reason
+    (SQLite creates and removes the WAL sidecars there), so it is the one not pinned.
+    """
+
+    root: Path
+    expected: dict[Path, _Entry]
+
+    def with_database(self, database: Path) -> _World:
+        return _World(self.root, {**self.expected, database: _stat_entry(database, False)})
+
+
+def _make_sandbox(work_dir: Path) -> _World:
     """One directory per world: the worker's cwd, its HOME, and its TMPDIR, all inside it."""
     root = work_dir.resolve()
     root.mkdir(parents=True, exist_ok=False)
     for relative in ("sandbox/cwd", "home", "tmp"):
         (root / relative).mkdir(parents=True, exist_ok=False)
+    expected = {
+        path: _stat_entry(path, pin_mtime=path != root / "sandbox" / "cwd")
+        for path in (root, root / "sandbox", root / "sandbox" / "cwd", root / "home", root / "tmp")
+    }
+    return _World(root, expected)
 
 
-def _require_only_the_store_wrote(work_dir: Path, database: Path) -> None:
+def _stat_entry(path: Path, pin_mtime: bool) -> _Entry:
+    status = path.lstat()
+    kind = (
+        "dir"
+        if stat.S_ISDIR(status.st_mode)
+        else "file"
+        if stat.S_ISREG(status.st_mode)
+        else "other"
+    )
+    return _Entry(
+        kind=kind,
+        mode=stat.S_IMODE(status.st_mode),
+        flags=int(getattr(status, "st_flags", 0)),
+        xattrs=tuple(_xattrs(path)),
+        mtime_ns=status.st_mtime_ns if pin_mtime else None,
+    )
+
+
+def _metadata_difference(expected: _Entry, observed: _Entry) -> str:
+    parts = []
+    if observed.kind != expected.kind:
+        names = {
+            "dir": "a directory",
+            "file": "a regular file",
+            "other": "neither a regular file nor a directory",
+        }
+        parts.append(f"it is now {names[observed.kind]}, not {names[expected.kind]}")
+    if observed.mode != expected.mode:
+        parts.append(f"permission bits {observed.mode:o} instead of {expected.mode:o}")
+    if observed.flags != expected.flags:
+        parts.append(f"file flags {observed.flags:#x} instead of {expected.flags:#x}")
+    if observed.xattrs != expected.xattrs:
+        parts.append(
+            f"extended attributes {list(observed.xattrs)} instead of {list(expected.xattrs)}"
+        )
+    if observed.mtime_ns != expected.mtime_ns:
+        parts.append("its modification time moved")
+    return ", ".join(parts) or "its metadata changed"
+
+
+def _world_entries(root: Path) -> list[Path]:
+    """Every entry under the world, listed by the kernel itself; a directory that cannot be listed
+    is a refusal, not an empty directory."""
+    found: list[Path] = []
+    stack = [root]
+    while stack:
+        directory = stack.pop()
+        try:
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    path = Path(entry.path)
+                    found.append(path)
+                    if entry.is_dir(follow_symlinks=False):
+                        stack.append(path)
+        except OSError as error:
+            relative = directory.relative_to(root).as_posix() or "."
+            raise _AttemptFailure(
+                ExecutionStatus.UNSUPPORTED,
+                f"the handler made {relative}/ in its world unlistable ({type(error).__name__}); "
+                "a directory the kernel cannot read is durable state no store commit made, so no "
+                "verdict is issued",
+            ) from error
+    return found
+
+
+def _require_only_the_store_wrote(world: _World, database: Path) -> None:
     """Refuse handlers that keep durable state anywhere in their world but the store.
 
-    Kill points are store commits. A dedup file, a journal, or an empty directory written in the
-    worker's cwd, its parents inside the world, its HOME, or its TMPDIR has crash windows the sweep
-    cannot reach, so such a handler cannot earn a verdict. Writes elsewhere on the machine are
-    outside what local mode can see and are a documented boundary.
+    Kill points are store commits. A dedup file, a journal, an empty directory, a removed or
+    replaced directory, a permission bit, a file flag, an extended attribute, or a directory's
+    modification time, anywhere in the worker's cwd, its parents inside the world, its HOME, or
+    its TMPDIR, has crash windows the sweep cannot reach, so such a handler cannot earn a
+    verdict. Writes elsewhere on the machine are outside what local mode can see and are a
+    documented boundary. Extra entries are named first, because they are the sentence a judge
+    can act on; the metadata pins come after.
     """
-    root = work_dir.resolve()
-    expected = {
-        root / "sandbox",
-        root / "sandbox" / "cwd",
-        root / "home",
-        root / "tmp",
-        database,
+    root = world.root
+
+    def relative(path: Path) -> str:
+        return path.relative_to(root).as_posix() or "."
+
+    sidecars = {
         database.with_name(f"{database.name}-wal"),
         database.with_name(f"{database.name}-shm"),
     }
     extra = sorted(
-        path.relative_to(root).as_posix() + ("/" if path.is_dir() else "")
-        for path in root.rglob("*")
-        if path not in expected
+        relative(path) + ("/" if path.is_dir() and not path.is_symlink() else "")
+        for path in _world_entries(root)
+        if path not in world.expected and path not in sidecars
     )
     if extra:
         shown = ", ".join(extra[:5]) + (", …" if len(extra) > 5 else "")
@@ -642,34 +777,74 @@ def _require_only_the_store_wrote(work_dir: Path, database: Path) -> None:
             "store commits, so crash windows around that state cannot be reached and no verdict "
             "is issued",
         )
-    status = database.stat()
-    if stat.S_IMODE(status.st_mode) != _SEED_MODE or _xattrs(database):
-        raise _AttemptFailure(
-            ExecutionStatus.UNSUPPORTED,
-            "the handler changed the database file's permission bits or extended attributes; "
-            "that is durable state no store commit made, so no verdict is issued",
-        )
+    # Deepest first, so a removed or replaced HOME is named before the root whose mtime it moved.
+    for path in sorted(world.expected, key=lambda item: (-len(item.parts), str(item))):
+        expected = world.expected[path]
+        try:
+            observed = _stat_entry(path, pin_mtime=expected.mtime_ns is not None)
+        except FileNotFoundError as error:
+            raise _AttemptFailure(
+                ExecutionStatus.UNSUPPORTED,
+                f"the handler removed {relative(path)} from its world; that is durable state no "
+                "store commit made, so no verdict is issued",
+            ) from error
+        if observed != expected:
+            raise _AttemptFailure(
+                ExecutionStatus.UNSUPPORTED,
+                f"the handler changed the metadata of {relative(path)} in its world "
+                f"({_metadata_difference(expected, observed)}); that is durable state no store "
+                "commit made, so no verdict is issued",
+            )
+    for sidecar in sidecars:
+        # The sidecars are the store's own; the kernel pins their kind and nothing else, because
+        # a flag at the sidecar names is a channel local mode names and does not claim.
+        if sidecar.exists() and _stat_entry(sidecar, False).kind != "file":
+            raise _AttemptFailure(
+                ExecutionStatus.UNSUPPORTED,
+                f"the handler replaced {relative(sidecar)} with something that is not a regular "
+                "file; that is durable state no store commit made, so no verdict is issued",
+            )
 
 
 _SEED_MODE = 0o600
+_XATTR_NOFOLLOW = 0x0001
 
 
 def _xattrs(path: Path) -> list[str]:
+    """The names of the extended attributes on ``path``, on Linux and on macOS.
+
+    CPython builds ``os.listxattr`` only on Linux; on macOS the same libc call is reached through
+    ctypes, because an inert guard is worse than none (a hostile review found it inert).
+    """
     listxattr = getattr(os, "listxattr", None)
-    if listxattr is None:
+    if listxattr is not None:
+        return sorted(str(name) for name in listxattr(path, follow_symlinks=False))
+    if sys.platform != "darwin":
         return []
-    try:
-        return sorted(listxattr(path))
-    except OSError:
+    libc = ctypes.CDLL(None, use_errno=True)
+    call = libc.listxattr
+    call.restype = ctypes.c_ssize_t
+    call.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int]
+    encoded = os.fsencode(path)
+    size = call(encoded, None, 0, _XATTR_NOFOLLOW)
+    if size < 0:
+        raise OSError(ctypes.get_errno(), f"listxattr failed for {path}")
+    if size == 0:
         return []
+    buffer = ctypes.create_string_buffer(size)
+    got = call(encoded, buffer, size, _XATTR_NOFOLLOW)
+    if got < 0:
+        raise OSError(ctypes.get_errno(), f"listxattr failed for {path}")
+    return sorted(name.decode("utf-8", "replace") for name in buffer.raw[:got].split(b"\0") if name)
 
 
 def _tree_state(root: Path) -> str:
     """Every entry in the bound tree, of any kind, with file bytes: the integrity comparison.
 
     The binding digest ignores ``__pycache__`` and non-files so an identity is stable; the
-    integrity check ignores nothing, because a handler that stores a flag as a bytecode-cache
-    file or an empty directory in its own tree has durable state no store commit made.
+    integrity check keeps every path and kind and every regular file's bytes, because a handler
+    that stores a flag as a bytecode-cache file or an empty directory in its own tree has durable
+    state no store commit made. Metadata (modes, attributes, times) is not part of it.
     """
     entries: list[list[object]] = []
     for path in sorted(root.rglob("*")):
@@ -801,9 +976,33 @@ class _Ledger:
         self.content, self.snapshot = other.content, other.snapshot
 
 
+def _file_identity(path: Path) -> dict[str, object]:
+    """The bytes of the database file that SQLite carries but never reads back for a commit.
+
+    The 100-byte header is compared whole, except the three fields a commit rewrites (the change
+    counter, the page count, and the version-valid-for number); the file must be exactly as many
+    pages long as its own header says. A flag in a header field the store never rewrites
+    (``default_cache_size``, the twenty reserved bytes), or in bytes past the last page, is
+    durable, invisible to every PRAGMA and every row, and caught here.
+    """
+    with open(path, "rb") as handle:
+        header = bytearray(handle.read(100))
+        size = os.fstat(handle.fileno()).st_size
+    if len(header) < 100 or header[:16] != b"SQLite format 3\0":
+        raise sqlite3.DatabaseError("the database file has no SQLite header")
+    page_size = int.from_bytes(header[16:18], "big")
+    page_size = 65_536 if page_size == 1 else page_size
+    pages = int.from_bytes(header[28:32], "big")
+    header[24:32] = bytes(8)
+    header[92:96] = bytes(4)
+    return {"header": header.hex(), "bytes_beyond_pages": size - pages * page_size}
+
+
 def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -> dict[str, object]:
-    """Everything durable in the file: the schema, the header pragmas, every row of every table."""
+    """Everything durable in the file: the schema, the header pragmas, every row of every table,
+    and the raw header and length of the file itself."""
     try:
+        identity = _file_identity(path)
         # ``closing``: a sqlite3 connection's own context manager ends the transaction and
         # leaves the handle open, and an open reader holds the WAL lock the worker needs.
         with closing(_read_only(path)) as connection:
@@ -820,11 +1019,11 @@ def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -
                 name: [[_json_safe(value) for value in row] for row in rows]
                 for name, rows in scenario.tables(connection).items()
             }
-    except sqlite3.Error as error:
+    except (sqlite3.Error, OSError) as error:
         raise _AttemptFailure(
             ExecutionStatus.PROBE_ERROR, f"read-only state probe failed ({error})"
         ) from error
-    return {"header": header, "schema": schema, "tables": tables}
+    return {"file": identity, "header": header, "schema": schema, "tables": tables}
 
 
 # Every durable header field a handler can set and a store commit never changes: the journal
@@ -834,6 +1033,7 @@ def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -
 _HEADER_PRAGMAS = (
     "application_id",
     "auto_vacuum",
+    "default_cache_size",
     "encoding",
     "freelist_count",
     "journal_mode",
@@ -874,7 +1074,15 @@ def _content_difference(
     if observed["schema"] != expected["schema"]:
         parts.append("the schema changed (a table, index, or trigger this scenario did not seed)")
     if observed["header"] != expected["header"]:
-        parts.append("the database header changed (PRAGMA user_version or application_id)")
+        parts.append(
+            "the database header changed (PRAGMA user_version, application_id, or "
+            "default_cache_size)"
+        )
+    if observed.get("file") != expected.get("file"):
+        parts.append(
+            "the database file's bytes changed outside SQLite's content (a header field no store "
+            "commit rewrites, or bytes past the last page)"
+        )
     expected_tables = cast(Tables, expected["tables"])
     observed_tables = cast(Tables, observed["tables"])
     differing = sorted(
@@ -980,7 +1188,16 @@ def _spawn_worker(
 def _expect_hello(
     spawn: _Spawn, capsule: ReproCapsule, execution_nonce: str, timeout_seconds: float
 ) -> None:
-    message = _receive(spawn.channel, spawn.receive_buffer, timeout_seconds)
+    message = _receive(
+        spawn.channel,
+        spawn.receive_buffer,
+        timeout_seconds,
+        what=(
+            f"the {spawn.phase} worker's hello (its interpreter starts and the handler module "
+            "and its imports load before it)"
+        ),
+        budget=timeout_seconds,
+    )
     expected = {
         "event_digest": capsule.event_digest,
         "execution_nonce": execution_nonce,
@@ -1006,6 +1223,12 @@ def _expect_hello(
         )
 
 
+def _next_message(spawn: _Spawn) -> str:
+    """What the controller is waiting for, for a timeout that can be diagnosed."""
+    commits = ", ".join(spawn.operations) or "none"
+    return f"the {spawn.phase} delivery's next store commit or its end (commits so far: {commits})"
+
+
 def _wait_for_checkpoint(
     scenario: Scenario,
     spawn: _Spawn,
@@ -1020,7 +1243,13 @@ def _wait_for_checkpoint(
     normalized = scenario.normalize_event(event)
     deadline = monotonic() + timeout_seconds
     while True:
-        message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
+        message = _receive(
+            spawn.channel,
+            spawn.receive_buffer,
+            max(0.001, deadline - monotonic()),
+            what=_next_message(spawn),
+            budget=timeout_seconds,
+        )
         kind = message.get("type")
         if kind == "commit":
             ledger.take(_attributed_probe(scenario, database, event, ledger, message))
@@ -1092,7 +1321,10 @@ def _kill_and_wait(spawn: _Spawn, timeout_seconds: float) -> None:
     try:
         return_code = spawn.process.wait(timeout=timeout_seconds)
     except subprocess.TimeoutExpired as error:
-        raise _AttemptFailure(ExecutionStatus.WAIT_ERROR, "killed worker was not reaped") from error
+        raise _AttemptFailure(
+            ExecutionStatus.WAIT_ERROR,
+            f"the killed worker was not reaped within {timeout_seconds:g} s",
+        ) from error
     if return_code != -signal.SIGKILL:
         raise _AttemptFailure(ExecutionStatus.WAIT_ERROR, "worker did not exit from SIGKILL")
     _collect(spawn)
@@ -1112,7 +1344,13 @@ def _finish_replay(
     """Drive one worker to completion; every durable change must be a store commit it reported."""
     deadline = monotonic() + timeout_seconds
     while True:
-        message = _receive(spawn.channel, spawn.receive_buffer, max(0.001, deadline - monotonic()))
+        message = _receive(
+            spawn.channel,
+            spawn.receive_buffer,
+            max(0.001, deadline - monotonic()),
+            what=_next_message(spawn),
+            budget=timeout_seconds,
+        )
         kind = message.get("type")
         if kind == "commit":
             ledger.take(_attributed_probe(scenario, database, event, ledger, message))
@@ -1138,8 +1376,8 @@ def _finish_replay(
     except subprocess.TimeoutExpired as error:
         raise _AttemptFailure(
             ExecutionStatus.TIMEOUT,
-            f"the {spawn.phase} delivery worker reported done but did not exit; a non-daemon "
-            "thread or child kept it alive",
+            f"the {spawn.phase} delivery worker reported done but did not exit within "
+            f"{timeout_seconds:g} s; a non-daemon thread or child kept it alive",
         ) from error
     _collect(spawn)
     if return_code != 0:
@@ -1182,6 +1420,7 @@ def _attributed_probe(
         )
     predicted_tables = scenario.apply(cast(Tables, ledger.content["tables"]), operation, normalized)
     predicted = {
+        "file": ledger.content["file"],
         "header": ledger.content["header"],
         "schema": ledger.content["schema"],
         "tables": predicted_tables,
@@ -1215,8 +1454,22 @@ def _attributed_probe(
     )
 
 
+def _timed_out(what: str, budget: float) -> _AttemptFailure:
+    """A timeout that says what did not happen and which knob a slow machine turns."""
+    return _AttemptFailure(
+        ExecutionStatus.TIMEOUT,
+        f"{what} did not arrive within {budget:g} s; {WORKER_TIMEOUT_VARIABLE} raises the "
+        "budget on a slow machine",
+    )
+
+
 def _receive(
-    channel: socket.socket, buffer: bytearray, timeout_seconds: float
+    channel: socket.socket,
+    buffer: bytearray,
+    timeout_seconds: float,
+    *,
+    what: str,
+    budget: float,
 ) -> dict[str, object]:
     deadline = monotonic() + timeout_seconds
     try:
@@ -1227,14 +1480,14 @@ def _receive(
                 )
             remaining = deadline - monotonic()
             if remaining <= 0:
-                raise _AttemptFailure(ExecutionStatus.TIMEOUT, "worker IPC timed out")
+                raise _timed_out(what, budget)
             channel.settimeout(remaining)
             chunk = channel.recv(min(1024, MAX_MESSAGE_BYTES + 1 - len(buffer)))
             if not chunk:
                 raise _AttemptFailure(ExecutionStatus.IPC_ERROR, "worker closed IPC unexpectedly")
             buffer.extend(chunk)
     except TimeoutError as error:
-        raise _AttemptFailure(ExecutionStatus.TIMEOUT, "worker IPC timed out") from error
+        raise _timed_out(what, budget) from error
     if newline > MAX_MESSAGE_BYTES:
         raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "worker message was oversized")
     data = bytes(buffer[:newline])
@@ -1299,8 +1552,9 @@ def _collect(spawn: _Spawn) -> None:
                         stream.close()
             raise _AttemptFailure(
                 ExecutionStatus.CLEANUP_ERROR,
-                "a child process inherited the worker's stdout/stderr and outlived the kill; "
-                "detached helpers must not share the worker's pipes",
+                "a child process inherited the worker's stdout/stderr and outlived the kill "
+                "(the pipes stayed open for 3 s after the worker died); detached helpers must "
+                "not share the worker's pipes",
             )
     if spawn.process.poll() is None:
         try:
@@ -1315,8 +1569,9 @@ def _collect(spawn: _Spawn) -> None:
     if descendants_survived:
         raise _AttemptFailure(
             ExecutionStatus.CLEANUP_ERROR,
-            "worker descendants survived their supervisor and were killed; a fire-and-forget "
-            "child that shares the worker's stdout/stderr is not exactly-once evidence",
+            "worker descendants survived their supervisor and were killed (the pipes stayed open "
+            "for more than 1 s after the worker died); a fire-and-forget child that shares the "
+            "worker's stdout/stderr is not exactly-once evidence",
         )
 
 
@@ -1376,7 +1631,9 @@ def _worker(argv: list[str]) -> int:
                 "worker_nonce": nonce,
             },
         )
+        trusted = _trusted_code(scenario)
         handler = _load_handler(Path(source), handler_path, symbol)
+        _require_trusted_code(scenario, trusted)
         store = scenario.store_class(Path(database), channel, event)
         handler(store, event)
         worker_send(
@@ -1390,6 +1647,39 @@ def _worker(argv: list[str]) -> int:
         return 3
     finally:
         channel.close()
+
+
+class TrustedStorePatched(RuntimeError):
+    """The handler module rebound a trusted store or protocol function when it was imported."""
+
+
+def _trusted_code(scenario: Scenario) -> dict[str, object]:
+    """The code objects the store and its protocol run with, captured before any candidate code.
+
+    A handler module is imported before the store is built, so module-level code could rebind
+    ``CreditStore.credit_and_mark`` to a version that makes two commits and reports one; the
+    handler body would then be the textbook one-liner and the store would under-report itself.
+    Comparing code objects before and after the import catches that; a candidate that patches
+    deeper (the socket, the interpreter) is hostile code, which local mode names as its boundary.
+    """
+    import nemisis.scenario as protocol
+
+    trusted: dict[str, object] = {}
+    for klass in (scenario.store_class, *scenario.store_class.__mro__[1:]):
+        for name, value in vars(klass).items():
+            if callable(value) and hasattr(value, "__code__"):
+                trusted.setdefault(f"{klass.__name__}.{name}", value.__code__)
+    for name in ("connect", "worker_send", "worker_receive"):
+        trusted[f"scenario.{name}"] = getattr(protocol, name).__code__
+    return trusted
+
+
+def _require_trusted_code(scenario: Scenario, trusted: dict[str, object]) -> None:
+    if _trusted_code(scenario) != trusted:
+        changed = sorted(
+            name for name, code in _trusted_code(scenario).items() if trusted.get(name) is not code
+        )
+        raise TrustedStorePatched(", ".join(changed) or "trusted code")
 
 
 def _load_handler(
@@ -1430,16 +1720,17 @@ if __name__ == "__main__":
 
 
 __all__ = [
+    "DEFAULT_WORKER_TIMEOUT_SECONDS",
+    "WORKER_TIMEOUT_VARIABLE",
     "MAX_MESSAGE_BYTES",
     "RUNNER_ID",
     "RUNNER_VERSION",
-    "STORE_REMEDY",
     "AnchorResolutionError",
-    "CreditStore",
     "bind_anchor",
     "capsule_event",
     "execute_attempt",
     "execute_no_fault_replay",
     "initial_database_digest",
     "runner_environment_digest",
+    "worker_timeout_seconds",
 ]

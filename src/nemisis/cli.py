@@ -10,6 +10,7 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from nemisis import __version__
 from nemisis.benchmark import BenchmarkError, BenchmarkResult, run_benchmark
 from nemisis.crash_fixture import SCENARIO_ID, parse_ref
 from nemisis.crash_models import ContractProposal, CrashCheckResult, CrashVerdict
@@ -25,6 +26,7 @@ from nemisis.scenarios import SCENARIOS, scenario_for
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nemisis")
+    parser.add_argument("--version", action="version", version=f"nemisis {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
 
     ref_help = (
@@ -46,7 +48,12 @@ def _parser() -> argparse.ArgumentParser:
     init = commands.add_parser("init", help="write or accept a CrashCheck contract")
     init.add_argument("--issue", type=Path, required=True, help="UTF-8 bug report file")
     init.add_argument(
-        "--target", required=True, help="module:function handler, e.g. app.credits:apply_credit"
+        "--target",
+        required=True,
+        help=(
+            "module:function handler; each scenario binds one audited target: "
+            + ", ".join(f"{name} -> {item.target}" for name, item in sorted(SCENARIOS.items()))
+        ),
     )
     init.add_argument("--base", required=True, help=f"exact base source: {ref_help}")
     init.add_argument(
@@ -179,7 +186,7 @@ def _parser() -> argparse.ArgumentParser:
         "--output",
         type=Path,
         default=Path(".nemisis/benchmark.json"),
-        help="result file; timings enter its digest, so use a fresh path to regenerate",
+        help="result file, replaced in place; wall-clock timings enter its digest",
     )
     benchmark.add_argument("--json", action="store_true", help="print the result document only")
     return parser
@@ -576,7 +583,10 @@ def main() -> None:
             from nemisis.redteam import run as run_redteam
 
             if args.out.exists():
-                _fail(f"output directory already exists: {args.out}", crashcheck=False)
+                _fail(
+                    f"output directory already exists: {args.out}; delete it or pass --out",
+                    crashcheck=False,
+                )
             try:
                 cases = run_redteam(args.cases, args.seed, args.out, args.scenario)
             except ValueError as error:

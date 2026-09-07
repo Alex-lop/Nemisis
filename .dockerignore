@@ -1,0 +1,9 @@
+# Only the package, the lock, and the metadata belong in the build context. Everything else is
+# evidence, documentation, or a local build directory, and none of it changes what the image runs.
+.git
+.venv
+.nemisis
+dist
+docs/assets
+site
+NEMISIS_*.md
