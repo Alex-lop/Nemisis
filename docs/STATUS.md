@@ -16,7 +16,7 @@ Committed hero evidence (regenerated 2026-09-06 at engine `14cd428`):
 
 Current tree:
 
-- engine code digest: `6edc971963dc9a4abf425330ffc28ca8b8ccb8dd813f41805896ad52fb0c3c33`
+- engine code digest: `2647b09453078364c29c86d1c0c6ec9b880a99e06999a6d3b619286b2e2991c8`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
@@ -78,6 +78,11 @@ New since 2026-09-05, from `overnight/hardening` and the `overnight2/*` branches
   tree (relative file writes no longer dirty it), cleanup errors no longer mask primary failures,
   and split worlds are named ("3 DUPLICATE_EFFECT, 2 EXACTLY_ONCE") instead of averaged.
 - The "single-action necessity proof" is called what it is, a no-crash control.
+- The judge's first five minutes: `init` refuses a target the base tree cannot bind at draft
+  time, in the sentence `check` would have printed plus the one change that makes it bind;
+  every anchor refusal, the no-crash control, the corrected control, and the eighteen ways five
+  worlds can fail to cohere name what happened and, where one exists, the remedy; `nemisis
+  --version` exists and `redteam` says what to do about an existing `--out`.
 
 New since 2026-08-30: `nemisis init --nemotron` asks Nemotron on Token Factory for a candidate-blind
 contract proposal (audited catalog IDs plus the expected single effect), accepts it only when fixed
@@ -96,7 +101,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 501 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 507 tests, and package build: pass locally on
   Python 3.12.13; CI runs the same gate on CPython 3.12 and 3.13
   ([run 34011484455](https://github.com/Alex-lop/Nemisis/actions/runs/34011484455), both legs green);
 - CI passed on the older commits these links were written for, every one of them earlier than the
