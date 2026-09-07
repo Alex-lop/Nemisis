@@ -31,6 +31,7 @@ G, E, M, A = Op.GUARD, Op.EFFECT, Op.MARK, Op.ATOMIC
 TM, RE = Op.TRY_MARK, Op.RETRY_EFFECT
 F, PF, HF, TF, DF = Op.RAW_FILE, Op.PARENT_FILE, Op.HOME_FILE, Op.TMP_FILE, Op.DELETE_FILE
 S, T, P, R, D = Op.RAW_SQL, Op.TABLE, Op.PRAGMA, Op.REPOINT, Op.DETECT
+HF, TB, HC, HR = Op.HEADER_FLAG, Op.TAIL_BYTES, Op.HOME_CHMOD, Op.HOME_RMDIR
 
 
 @pytest.mark.parametrize(
@@ -84,6 +85,13 @@ S, T, P, R, D = Op.RAW_SQL, Op.TABLE, Op.PRAGMA, Op.REPOINT, Op.DETECT
         ((F, E, DF, M), Expected.INCOMPLETE, "around the store"),  # present at the kill
         ((PF, DF, A), Expected.INCOMPLETE, "around the store"),  # the delete reaches only cwd
         ((DF,), Expected.INCOMPLETE, "never reached"),
+        # The third hostile review's channels: a header field no store commit rewrites, bytes past
+        # the last page, the mode of the world's HOME, HOME removed.
+        ((HF, A), Expected.INCOMPLETE, "around the store"),
+        ((A, TB), Expected.INCOMPLETE, "around the store"),
+        ((HC, A), Expected.INCOMPLETE, "around the store"),
+        ((A, HR), Expected.INCOMPLETE, "around the store"),
+        ((A, G, HC), Expected.PROVEN, "every kill point"),
         # World detection must be a no-op: every world is named by an opaque id.
         ((D, A), Expected.PROVEN, "every kill point"),
         ((G, D, E, M), Expected.STILL_REPRODUCES, "boundary"),
