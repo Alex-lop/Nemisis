@@ -417,9 +417,9 @@ def _print_map(result: MapResult, *, as_json: bool) -> None:
         print(f"no map: {result.anchor_failure}")
         return
     print(f"census: {result.census_status} / {result.census_integrity}")
-    if result.census_refusal is not None:
-        print(f"refused: {result.census_refusal}")
-        print("no crash-window map: the kernel could not attribute this tree's census")
+    if result.refusal is not None:
+        print(f"refused: {result.refusal}")
+        print("no crash-window map: the kernel could not attribute this tree")
         return
     commits = ", ".join(result.commits) or "none observed"
     print(f"commits: {commits}")

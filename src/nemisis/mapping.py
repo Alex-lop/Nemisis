@@ -11,10 +11,12 @@ It is read-only and durable-state-free: the sweep runs under a temporary directo
 when the map returns. Nothing is uploaded and no run directory is kept. The kernel it drives never
 calls a model.
 
-A census that does not complete cleanly (a handler that writes around the store forfeits its
-census the same way it forfeits a verdict) degrades the map to the census's own refusal sentence;
-it never prints a clean per-commit map for a tree the kernel could not attribute. An anchor that
-cannot bind produces no map at all: ``mappable`` is ``False`` and the caller exits non-zero.
+A tree the kernel cannot attribute degrades to the kernel's own refusal sentence with no windows,
+by the same three tests ``check`` applies after the sweep: a census that did not complete cleanly
+(a handler that writes around the store), a write beside the copied source in CrashCheck's scratch
+tree, or a commit schedule that differs between worlds started from the same seed. It never prints
+a clean per-commit map for a tree ``check`` would refuse. An anchor that cannot bind produces no
+map at all: ``mappable`` is ``False`` and the caller exits non-zero.
 """
 
 from __future__ import annotations
@@ -38,9 +40,11 @@ from nemisis.scenarios import scenario_for
 class CrashWindow(StrictModel):
     """One kill point in the sweep: kill after this commit, and what the retry left behind.
 
-    ``execution_status`` and ``detail`` are the attempt's own, verbatim; no verdict is inferred
-    from them. ``post_kill`` is the durable state the instant the worker was killed; ``after_retry``
-    is the state after a fresh worker replayed the same event.
+    Every field is the killed attempt's own, verbatim — ``operation`` is the operation that
+    attempt committed (from its ``first_worker_operations``), not the census's, so a schedule that
+    differs between worlds can never mislabel a window. No verdict is inferred. ``post_kill`` is
+    the durable state the instant the worker was killed; ``after_retry`` is the state after a fresh
+    worker replayed the same event.
     """
 
     kill_after_commit: int
@@ -54,10 +58,12 @@ class CrashWindow(StrictModel):
 class MapResult(StrictModel):
     """A verdict-free crash-window map for one candidate tree under one scenario.
 
-    ``mappable`` is ``False`` only when the anchor could not bind (no windows can exist);
-    ``census_refusal`` carries the census's sentence when the census did not complete cleanly, and
-    ``windows`` is then empty by design — a tree the kernel cannot attribute gets its refusal, not
-    a map. ``truth_label`` is the label of the local execution this wraps and is never upgraded.
+    ``mappable`` is ``False`` only when the anchor could not bind (no windows can exist).
+    ``refusal`` carries the kernel's own sentence for a tree it cannot attribute — a census that
+    did not complete cleanly, a write beside the copied source in CrashCheck's scratch tree, or a
+    commit schedule that differs between worlds started from the same seed — and ``windows`` is
+    then empty by design: exactly the trees ``check`` refuses get that refusal here, not a map.
+    ``truth_label`` is the label of the local execution this wraps and is never upgraded.
     """
 
     scenario_id: str
@@ -69,7 +75,7 @@ class MapResult(StrictModel):
     anchor_failure: str | None
     census_status: str
     census_integrity: str
-    census_refusal: str | None
+    refusal: str | None
     commits: tuple[str, ...]
     windows: tuple[CrashWindow, ...]
 
@@ -95,28 +101,58 @@ def map_windows(candidate: str | Path, scenario_id: str) -> MapResult:
                 anchor_failure=_engine._anchor_failure_summary(binding),
                 census_status=ExecutionStatus.UNSUPPORTED.value,
                 census_integrity=IntegrityStatus.INVALID.value,
-                census_refusal=None,
+                refusal=None,
                 commits=(),
                 windows=(),
             )
-        sweep = _engine._execute_sweep(
-            capsule, binding, source.path, scratch.phase(), WorldRole.CANDIDATE
-        )
+        # The three ways the kernel refuses to attribute a tree, in the order check applies them:
+        # a census that did not complete, a write beside the copied source (settle re-checks the
+        # whole scratch tree and may raise from inside the sweep or from settle itself), and a
+        # commit schedule that differs between worlds.
+        sweep = None
+        escape: str | None = None
+        try:
+            sweep = _engine._execute_sweep(
+                capsule, binding, source.path, scratch.phase(), WorldRole.CANDIDATE
+            )
+            scratch.settle(source.path)
+        except _engine.CrashCheckError as error:
+            escape = str(error)
+        if sweep is None:
+            return MapResult(
+                scenario_id=scenario_id,
+                truth_label=label.value,
+                engine_code_digest=engine_code_digest(),
+                source_ref=source.ref,
+                tree_digest=binding.tree_digest,
+                mappable=True,
+                anchor_failure=None,
+                census_status=ExecutionStatus.UNSUPPORTED.value,
+                census_integrity=IntegrityStatus.INVALID.value,
+                refusal=escape or "the sweep did not complete",
+                commits=(),
+                windows=(),
+            )
         census = sweep.census
-        census_clean = (
+        refusal: str | None = None
+        if not (
             census.execution_status is ExecutionStatus.COMPLETED
             and census.integrity_status is IntegrityStatus.VALID
-        )
+        ):
+            refusal = census.failure_detail or "the census did not complete cleanly"
+        elif escape is not None:
+            refusal = escape
+        else:
+            refusal = _engine._schedule_split(sweep.attempts, sweep)
         windows: tuple[CrashWindow, ...] = ()
-        if census_clean:
-            operations = census.first_delivery_operations
+        if refusal is None:
             windows = tuple(
                 CrashWindow(
                     kill_after_commit=attempt.kill_after_commit or 0,
                     operation=(
-                        operations[attempt.kill_after_commit - 1]
+                        attempt.first_worker_operations[attempt.kill_after_commit - 1]
                         if attempt.kill_after_commit is not None
-                        and attempt.kill_after_commit <= len(operations)
+                        and attempt.kill_after_commit <= len(attempt.first_worker_operations)
                         else "unknown"
                     ),
                     execution_status=attempt.execution_status.value,
@@ -136,7 +172,7 @@ def map_windows(candidate: str | Path, scenario_id: str) -> MapResult:
             anchor_failure=None,
             census_status=census.execution_status.value,
             census_integrity=census.integrity_status.value,
-            census_refusal=None if census_clean else census.failure_detail,
+            refusal=refusal,
             commits=tuple(census.first_delivery_operations),
             windows=windows,
         )

@@ -106,9 +106,12 @@ that reorders the two commits and loses the reservation instead.
 | `EVIDENCE_INCOMPLETE` | 2 | Required execution, mapping, integrity, or provenance evidence is missing or contradictory. |
 | `UNSUPPORTED_TARGET` | 2 | Deterministic preflight proves the scenario, catalog ID, adapter, or target shape is outside the alpha. |
 
-Two commands exit outside that table because neither emits a verdict. `nemisis redteam` exits `1`
+Three commands exit outside that table because none emits a verdict. `nemisis redteam` exits `1`
 when any generated handler's verdict disagrees with the oracle and `0` when none does. `nemisis
-doctor` exits `2` when its status is anything but `READY`, and `0` when it is.
+doctor` exits `2` when its status is anything but `READY`, and `0` when it is. `nemisis map` exits
+`0` whenever a map was produced — including a degraded map whose census the kernel refused, which
+carries the refusal sentence and no windows — and `2` only when no map could be produced at all
+(the candidate's anchor did not bind).
 
 Transport success is not execution success. Completed execution with invalid provenance is not a
 behavioral claim. Model prose cannot upgrade either case.
