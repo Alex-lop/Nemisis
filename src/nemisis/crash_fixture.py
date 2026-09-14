@@ -31,6 +31,7 @@ LEFTOVER_CREDIT_REF = CREDIT.ref("leftover-credit")
 NEVER_MARKS_REF = CREDIT.ref("never-marks")
 RAW_SQL_REF = CREDIT.ref("raw-sql")
 SHADOW_TABLE_REF = CREDIT.ref("shadow-table")
+TAIL_BYTES_REF = CREDIT.ref("tail-bytes")
 # The three-tree hero the benchmark measures, in canonical order.
 HERO_REFS = tuple(CREDIT.ref(variant) for variant in CREDIT.hero_variants)
 # Every packaged tree of every registered scenario; each is one flag away for anyone to rerun.

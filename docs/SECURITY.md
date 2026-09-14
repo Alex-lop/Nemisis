@@ -70,11 +70,24 @@ changes (journal mode, the schema cookie, the free-page count, page size, vacuum
 `default_cache_size`, `user_version`, `application_id`), and the file's own identity (its 100-byte
 header, except the three fields a commit rewrites, and its length, which must be exactly the page
 count its header states), reads all of it at that instant, and refuses anything that differs; it
-reads again after the kill and after the worker's final message. The seed leaves the file in WAL
+reads again after the kill, after the worker's final message (the store holds one connection
+for the worker's life and closes it only after that read and the controller's release, because
+closing a connection checkpoints the WAL and a checkpoint truncates the file to its page count;
+the nightly red team found on 2026-09-08 that a per-call connection closed by the garbage
+collector had erased bytes a handler appended after its last commit before the engine looked),
+and once more after the worker has exited. During a delivery no automatic checkpoint runs, so
+the main database file is byte-identical to the seed and is pinned whole, by digest and length
+(a checkpoint a handler runs itself changes the file and is the refused write); after the exit,
+which follows the store's own checkpoint, the file must be exactly the logical database the
+last read saw through the log, and the log must be empty. The write-ahead log grows only at
+store commits, keeps every byte it had (a commit appends frames), and its length must be
+exactly its frames', so bytes appended past the last frame, rewritten inside a frame, or written
+after the close are refused wherever the file is read. The seed leaves the file in WAL
 mode so the journal bits are constant for the run. A handler that moves money through its own
-SQLite connection, creates a table for its dedup flag, stores a flag in a header field (read or
-reserved), in a rowid, in the free-page count, or in bytes past the last page, re-points a ledger
-row, or renames and replaces a table therefore cannot earn a verdict. If it also makes a store
+SQLite connection, creates a table for its dedup flag, stores a flag in a header field (read,
+reserved, or one a checkpoint rewrites), in a rowid, in the free-page count, in bytes past the last
+page, or past the last frame of the write-ahead log, re-points a ledger row, or renames and replaces
+a table therefore cannot earn a verdict. If it also makes a store
 commit, the unattributed content is caught at the next probe and the run is `INTEGRITY_ERROR` /
 `INVALID`, because the kill point could no longer be trusted to sit where the money moved. If it
 makes no store commit at all, which is what the textbook atomic fix written as one raw transaction
@@ -88,15 +101,25 @@ directories, a HOME removed or replaced, a directory made unlistable, a scratch-
 built from names, the trusted store patched at import); each is pinned in
 `tests/test_verdict_paths.py`. The worker compares the trusted store's and protocol's code objects
 before and after the handler module is imported, so a module that rebinds a store method to one
-that under-reports its commits is refused as `TrustedStorePatched`.
+that under-reports its commits is refused as `TrustedStorePatched`. The store audits its own
+database before every method (its own connection), after every accepted commit (other
+connections), and before the worker reports done: SQLite's `data_version` changes
+only when another connection commits, and `total_changes` counts what the store's own connection
+changed, so SQL committed around the store's methods through any connection, whatever bytes it
+left and whether or not it was reverted, is refused as `WroteAroundTheStore` (a row inserted and
+deleted again leaves its bytes in a page's free space and no trace in any row; a third round of
+lenses found that channel on 2026-09-14), unless the handler also alters the store's own private
+state, which is the in-process boundary below.
 
 What the controller cannot read, it does not claim. These stay outside what local mode can see,
 and are the honest list: a flag the store's own next commit overwrites (the database file's
-modification time, the bytes of the WAL sidecar); a flag at the sidecar names the store owns
+modification time); the shm sidecar, whose header the kernel reads for the log's frame count
+and whose other bytes every reader rewrites and nothing pins, and which the controller's own
+read-only probe leaves behind; a connection the handler leaves open with a transaction or an
+unexhausted cursor past its return, which keeps the store's checkpoint from completing and is
+refused with a sentence that names it, not proven; a flag at the sidecar names the store owns
 (`<database>-wal`, `<database>-shm`), whose presence after a kill a handler can also read as "the
-last delivery crashed"; a write through a private connection that is reverted before the next
-store commit, because attribution samples the database at commits and not between them (the kill
-points are store commits, so such a window is one CrashCheck never claimed); a handler that reads
+last delivery crashed"; a handler that reads
 CrashCheck's scratch tree and counts the worlds of its phase, which tells a census from a kill
 world; and durable state kept elsewhere on the machine by absolute path. A handler that forges the
 IPC message on the store's private channel, or patches the interpreter below the store, is hostile

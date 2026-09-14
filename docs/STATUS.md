@@ -16,13 +16,14 @@ Committed hero evidence (regenerated 2026-09-07 at engine `c339aa9`, the third h
 
 Current tree:
 
-- engine code digest: `29205c5be25169f0ec17faccddd824e2b931ef0efbcaadae23b6f38c7217e94d`
+- engine code digest: `1afdb6ee88585074eaeda65c50223c18fb73c4b67710affb247ff8e55a51bb15`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
 - interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence
-- reviewed action pin: `a0c4a9f211a42c68a6e222c238ee14bda01bd902`, the exact `main` commit that
-  [`.github/examples/crashcheck.yml`](../.github/examples/crashcheck.yml) runs
+- reviewed action pin: `10dfbeecae6bba9dbde607ea8ff9e7f1b4067690`, the commit that
+  [`.github/examples/crashcheck.yml`](../.github/examples/crashcheck.yml) runs (on `main` it is
+  `main`'s engine; a pull request pins its own last engine commit until it merges)
   (`tests/test_docs_identity.py` fails when the two differ, and fails on `main` when
   `src/nemisis`, `action.yml`, `pyproject.toml`, or `uv.lock` at the pinned commit differs from
   `main`'s; an engine pull request carries its own bump, and
@@ -73,11 +74,21 @@ New since 2026-09-05, from `overnight/hardening` and the `overnight2/*` branches
   free-page count, a re-pointed row, a renamed table, files and directories beside, above, under
   `~`, under `TMPDIR`, in the bound tree, deleted on exit). Each is pinned in
   `tests/test_verdict_paths.py`; the table one ships as `fixture:sqlite-credit-v1/shadow-table`.
+  The nightly red team then caught a fourth-round shape on its own: bytes appended past the
+  database's last page after the handler's last commit earned a verdict for five nights and
+  `FIX_PROVEN_FOR_THIS_CAPSULE` twice, in one run (runs 34219859012, 34345065158, 34593382316, 34689225054, 34755449725; ten cases,
+  twenty lines, each case in both scenarios), because SQLite's close-time checkpoint truncated
+  the file before the engine's read; the engine now reads after the worker's final message and
+  before it may exit, pins the main file whole during a delivery, holds the write-ahead log to
+  its frames, and the shape ships as `fixture:sqlite-credit-v1/tail-bytes`; the lenses on that
+  fix found and closed a flag in the header's change counter and an append to the log.
   A third review on 2026-09-07 confirmed thirty-seven more (a header field the probe never read,
   the reserved header bytes, bytes past the last page, a file flag, an extended attribute on the
   platform where the guard was inert, the mode and mtime of the world's own directories, HOME
   removed or replaced, a directory made unlistable, a scratch-tree whitelist built from names, the
-  store patched at import); the probe now reads the file's raw header and length, the world scan
+  store patched at import); the probe now reads the file's raw header and length (which closed
+  the orderings where the bytes outlive the worker; the ordering after the last commit waited
+  for the nightly, below), the world scan
   pins every entry's metadata and refuses what it cannot list, the scratch root is known by
   recorded identity, and the worker refuses a patched store. Thirteen shapes are pinned; the
   channels that remain are listed in `docs/SECURITY.md`.
@@ -112,7 +123,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 558 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 568 tests, and package build: pass locally on
   Python 3.12.13; CI runs the same gate on CPython 3.12, 3.13, and 3.14 (the 3.14 leg first ran
   green on a real runner at
   [run 34093138705](https://github.com/Alex-lop/Nemisis/actions/runs/34093138705), where the only

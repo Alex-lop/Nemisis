@@ -21,6 +21,7 @@ from nemisis.crash_fixture import (
     RAW_SQL_REF,
     SCENARIO_ID,
     SHADOW_TABLE_REF,
+    TAIL_BYTES_REF,
     load_issue,
     materialize_fixture,
 )
@@ -1334,26 +1335,26 @@ def test_side_channels_from_the_second_hostile_review_forfeit_the_verdict(
     assert cli._exit_code(result.verdict) == 2
 
 
-def test_a_journal_mode_flag_does_not_survive_the_store_and_the_duplicate_shows(
+def test_a_journal_mode_flag_cannot_be_written_while_the_store_holds_its_connection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Hostile review: a dedup flag kept in the journal-mode header bits. The seed leaves the
-    file in WAL and the store's own connection puts it back in WAL on every commit, so the flag is
-    gone by the time a redelivery looks for it and the credit lands twice. That is the patch's
-    real failure, and it is the same on every machine: an earlier engine leaked a read-only probe
-    connection, which made the handler's own PRAGMA fail with "database is locked" in whichever
-    delivery lost the race, and the case was pinned to that accident."""
+    """Hostile review: a dedup flag kept in the journal-mode header bits. Two engines ago the
+    handler's PRAGMA failed with "database is locked" only in whichever delivery lost a race
+    against a leaked read-only probe, and the case was pinned to that accident; one engine ago
+    the store's per-call connection put the file back in WAL on every commit, so the flag was
+    gone by the redelivery and the duplicate showed. Now the store holds one connection for the
+    worker's whole life, and leaving WAL needs exclusive access to the file, so the handler's
+    PRAGMA fails the same way on every machine, in every world: the run stops without a verdict
+    and says what the handler raised. A flag written into those bits some other way is a change
+    to the main file, which is pinned whole during a delivery."""
     monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
     candidate = _tree(tmp_path, "journal-mode", JOURNAL_MODE_FLAG)
 
     result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
 
-    assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES, result.summary
-    assert "duplicate" in result.summary, result.summary
-    assert result.integrity_status.value == "VALID"
-    assert all(a.failure_detail is None for a in result.attempts), [
-        a.failure_detail for a in result.attempts
-    ]
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert "the handler raised OperationalError" in result.summary, result.summary
+    assert cli._exit_code(result.verdict) == 2
 
 
 def test_a_flag_written_into_the_scratch_tree_stops_the_run_without_a_verdict(
@@ -1741,8 +1742,8 @@ def apply_credit(store, event):
     ("name", "source", "fragment"),
     [
         ("default-cache-size", DEFAULT_CACHE_SIZE_FLAG, "default_cache_size"),
-        ("header-reserved-byte", HEADER_RESERVED_BYTE, "bytes changed outside SQLite's content"),
-        ("trailing-bytes", TRAILING_BYTES, "bytes changed outside SQLite's content"),
+        ("header-reserved-byte", HEADER_RESERVED_BYTE, "a header field no store commit rewrites"),
+        ("trailing-bytes", TRAILING_BYTES, "bytes past the database file's last page"),
         (
             "file-metadata",
             FILE_METADATA_FLAG,
@@ -1847,3 +1848,339 @@ def test_the_scratch_tree_is_known_by_identity_not_by_name(
 
     with pytest.raises(CrashCheckError, match=fragment):
         check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+
+BYTES_AFTER_THE_LAST_COMMIT = {
+    "effect-then-tail": """def apply_credit(store, event):
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    with open(store._database, "ab") as tail:
+        tail.write(b"\\x5a" * 16)
+""",
+    "guarded-atomic-then-tail": """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    with open(store._database, "ab") as tail:
+        tail.write(b"\\x5a" * 16)
+    if store.processed(event["event_id"]):
+        return
+""",
+    # The third refuter's shape: a garbage collection after the append. On an engine whose
+    # per-call store connection was closed by the collector, that close checkpointed and erased
+    # the bytes before any read, and this earned FIX_PROVEN; the store now holds one connection
+    # for the worker's life and closes it only after the controller's release.
+    "guarded-atomic-then-tail-then-gc": """import gc
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    with open(store._database, "ab") as tail:
+        tail.write(b"\\x5a" * 16)
+    gc.collect()
+""",
+}
+
+
+@pytest.mark.parametrize("name", sorted(BYTES_AFTER_THE_LAST_COMMIT))
+def test_bytes_written_after_the_last_commit_forfeit_the_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    """The nightly red team's first real finding (five failing runs, 2026-09-08 to 2026-09-13, ten
+    cases in both scenarios, every one this shape): bytes appended past the database file's last
+    page after the handler's last store commit. The engine read the file only after the worker had
+    exited; a worker's clean exit closes its store connection, closing it checkpoints the WAL, and
+    a checkpoint truncates the file back to its page count, so the write was gone before the
+    engine looked. `effect, tail` earned PATCH_FAILED_STILL_REPRODUCES and `guard, atomic, tail,
+    guard` earned FIX_PROVEN_FOR_THIS_CAPSULE (run 34593382316, cases 25 and 16). The controller
+    now reads the database while the worker still holds its connection, before releasing it."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, name, BYTES_AFTER_THE_LAST_COMMIT[name])
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert result.integrity_status.value == "INVALID"
+    assert "before the worker exited" in result.summary, result.summary
+    assert "bytes past the database file's last page" in result.summary, result.summary
+    assert cli._exit_code(result.verdict) == 2
+
+
+def test_tail_bytes_is_a_packaged_zoo_tree_pinned_to_no_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The nightly's false pass ships as fixture:sqlite-credit-v1/tail-bytes, one flag away."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+
+    result = check(BUGGY_REF, TAIL_BYTES_REF, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert result.integrity_status.value == "INVALID"
+    assert "before the worker exited" in result.summary
+    assert "store.credit_and_mark(account_id, event_id, amount_cents)" in result.summary
+    assert cli._exit_code(result.verdict) == 2
+
+
+# The false-pass lens on the nightly fix (2026-09-14): a flag in the header's change counter,
+# which a checkpoint rewrites and the probe therefore masked, was durable for the life of a world
+# in WAL mode and invisible to every read. The main file is now byte-constant during a delivery
+# (no automatic checkpoint) and pinned whole, so the write is caught at the next commit.
+CHANGE_COUNTER_FLAG = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    path = str(store._database)
+    with open(path, "rb") as handle:
+        handle.seek(24)
+        seen = handle.read(4) == b"\\x5a\\x5a\\x5a\\x5a"
+    if seen:
+        store.mark_processed(event["event_id"])
+        return
+    with open(path, "r+b") as handle:
+        handle.seek(24)
+        handle.write(b"\\x5a\\x5a\\x5a\\x5a")
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+# The same lens: sixteen bytes appended to the write-ahead log after the last commit. SQLite
+# ignores bytes past the last frame, a later worker can read them, and the kernel allowed the
+# sidecar by name without reading it. The log's length must now be its frames'.
+WAL_TAIL_AFTER_COMMIT = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    with open(str(store._database) + "-wal", "ab") as tail:
+        tail.write(b"\\x5a" * 16)
+"""
+
+# The kill-world variant: garbage written into the log before the first commit outlasts the
+# store's frames (SQLite restarts the log from its start and does not truncate it) and the kill.
+WAL_GARBAGE_BEFORE_COMMIT = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    wal = str(store._database) + "-wal"
+    with open(wal, "ab") as handle:
+        handle.write(b"\\x5a" * 65536)
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+
+# The lenses' other way to erase the append: a checkpoint through the handler's own connection.
+# It backfills the store's frames into the main file, and the main file may not change during a
+# delivery, so the checkpoint itself is the write that is refused.
+OWN_CHECKPOINT_AFTER_TAIL = """import sqlite3
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    with open(store._database, "ab") as tail:
+        tail.write(b"\\x5a" * 16)
+    with sqlite3.connect(store._database, isolation_level=None) as connection:
+        connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+"""
+
+
+# Round two of the lenses aimed at the read after the exit, which follows the store's own
+# checkpoint and used to compare only a masked header. An exit hook runs after the release and
+# the close: it appends a whole page and bumps the header's page count; it writes the change
+# counter the checkpoint just rewrote; it writes into the log. The file after the exit must now
+# be the logical image the last read saw through the log, and the log must be empty.
+EXIT_HOOK_PAGE = """import atexit
+
+
+def _append_page(path):
+    with open(path, "r+b") as handle:
+        header = bytearray(handle.read(100))
+        pages = int.from_bytes(header[28:32], "big")
+        handle.seek(0, 2)
+        handle.write(b"\\x5a" * 4096)
+        handle.seek(28)
+        handle.write((pages + 1).to_bytes(4, "big"))
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    atexit.register(_append_page, str(store._database))
+"""
+
+EXIT_HOOK_CHANGE_COUNTER = """import atexit
+
+
+def _flag(path):
+    with open(path, "r+b") as handle:
+        handle.seek(24)
+        handle.write(b"\\xde\\xad\\xbe\\xef")
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    atexit.register(_flag, str(store._database))
+"""
+
+EXIT_HOOK_SIDECAR = """import atexit
+
+
+def _sidecar(path):
+    with open(path + "-wal", "wb") as handle:
+        handle.write(b"\\x5a" * 32)
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    atexit.register(_sidecar, str(store._database))
+"""
+
+# Sixteen bytes overwritten inside a frame the store already wrote: the log's length is its
+# frames' and SQLite's checkpoint would copy the page into the main file. The log may only grow.
+WAL_FRAME_OVERWRITE = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    with open(str(store._database) + "-wal", "r+b") as handle:
+        handle.seek(32 + 24 + 2000)
+        handle.write(b"NEMISIS-MARKER!!")
+"""
+
+# Round three of the lenses: a dedup flag in a page's free space. A long row inserted and deleted
+# again, through any connection, leaves its bytes in the page and no trace in any row, rides the
+# log across a kill and the checkpoint across a clean exit, and every rule about the file's bytes
+# still holds. The store now refuses it itself: SQLite's data_version changes only when another
+# connection commits, and total_changes counts what the store's own connection changed, so any
+# SQL committed around the store's methods is named at the next moment the store speaks.
+FREE_SPACE_FLAG = """import sqlite3
+
+TOKEN = "NEMISIS-FREE-SPACE-FLAG-" * 8
+
+
+def _planted(path):
+    with open(path, "rb") as handle:
+        data = handle.read()
+    with open(path + "-wal", "rb") as handle:
+        data += handle.read()
+    return TOKEN.encode() in data
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    if _planted(str(store._database)):
+        store.mark_processed(event["event_id"])
+        return
+    with sqlite3.connect(store._database, isolation_level=None) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            "INSERT INTO accounts(account_id, balance_cents) VALUES (?, 0)", (TOKEN,)
+        )
+        connection.execute("DELETE FROM accounts WHERE account_id = ?", (TOKEN,))
+        connection.commit()
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+# Round four: a TEMP trigger on the store's own connection runs inside the store's transaction
+# and shows in no probe; the stores create no temporary objects, so one is refused.
+TEMP_TRIGGER_ON_THE_STORE = """TOKEN = "NEMISIS-TRIGGER-FLAG-" * 8
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    connection = store._connection
+    connection.execute("PRAGMA temp_store=MEMORY")
+    connection.execute(
+        "CREATE TEMP TRIGGER plant AFTER INSERT ON processed_events BEGIN "
+        "INSERT INTO accounts(account_id, balance_cents) VALUES ('" + TOKEN + "', 0); "
+        "DELETE FROM accounts WHERE account_id = '" + TOKEN + "'; END"
+    )
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+FREE_SPACE_FLAG_ON_THE_STORE = """TOKEN = "NEMISIS-FREE-SPACE-FLAG-" * 8
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    connection = store._connection
+    connection.execute("BEGIN IMMEDIATE")
+    connection.execute("INSERT INTO accounts(account_id, balance_cents) VALUES (?, 0)", (TOKEN,))
+    connection.execute("DELETE FROM accounts WHERE account_id = ?", (TOKEN,))
+    connection.commit()
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+
+@pytest.mark.parametrize(
+    ("name", "source", "fragment"),
+    [
+        ("change-counter-flag", CHANGE_COUNTER_FLAG, "a header field a checkpoint rewrites"),
+        ("own-checkpoint-after-tail", OWN_CHECKPOINT_AFTER_TAIL, "the store refused"),
+        ("exit-hook-page", EXIT_HOOK_PAGE, "image the last read saw"),
+        ("exit-hook-change-counter", EXIT_HOOK_CHANGE_COUNTER, "image the last read saw"),
+        ("exit-hook-sidecar", EXIT_HOOK_SIDECAR, "write-ahead log still holds"),
+        ("wal-frame-overwrite", WAL_FRAME_OVERWRITE, "write-ahead log"),
+        ("free-space-flag", FREE_SPACE_FLAG, "the store refused"),
+        ("free-space-flag-on-the-store", FREE_SPACE_FLAG_ON_THE_STORE, "the store refused"),
+        ("temp-trigger-on-the-store", TEMP_TRIGGER_ON_THE_STORE, "the store refused"),
+        ("wal-tail-after-commit", WAL_TAIL_AFTER_COMMIT, "write-ahead log is"),
+        ("wal-garbage-before-commit", WAL_GARBAGE_BEFORE_COMMIT, "write-ahead log is"),
+    ],
+)
+def test_the_file_and_its_log_are_pinned_whole_during_a_delivery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, source: str, fragment: str
+) -> None:
+    """The false-pass lens on the nightly fix found two channels the reading-schedule fix did
+    not reach: the header's change counter (masked because a checkpoint rewrites it, durable in
+    WAL mode until one does) and the write-ahead log (allowed by name, never read). Each earned
+    FIX_PROVEN_FOR_THIS_CAPSULE; each is refused now with a sentence that names it."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, name, source)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert result.integrity_status.value == "INVALID"
+    assert fragment in result.summary, result.summary
+    assert cli._exit_code(result.verdict) == 2
+
+
+PRIVATE_READER_LEFT_OPEN = """import sqlite3
+
+_reader = None
+
+
+def apply_credit(store, event):
+    global _reader
+    _reader = sqlite3.connect(f"file:{store._database}?mode=ro", uri=True)
+    _reader.execute("SELECT count(*) FROM accounts").fetchone()
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+
+def test_a_private_reader_left_open_does_not_cost_an_honest_handler_its_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The sqlite-semantics lens: a handler that opens a connection of its own and lets it live
+    past the handler writes nothing, but its handle used to keep the store's close from being the
+    last one, so no checkpoint ran and the read after the exit refused a write that never was.
+    The store's close checkpoints explicitly now, and the honest handler keeps its verdict."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "private-reader", PRIVATE_READER_LEFT_OPEN)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE, result.summary
+    assert result.integrity_status.value == "VALID"

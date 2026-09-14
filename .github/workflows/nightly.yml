@@ -1,6 +1,11 @@
 # Nightly red team: a few hundred generated handlers against the checker, judged by the oracle.
 # A disagreement is either a checker false pass or false fail (the most valuable bug this
 # repository can find) or an oracle bug; either way the job fails and the handlers are uploaded.
+# A case the kernel refused for a wall-clock reason (a world's execution status is TIMEOUT) is
+# the machine, not the checker: it is counted as `unknown`, printed in the step summary, and fails
+# the job only above --max-unknown. The worker budget here is 30 s, three times the local default,
+# because a shared runner is slower than a laptop; that is the knob's documented use, not a change
+# to the default.
 name: Nightly red team
 
 on:
@@ -43,16 +48,19 @@ jobs:
           CASES: ${{ inputs.cases || '300' }}
           SEED: ${{ inputs.seed || github.run_id }}
           SCENARIO: ${{ matrix.scenario }}
+          NEMISIS_WORKER_TIMEOUT_SECONDS: "30"
         run: |
+          status=0
           uv run nemisis redteam --cases "$CASES" --seed "$SEED" --scenario "$SCENARIO" \
-            --out "$RUNNER_TEMP/redteam" | tee redteam.txt
+            --max-unknown 3 --out "$RUNNER_TEMP/redteam" | tee redteam.txt || status=$?
           {
             echo "## Nightly red team ($SCENARIO)"
             echo
             echo '```'
-            tail -n 5 redteam.txt
+            grep -E "^generated |^  case " redteam.txt || tail -n 5 redteam.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
       - name: Upload the handlers and their evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

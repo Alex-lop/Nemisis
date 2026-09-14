@@ -61,10 +61,11 @@ static HTML report, and a content-addressed repro capsule you can replay against
 ## Why a single kill point is not enough
 
 The checker is red-teamed by a generator with an independent oracle: ten generated handlers on every
-test run, three hundred nightly, on top of a fixed zoo of hand-written shapes. Five of those
+test run, three hundred nightly, on top of a fixed zoo of hand-written shapes. Six of those
 hand-written handlers ship as fixture refs (`mark-first`, `leftover-credit`, `never-marks`,
-`raw-sql`, `shadow-table`). Two of them fooled an earlier engine: `mark-first`, and `shadow-table`,
-which kept its dedup state in a table inside the store's own database. `mark-first` is the important
+`raw-sql`, `shadow-table`, `tail-bytes`). Three of them fooled an earlier engine: `mark-first`;
+`shadow-table`, which kept its dedup state in a table inside the store's own database; and
+`tail-bytes`, which appended bytes past the file's last page after its last commit. `mark-first` is the important
 one: it passes the unit test, passes call-it-twice, and passes the kill the original handler failed,
 because its marker is already durable when the kill lands. Killed one commit earlier, it marks the
 event done and never credits it. CrashCheck therefore sweeps: a claimed fix is killed once after
