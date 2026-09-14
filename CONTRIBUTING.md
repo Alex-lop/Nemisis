@@ -50,6 +50,18 @@ and both ledgers have to be requoted. A candidate that earns `FIX_PROVEN_FOR_THI
 wrong is the most valuable contribution possible; please open it as an issue even if you cannot
 fix the checker.
 
+## The example's action pin
+
+`.github/examples/crashcheck.yml` pins the Nemisis action to one full `main` commit, and
+`docs/STATUS.md` names the same SHA as the reviewed action pin. `tests/test_docs_identity.py`
+requires the two to agree and requires `src/nemisis` at that commit to equal `src/nemisis` at the
+commit where your branch left `main`, so an engine change stays green while its pull request is
+open and `main` goes red the moment an engine change lands without the pin following it.
+`.github/workflows/pin-bump.yml` does the following: after every push to `main` whose engine
+differs from the pinned commit's, it opens a pull request that moves both lines to the new head,
+dispatches CI on that branch, and enables auto-merge. Do not move the pin by hand; if the
+workflow is broken, fix the workflow.
+
 ## Truth labels
 
 `LOCAL`, `FIXTURE`, `MOCKED`, `BLOCKED`, and `LIVE` are not interchangeable. A pull request that

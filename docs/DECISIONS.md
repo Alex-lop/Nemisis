@@ -424,3 +424,33 @@ provider-owned receipts, a live CrashCheck run cannot carry the same claims as a
 that is why `doctor` stays `BLOCKED` and no path from `BLOCKED` to a run is written: a
 fail-closed skeleton with an injected client is honest, a transport that reports `LIVE` with
 weaker receipts is not.
+
+## The example pin follows main's engine (2026-09-13)
+
+The copyable workflow pins the action to a full commit SHA, as every action in `.github/` is
+pinned, and that pin was ninety-five commits and three hostile rounds behind `main` by the time
+anyone looked. The reminder to bump it was written down twice and done neither time, so the bump
+is now a machine's job and the rot is a test's job.
+
+The test (`tests/test_docs_identity.py`) compares trees, not digests: `git rev-parse
+<pin>:src/nemisis` must equal the same tree at `git merge-base HEAD origin/main`. On `main` that
+is `HEAD`, so `main` is red the moment an engine change lands without the pin. On a branch it is
+the point the branch left `main`, so an engine change stays green while its pull request is open,
+which is the only way an engine pull request can be green at all: a commit cannot pin its own
+SHA. CI checks out with `fetch-depth: 0` so the pinned commit is present; a shallow clone fails
+the test with a sentence that says to fetch, and never skips.
+
+The bot (`.github/workflows/pin-bump.yml`) runs on every push to `main`. If `git diff --quiet
+<pin>..HEAD -- src/nemisis` is quiet it exits, which is what keeps it from reacting to its own
+bump commit, since a bump touches only the example and STATUS. Otherwise it rewrites both lines
+to the new head on a `pin/<sha>` branch, opens a pull request, dispatches `ci.yml` on that
+branch (a pull request opened with the repository token starts no workflow run on its own, and
+`workflow_dispatch` is the documented exception; the check runs land on the same head SHA the
+ruleset reads), and enables auto-merge. `ci.yml` gained `workflow_dispatch` for that reason and
+nothing else. If a `pin/` pull request is already open the bot waits for the next push. What
+this cannot do: the pin lags `main` by one bot pull request, minutes on a normal day, and during
+that window `main` is red on this one test, which is the visibility the test exists to give.
+
+Revert: delete the workflow and the test, restore the sentence in STATUS, and the pin is a
+manual step again.
+
