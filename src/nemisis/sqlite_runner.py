@@ -57,7 +57,15 @@ from nemisis.crash_models import (
 from nemisis.hashing import canonical_json, sha256_bytes, sha256_json, sha256_tree
 from nemisis.models import TruthLabel
 from nemisis.safety import safe_relative_path
-from nemisis.scenario import MAX_MESSAGE_BYTES, Event, Scenario, StoreBase, Tables, worker_send
+from nemisis.scenario import (
+    MAX_MESSAGE_BYTES,
+    Event,
+    Scenario,
+    StoreBase,
+    Tables,
+    worker_receive,
+    worker_send,
+)
 from nemisis.scenarios import scenario_for
 
 RUNNER_ID = "sqlite-runner-v2"
@@ -1276,6 +1284,8 @@ def _wait_for_checkpoint(
                     f"the handler raised {message.get('error', 'an exception')} before the "
                     f"durable {scenario.effect_noun} checkpoint"
                 )
+            if kind == "done":
+                _send(spawn.channel, {"type": "release"})
             raise _AttemptFailure(ExecutionStatus.CHECKPOINT_NOT_REACHED, detail)
         else:
             raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "unexpected worker message")
@@ -1371,6 +1381,22 @@ def _finish_replay(
         if message != expected:
             raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "replay completion was malformed")
         break
+    # Read while the worker still holds its store connection, before it may exit: closing the
+    # connection checkpoints the WAL, and a checkpoint truncates the file to its page count, so
+    # bytes appended past the last page after the last commit would be tidied away before a read
+    # that waited for the exit. The nightly red team found exactly that on 2026-09-08.
+    observed = _ledger(scenario, database, event)
+    if sha256_json(observed.content) != sha256_json(ledger.content):
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            "the database changed after the worker's last reported store commit and before the "
+            "worker exited; something wrote around the trusted store (a direct connection or a "
+            "raw write to the file): "
+            f"{_content_difference(ledger.content, observed.content, scenario)}. "
+            + scenario.store_remedy,
+            integrity=IntegrityStatus.INVALID,
+        )
+    _send(spawn.channel, {"type": "release"})
     try:
         return_code = spawn.process.wait(timeout=max(1.0, deadline - monotonic()))
     except subprocess.TimeoutExpired as error:
@@ -1386,8 +1412,9 @@ def _finish_replay(
     if sha256_json(observed.content) != sha256_json(ledger.content):
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
-            "the database changed after the worker's last reported store commit; something wrote "
-            "around the trusted store (an exit hook, a thread, a child, or a direct connection): "
+            "the database changed after the worker's last reported store commit and after the "
+            "worker exited; something wrote around the trusted store (an exit hook, a thread, or "
+            "a child): "
             f"{_content_difference(ledger.content, observed.content, scenario)}. "
             + scenario.store_remedy,
             integrity=IntegrityStatus.INVALID,
@@ -1640,6 +1667,12 @@ def _worker(argv: list[str]) -> int:
             channel,
             {"event_digest": event_digest, "execution_nonce": execution_nonce, "type": "done"},
         )
+        # The store connection stays open until the controller has read the database once more.
+        # Closing it checkpoints the WAL, and a checkpoint truncates the file to its page count,
+        # so bytes a handler appended past the last page after its last commit were gone before
+        # a controller that waited for the exit could look (the nightly red team, 2026-09-08).
+        if worker_receive(channel) != {"type": "release"}:
+            raise RuntimeError("controller returned an invalid completion acknowledgement")
         return 0
     except Exception as error:  # Candidate exceptions are bounded protocol evidence.
         with suppress(OSError):
