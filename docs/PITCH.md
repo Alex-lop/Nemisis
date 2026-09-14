@@ -103,13 +103,13 @@ crash-consistency and fault-injection testing (Jepsen, ALICE, CrashMonkey and th
 done it to databases and file systems for years. What is specific here is the packaging: the kill is
 aimed at one patch's exact side effect, the base is checked candidate-blind first, the verdict is a
 per-patch accept/reject with exit codes a CI gate can use, and the crash is frozen into a
-content-addressed capsule that the next patch has to beat. It is deliberately narrow: two audited
+content-addressed capsule that the next patch has to beat. It is deliberately narrow: three audited
 scenarios, one handler shape, executed rather than inferred.
 
 ## What it is not, on purpose
 
-Two scenarios (`sqlite-credit-v1`, `sqlite-inventory-v1`), one handler shape, Python 3.12+, SQLite,
-POSIX `SIGKILL`. It is not a general fuzzer, not a formal verifier, and a passing result means "this
+Three scenarios (`sqlite-credit-v1`, `sqlite-inventory-v1`, `sqlite-outbox-v1`), one handler
+shape, Python 3.12+, SQLite, POSIX `SIGKILL`. It is not a general fuzzer, not a formal verifier, and a passing result means "this
 exact tree defeated this exact capsule and every kill point of its own," nothing broader. Five
 worlds must agree or there is no verdict; a nondeterministic handler is reported as a split, never
 averaged. The narrowness is what makes the verdict trustworthy.

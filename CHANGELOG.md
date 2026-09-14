@@ -13,9 +13,12 @@ it caught on its own), the example pin kept current by a test and a bot, and the
 
 - `sqlite-inventory-v1`: a second audited scenario, a decrement with its own seed and its own
   predicate, running on the same kernel as the credit scenario.
+- `sqlite-outbox-v1`: a third audited scenario, exactly-once send through a transactional outbox.
+  The payload size is the audited scalar the seam demanded, so no seam change was needed; what
+  the receipt proves is the outbox row, never the email.
 - `nemisis redteam`: a grammar over store operations and the writes around the store, an oracle
   computed from the operation sequence alone, and a non-zero exit on any disagreement. The grammar
-  speaks the hostile shapes two reviews wrote by hand, in both scenarios.
+  speaks the hostile shapes two reviews wrote by hand, in every registered scenario.
 - A nightly workflow that sweeps generated handlers past the checker, one sweep per audited
   scenario, and uploads every handler and its evidence when the oracle disagrees.
 - `raw-sql` in the candidate zoo: a handler that is correct but unjudgeable, told the one-line

@@ -17,7 +17,8 @@ CrashCheck is the primary product surface.
 - Input: issue text, one synchronous `module:function` target, exact base and candidate sources,
   and an optional corrected control.
 - Contract: accepted, base-owned JSON selecting only one registered scenario's fixed event,
-  fault, probe, predicate, and adapter catalog (`sqlite-credit-v1` or `sqlite-inventory-v1`).
+  fault, probe, predicate, and adapter catalog (`sqlite-credit-v1`, `sqlite-inventory-v1`, or
+  `sqlite-outbox-v1`).
 - Output: every run publishes a JSON manifest plus the capsule, contract, event, and metadata of its
   content-addressed repro directory. Attempt-bearing runs add a static report; runs that completed
   with valid integrity add the executable regression. A pre-execution anchor failure instead adds a
@@ -42,8 +43,9 @@ The packaged fixture command is the audited shortcut because its contract is alr
    fresh base worlds. Proceed only when both end exactly once, which shows the base's duplicate
    needs the crash and is not a handler that is simply wrong.
 3. In every proof world, observe the scenario's durable effect (the `$25` credit in
-   `sqlite-credit-v1`, the two-unit reservation in `sqlite-inventory-v1`), send process-group
-   `SIGKILL`, confirm exit `-9`, start a fresh worker, and replay the byte-identical event.
+   `sqlite-credit-v1`, the two-unit reservation in `sqlite-inventory-v1`, the 512-byte outbox row
+   in `sqlite-outbox-v1`), send process-group `SIGKILL`, confirm exit `-9`, start a fresh worker,
+   and replay the byte-identical event.
 4. Require five fresh base and candidate worlds, plus five corrected worlds when supplied. A
    claimed fix whose five boundary worlds end exactly once is then swept: a census delivery with no
    kill records every store commit the handler makes, and one more fresh world kills the worker
@@ -95,6 +97,20 @@ The one-line fix is `store.reserve_and_mark(...)`; the three-step form (`reserve
 `mark_reserved`) is where the bug lives, and `fixture:sqlite-inventory-v1/mark-first` is the patch
 that reorders the two commits and loses the reservation instead.
 
+`sqlite-outbox-v1` exposes an `OutboxStore` of the same shape. The effect is the outbox row that
+stands for an email or a webhook, and the subject is the bytes handed to one channel.
+
+| Call | What it commits | Reported as |
+| --- | --- | --- |
+| `store.sent(event_id) -> bool` | nothing (a read) | not a commit |
+| `store.send(channel, event_id, payload_bytes)` | the channel's byte total and one outbox row | `send` |
+| `store.mark_sent(event_id)` | the sent marker | `mark_sent` |
+| `store.send_and_mark(channel, event_id, payload_bytes)` | byte total, outbox row, and marker together, skipped if the marker exists | `send_and_mark` |
+
+What the receipt proves is the row, never the email: a handler that calls SMTP twice and writes one
+outbox row reads exactly once here, exactly as a handler that emails twice and writes one credit
+ledger row does. The one-line fix is `store.send_and_mark(...)`.
+
 ## Verdict contract
 
 | Verdict | Exit | Exact meaning |
@@ -135,8 +151,8 @@ The model that wrote the patch is never the thing that judges it.
 the exact base handler) becomes a typed catalog proposal plus one bounded scalar. That call may not
 emit commands, probes, SQL, assertions, or verdicts. Deterministic code accepts the proposal only
 when it selects the audited fault intent and the exact value of the scenario's one bounded scalar
-(`amount_cents` in `sqlite-credit-v1`, `quantity` in `sqlite-inventory-v1`); otherwise no contract
-is drafted. The sanitized receipt (`.nemisis/proposal.json`) is provenance carried into the check
+(`amount_cents` in `sqlite-credit-v1`, `quantity` in `sqlite-inventory-v1`, `payload_bytes` in
+`sqlite-outbox-v1`); otherwise no contract is drafted. The sanitized receipt (`.nemisis/proposal.json`) is provenance carried into the check
 manifest and report, never crash evidence, and it never enters the capsule digest. The adapter is
 contract-tested with injected clients (`MOCKED`); a `LIVE` receipt requires a genuine Token Factory
 call with `NEBIUS_API_KEY`, which this environment lacks. The inherited differential live path has a
@@ -151,9 +167,9 @@ tree, event, database, worker, execution, and capsule identities.
 ## Alpha boundary
 
 Supported: Python 3.12+, POSIX process groups and `SIGKILL`, SQLite WAL with
-`synchronous=FULL`, the two registered scenarios and their fixed trusted stores (`sqlite-credit-v1`
-/ `CreditStore`, `sqlite-inventory-v1` / `InventoryStore`), exact fixture/local directory/Git
-sources, and trusted owner checkouts.
+`synchronous=FULL`, the three registered scenarios and their fixed trusted stores
+(`sqlite-credit-v1` / `CreditStore`, `sqlite-inventory-v1` / `InventoryStore`, `sqlite-outbox-v1`
+/ `OutboxStore`), exact fixture/local directory/Git sources, and trusted owner checkouts.
 
 Unsupported: arbitrary languages, databases, side effects, handlers outside the fixed adapter
 shape, hostile local fork execution, generalized schedule or interleaving search, model-authored

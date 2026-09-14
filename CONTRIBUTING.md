@@ -31,8 +31,8 @@ plus the composite action and an installed-wheel smoke test.
 grammar over store operations and the writes around the store that hostile reviews have written
 by hand (`Op` in `src/nemisis/redteam.py` is the whole list), runs `check` on each, and compares
 the verdict with an oracle computed from the operation sequence alone; `--scenario
-sqlite-inventory-v1` speaks the second scenario's vocabulary. It exits `1` on any disagreement and
-leaves every handler and its evidence under `./redteam`. A disagreement is either a checker false
+sqlite-inventory-v1` and `--scenario sqlite-outbox-v1` speak the other scenarios' vocabularies.
+It exits `1` on any disagreement and leaves every handler and its evidence under `./redteam`. A disagreement is either a checker false
 pass or false fail or an oracle bug; either is worth an issue with the case's ops and summary. A
 new hostile shape belongs in the grammar as an `Op` with its oracle rule, so the nightly sweep
 keeps writing it.
@@ -44,8 +44,10 @@ Pick the scenario first. For `sqlite-credit-v1`, drop a tree under
 `ZOO_VARIANTS` and its tree digest to `TREE_DIGESTS` in `src/nemisis/scenarios/sqlite_credit_v1.py`,
 and assert the verdict it earns in `tests/test_verdict_paths.py`. For `sqlite-inventory-v1` the same
 three steps run through `src/nemisis/fixtures/sqlite_inventory_v1/trees/<name>/app/inventory.py`,
-`src/nemisis/scenarios/sqlite_inventory_v1.py`, and `tests/test_inventory_scenario.py`. Both
-scenario modules are trusted engine resources, so registering a variant moves the engine code digest
+`src/nemisis/scenarios/sqlite_inventory_v1.py`, and `tests/test_inventory_scenario.py`, and for
+`sqlite-outbox-v1` through `src/nemisis/fixtures/sqlite_outbox_v1/trees/<name>/app/outbox.py`,
+`src/nemisis/scenarios/sqlite_outbox_v1.py`, and `tests/test_outbox_scenario.py`. Every
+scenario module is a trusted engine resource, so registering a variant moves the engine code digest
 and both ledgers have to be requoted. A candidate that earns `FIX_PROVEN_FOR_THIS_CAPSULE` while being
 wrong is the most valuable contribution possible; please open it as an issue even if you cannot
 fix the checker.

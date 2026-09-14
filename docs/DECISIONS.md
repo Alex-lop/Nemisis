@@ -349,6 +349,18 @@ Decision: no third scenario tonight. The conservation class needs the seam widen
 the outbox class is one seam change (an optional scalar) away from honest. A design that
 prevents a wrong day of work outranks a fixture that decorates.
 
+## The third scenario, and the seam change it did not need (2026-09-14)
+
+`sqlite-outbox-v1` landed as written above, minus the seam change. The caveat that an outbox
+event "has no natural integer" assumed the subject had to be a send count; the message's payload
+size is both natural and audited, so `scalar_name` is `payload_bytes`, the subject is the bytes
+handed to one channel, and one send moves it by the message's own size. `Scenario` is unchanged,
+`StateSnapshot` is unchanged, and the engine bytes that moved are the registry tuple and
+`_ENGINE_RESOURCES`. The other caveat is not designed away but written down, in the scenario
+module and in the README: the receipt proves the outbox row, never the email. A handler that
+calls SMTP twice and writes one row reads exactly once here, exactly as a handler that emails
+twice and writes one credit ledger row does.
+
 ## The third hostile round (2026-09-07)
 
 Six reviewers with six lenses (the diff, SQLite internals, the process and filesystem, the store

@@ -101,7 +101,8 @@ sweep (census and one kill world per commit) for the corrected tree.
 
 Everything scenario-specific (catalog ids, schema, seed, store class, attribution deltas, event
 shape, checkpoint predicate, display words) lives in one `nemisis.scenario.Scenario` object;
-`sqlite-credit-v1` and `sqlite-inventory-v1` are the registered instances (`nemisis.scenarios`).
+`sqlite-credit-v1`, `sqlite-inventory-v1`, and `sqlite-outbox-v1` are the registered instances
+(`nemisis.scenarios`).
 The kernel reads them and special-cases nothing. The current adapter accepts one synchronous
 two-argument Python handler using the scenario's trusted store API (`CreditStore` for
 `sqlite-credit-v1`, `InventoryStore` for `sqlite-inventory-v1`):

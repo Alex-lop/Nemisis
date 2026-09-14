@@ -212,24 +212,33 @@ is an `EVIDENCE_INCOMPLETE` whose message names the phase, the commits seen so f
 budget. On a slow or loaded machine, `NEMISIS_WORKER_TIMEOUT_SECONDS=30` raises it; no receipt
 depends on the value, and a value outside 1 to 600 is refused rather than clamped.
 
-## Two scenarios, one kernel
+## Three scenarios, one kernel
 
 The kernel is written once; a scenario is one object (schema, seed, store, probe, predicate, words).
 `sqlite-inventory-v1` is the second: an order reserves two units of a SKU, stock goes 10 to 8, and
 a crash between the decrement and its marker oversells to 6. It is the bug the original
-differential verifier could only mark `UNRESOLVED`, decided:
+differential verifier could only mark `UNRESOLVED`, decided. `sqlite-outbox-v1` is the third: a
+transactional outbox writes the row that stands for a webhook, a crash lands before the row is
+marked sent, and the retry sends it again. What the receipt proves is the row, never the email:
+a handler that calls SMTP twice and writes one row reads exactly once.
 
 | Scenario | Effect | Buggy | Agent's rewrite | Atomic | `mark-first` |
 | --- | --- | --- | --- | --- | --- |
 | `sqlite-credit-v1` | `$0` to `$25` | `$50` | `$50` | `$25` | `$0`, marked done |
 | `sqlite-inventory-v1` | 10 to 8 units | 6 units | 6 units | 8 units | 10 units, marked reserved |
+| `sqlite-outbox-v1` | 0 to 512 bytes | 1024 bytes | 1024 bytes | 512 bytes | 0 bytes, marked sent |
 
 ```bash
 uv run nemisis check --base fixture:sqlite-inventory-v1/buggy --candidate fixture:sqlite-inventory-v1/mark-first
 ```
 
+```bash
+uv run nemisis check --base fixture:sqlite-outbox-v1/buggy --candidate fixture:sqlite-outbox-v1/atomic
+```
+
 The scenario is inferred from a fixture base ref; `init --scenario sqlite-inventory-v1` binds your
-own `app.inventory:reserve_inventory` the same way the credit contract does.
+own `app.inventory:reserve_inventory` the same way the credit contract does, and
+`--scenario sqlite-outbox-v1` binds `app.outbox:dispatch_outbox`.
 
 ## What it never does
 

@@ -9,7 +9,7 @@ argument, not a roadmap. It ends in one recommendation and one probe.
 ## The honest limit today
 
 The kernel judges one handler shape, a synchronous top-level `def handler(store, event)`, against
-a store it owns (`CreditStore` or `InventoryStore`, four methods each), on a SQLite file in a
+a store it owns (`CreditStore`, `InventoryStore`, or `OutboxStore`, four methods each), on a SQLite file in a
 directory it made, in a fixed scenario: its schema, its seed, its event (`evt_1042`, `$25`, one
 account). The GitHub Action is the product surface, and the cold judge got from a clean wheel to a
 verdict in five seconds. To be judged, a user changes everything about their own code: the
@@ -22,26 +22,29 @@ until the judge's seven stalls were fixed in #26). The cold judge's realistic
 handler's shape (one top-level `def`, two positional parameters) and cannot see that the second one
 is a connection, not the store. That is the limit: "your code" is not a thing this tool is pointed at; it is a thing you port into it.
 
-Sizes: 13,729 source lines under `src/nemisis` without the fixtures and 615 tests at the merged
+Sizes: 13,729 source lines under `src/nemisis` without the fixtures and 633 tests at the merged
 engine; from the cold read at `a0c4a9f`, before the fix added its pins, 43 pinned side-channel
 shapes in `tests/test_verdict_paths.py`, 91 code lines that assume SQLite (47 of them in the kernel's four
 files, in 11 functions and 6 constants), 13 places that assume the handler shape. `crashcheck.py`
 and `crash_models.py` make no SQLite call of their own (`crashcheck.py` imports the runner and lists
 the SQLite resources in the engine digest; `crash_models.py` names the slice in its docstring); the
 store dependency's code lives in `sqlite_runner.py` (1,736 lines) and `scenario.py` (179 lines), behind the `Scenario` seam that
-`sqlite-inventory-v1` proved (964 insertions, 22 files, zero runner lines).
+`sqlite-inventory-v1` proved (964 insertions, 22 files, zero runner lines) and `sqlite-outbox-v1`
+proved again (zero runner lines, and the optional scalar the 2026-09-07 decision expected to need
+turned out to be unnecessary: the payload's size is the audited integer).
 
 ## Direction A: bring your own store
 
 What "bring your own store" means splits in two, and the split is the whole argument.
 
 Step 1, a user scenario on the kernel's SQLite backend: open the registry (`SCENARIOS` is a
-two-entry module literal, `src/nemisis/scenarios/__init__.py:10-13`), bind the user scenario's
-bytes into `engine_code_digest` (today a fixed nineteen-name list of fifteen modules and four packaged
-JSON files, `crashcheck.py:80-100`, so a foreign scenario would run unhashed and every receipt would misstate its engine), make the nine
+three-entry module literal, `src/nemisis/scenarios/__init__.py:10-14`), bind the user scenario's
+bytes into `engine_code_digest` (today a fixed twenty-two-name list of sixteen modules and six packaged
+JSON files, `crashcheck.py:80-103`, so a foreign scenario would run unhashed and every receipt would misstate its engine), make the nine
 packaged-resource fields of `Scenario` optional, seal `StoreBase._pause` and `_require` against a
 subclass that commits without pausing (the commit report is the kill point), and lift `_next_rowid`
-into the kernel (copied verbatim in both scenarios; a third author will get it wrong). Estimate: 2
+into the kernel (copied verbatim in all three scenarios now; the third author copied it rather than
+rewrote it, which is the same debt one edit further from being paid). Estimate: 2
 days. Pinned shapes that come back: none; the probes, the world scan, the sweep, and the kill are
 untouched.
 
@@ -65,11 +68,12 @@ untrusted party what it holds".
 ## Direction B: one painful niche
 
 Webhook and idempotency-key handlers are already what the kernel proves: `checkpoint_reached` is
-"one durable effect plus its marker", which is the idempotency-key invariant, and both shipped
-scenarios are that shape with different nouns. Stage 0 is a Stripe-shaped third scenario
-(`sqlite-webhook-idempotency-v1`: key written before the effect, key retention sweep, same-key
-redelivery, as zoo trees), which costs what the inventory scenario cost: 1.5 days, zero runner
-lines, zero new false-pass surface. Everything after it is where the niche bites: un-pin the
+"one durable effect plus its marker", which is the idempotency-key invariant, and all three shipped
+scenarios are that shape with different nouns. Stage 0 was a Stripe-shaped third scenario, and
+`sqlite-outbox-v1` is it: the outbox row is the effect, the send receipt is the key, and it cost
+what the inventory scenario cost (zero runner lines, zero new false-pass surface). What it did not
+buy is anything after it: the key-retention sweep and the same-key-under-a-different-payload
+redelivery are still unwritten, as zoo trees would be. Everything after it is where the niche bites: un-pin the
 target (`bind_anchor` refuses any target but the scenario's constant), declare the binding shape
 instead of hardcoding `(store, event)` (measured: 1 of 11 realistic Flask, FastAPI, Celery and
 class-based shapes binds today; FastAPI handlers are `async def`, which is refused outright), let

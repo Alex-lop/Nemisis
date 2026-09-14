@@ -16,7 +16,7 @@ Committed hero evidence (regenerated 2026-09-07 at engine `c339aa9`, the third h
 
 Current tree:
 
-- engine code digest: `1afdb6ee88585074eaeda65c50223c18fb73c4b67710affb247ff8e55a51bb15`
+- engine code digest: `47de6ab78521af339e43e68e00384f254c8b7cfbe18704b740a6e742f1004636`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
@@ -72,8 +72,8 @@ New since 2026-09-05, from `overnight/hardening` and the `overnight2/*` branches
   around the store that two hostile reviews wrote by hand (a table, a pragma, files beside, above,
   under `HOME` and `TMPDIR`, a file tidied away before returning, a re-pointed row, a swallowed
   second marker, a retry loop, a helper function, a world-detection attempt) and compares every
-  verdict with an oracle, in either scenario's vocabulary; ten cases run in the normal suite,
-  three hundred per scenario nightly. The nightly's first GitHub run is
+  verdict with an oracle, in each registered scenario's vocabulary; ten cases run in the normal
+  suite, three hundred per scenario nightly. The nightly's first GitHub run is
   [34086693284](https://github.com/Alex-lop/Nemisis/actions/runs/34086693284) (300 handlers, seed
   20260907, 0 disagreements, on the engine before this grammar); the first run at the engine that
   refuses what the nightly found is
@@ -142,7 +142,7 @@ provider run.
   reason, 21 holes
   each naming the test it is owed); `mutants.yml` reruns the thirteen targets monthly and fails on a
   survivor the newest ledger does not list;
-- locked dependency sync, formatter, Ruff, mypy, 615 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 633 tests, and package build: pass locally on
   Python 3.12.13; CI runs the same gate on CPython 3.12, 3.13, and 3.14 (the 3.14 leg first ran
   green on a real runner at
   [run 34093138705](https://github.com/Alex-lop/Nemisis/actions/runs/34093138705), where the only
@@ -220,6 +220,7 @@ Option A is retained: one excellent SQLite slice, made undeniable. In order:
 4. Published: the static viewer and the landing page are live at
    <https://alex-lop.github.io/Nemisis/>.
 
-A second scenario exists: `sqlite-inventory-v1` (stock 10 to 8, oversold to 6 by the crash),
-built on the `Scenario` seam that now owns every point `sqlite_runner.py` and `crash_models.py`
-used to hardcode. A second storage backend is still deferred by design.
+Two more scenarios exist: `sqlite-inventory-v1` (stock 10 to 8, oversold to 6 by the crash) and
+`sqlite-outbox-v1` (0 to 512 bytes on a channel, sent twice by the crash), both built on the
+`Scenario` seam that now owns every point `sqlite_runner.py` and `crash_models.py` used to
+hardcode; neither needed a runner change. A second storage backend is still deferred by design.

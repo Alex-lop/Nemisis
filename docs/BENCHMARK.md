@@ -5,8 +5,8 @@ Status: measured `LOCAL` / `FIXTURE` evidence generated on 2026-09-06 from clean
 [`benchmarks/results/crashcheck-v1.json`](../benchmarks/results/crashcheck-v1.json).
 
 This benchmark compares ordinary green checks with the real process-kill counterexample for one of
-the two audited scenarios, `sqlite-credit-v1`. The other, `sqlite-inventory-v1`, is audited and
-checkable but is not benchmarked here. This is not a cloud-performance, arbitrary-repository, or
+the three audited scenarios, `sqlite-credit-v1`. The others, `sqlite-inventory-v1` and
+`sqlite-outbox-v1`, are audited and checkable but are not benchmarked here. This is not a cloud-performance, arbitrary-repository, or
 general schedule-search benchmark.
 
 ## Protocol
