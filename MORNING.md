@@ -1,10 +1,11 @@
 # Morning
 
 An AI coding agent, handed a repository with a retry bug and nothing but the Nemisis MCP server, a
-skill, and one instruction, reached `FIX_PROVEN_FOR_THIS_CAPSULE` with no human input — it wrote a
-port, mapped the crash windows, hit `EVIDENCE_INCOMPLETE`, read the remedy, fixed its port, proved
-the fix, and applied the same change to the real handler. The one thing that had to be true by
-morning is true, and the transcript is in the repo.
+skill, and one instruction, reached `FIX_PROVEN_FOR_THIS_CAPSULE` with no human input — it listed the
+scenarios, got a port template, wrote a port, mapped the crash windows, refined the port, ran
+`check` to `FIX_PROVEN_FOR_THIS_CAPSULE`, and applied the same change to the real handler — 14
+turns. The one thing that had to be true by morning is true, and the receipt and the tool log are
+committed beside the write-up.
 
 | PR | Title | Head | CI on that head | Merge |
 | -- | ----- | ---- | --------------- | ----- |
@@ -20,8 +21,8 @@ morning is true, and the transcript is in the repo.
 | - | ----- | -- | ------ | -------------------------- |
 | 1 | Every MCP tool is contract-tested | #35 | PASS | `uv run pytest -q tests/test_mcp_server.py` → 11 passed: list_scenarios/port_template schemas and FIXTURE label, check FIX_PROVEN + LOCAL label + error shape, map census refusal, doctor status, the two Nemotron tools BLOCKED without a key, and a blocked tool writes nothing |
 | 2 | The scripted no-model end-to-end test proves the loop | #35 | PASS | `test_the_scripted_agent_reaches_fix_proven_with_no_model`: list_scenarios → port_template → buggy port (fails) → atomic port (`FIX_PROVEN`, exit 0) → the receipt read back as a resource |
-| 3 | An unaided agent reached FIX_PROVEN — credit | – | PASS | a fresh `claude -p` headless session, MCP server + skill only, 14 turns, `list_scenarios → port_template → map → check (EVIDENCE_INCOMPLETE → remedy → FIX_PROVEN)`; fixed `app/credits.py` to `credit_and_mark`; receipt on disk. Transcript and reproduce commands: `docs/reports/2026-09-15-agent-demo.md` |
-| 4 | An unaided agent reached FIX_PROVEN — inventory | – | PARTIAL | same loop on `sqlite-inventory-v1`; reached `FIX_PROVEN`, wrote the receipt, applied `reserve_and_mark`; the headless wrapper was cut before its final summary (low memory), so the transcript ends mid-stream. Proof and fixed handler on disk; narration incomplete |
+| 3 | An unaided agent reached FIX_PROVEN — credit | – | PASS | a fresh `claude -p` headless session, MCP server + skill only, 14 turns: `list_scenarios → port_template → wrote a port → map → refined → check → FIX_PROVEN` (exit 0); fixed `app/credits.py` to `credit_and_mark`. The receipt (`docs/reports/2026-09-15-agent-demo-credit-capsule.json`) and the distilled tool log (`…-toollog.txt`) are committed; write-up and reproduce commands in `docs/reports/2026-09-15-agent-demo.md` |
+| 4 | An unaided agent reached FIX_PROVEN — inventory | – | PARTIAL | same loop on `sqlite-inventory-v1`; reached `FIX_PROVEN`, wrote a receipt, applied `reserve_and_mark`; the headless wrapper was cut before its final summary (low memory), so its transcript ends mid-stream and is not committed. Reported as partial, not quoted |
 | 5 | `map` is a command and refuses side-channel trees | #34 | PASS | `uv run nemisis map fixture:sqlite-credit-v1/tail-bytes` and `.../raw-sql` → census `INTEGRITY_ERROR`, the refusal sentence, no windows; `.../mark-first` → two clean windows. `uv run pytest -q tests/test_mapping.py` → 8 passed |
 | 6 | map is as strict as check on what it refuses | #34 | PASS | its two-lens review found map skipped `scratch.settle`/`_schedule_split`; fixed, with regression tests for both shapes |
 | 7 | A scenario merged and its nightly leg | – | FAIL (by choice) | none merged. Both new scenarios are staged (#36, #37) because #36's 8-lens review surfaced a kernel false pass (below); a third "FIX_PROVEN is trustworthy" scenario should not ship while it is open |

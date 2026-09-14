@@ -1,0 +1,22 @@
+# Credit demo — the fresh agent's tool calls, in order, distilled from the headless run's
+# stream-json transcript. Bash lines are abbreviated; MCP tool inputs are shown.
+
+ 2. bash cat issue.md && echo ---- && cat app/credits.py && echo ---- && ls -R app .nemisis 2>/dev/null; grep
+ 4. MCP  list_scenarios()
+ 5. MCP  port_template(sqlite-credit-v1)
+ 6. bash mkdir -p .nemisis/port/sqlite-credit-v1/app && cat > .nemisis/port/sqlite-credit-v1/app/credits.py <
+ 7. MCP  map(.nemisis/port/sqlite-credit-v1)
+ 8. bash cat > .nemisis/port/sqlite-credit-v1/app/credits.py <<'EOF' ; """Port of app.credits:apply_credit to
+ 9. MCP  check(.nemisis/port/sqlite-credit-v1)
+10. bash jq '{verdict,exit_code,summary,run_id,receipt_path,receipt_resource,report_path}' "/Users/alexlopez/
+11. bash python3 - <<'EOF' ; import re,pathlib ; p=pathlib.Path("app/credits.py"); s=p.read_text() ; s=s.repl
+12. bash sed -i '' 's|app/credits.py:26  if|app/credits.py:24  if|; s|app/credits.py:29  credit|app/credits.p
+
+result: num_turns=14, is_error=False
+final: Done. Verdict is `FIX_PROVEN_FOR_THIS_CAPSULE`, exit 0.
+
+**The bug.** The handler did `credit` then `mark_processed` as two separate commits. The crash map showed the dangerous window: killed after `credit`, the retry sees no marker and credits again, leaving acct_7 at $50.
+
+**The fix** in `app/credits.py:27`: replace the two calls with the store's atomic `credit_and_mark`, so the credit and its marker land in one transaction. The processed check stays as the retry guard.
+
+**Proof.** The check k

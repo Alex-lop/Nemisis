@@ -16,7 +16,7 @@ One row is one **scenario × model × exact engine**, with a `LIVE` receipt, or 
 | engine code digest | `engine_code_digest()` at the commit the row ran on |
 | verdict | the final `check` verdict the agent reached |
 | turns / tool calls | from the agent transcript |
-| tokens in / out | from the model call receipts (`propose_patch` records them today) |
+| tokens in / out | from the Token Factory API response's usage at run time (the committed receipt does not carry token counts today; recording them is part of building the harness) |
 | cost | tokens × the tier's published price |
 | receipt | the capsule digest and the run directory; without it there is no row |
 

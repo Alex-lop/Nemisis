@@ -644,19 +644,24 @@ the window between them.
 **Why it is inside the stated boundary, and why that is not an excuse.** The attack reaches the
 store's private members: `store._connection` (the trusted store's own connection) and
 `store._pause` (the private commit-report channel). `docs/SECURITY.md` has said since the third
-hostile round of 2026-09-06 that a handler that alters the trusted store's private state is hostile
-code local mode does not claim to contain, and it names `_settle()` and replacing `_connection`
-explicitly. This is the same class. But every *other* private-state rail (the `total_changes`
-audit, the `data_version` audit, `sqlite_temp_master`, the tree and file pins) fires; only the
-commit-report channel is fooled, silently, into a green verdict. A boundary that is documented but
+hostile round that a handler that alters the trusted store's own private state is the in-process
+boundary local mode does not claim to contain — "the store object is in its hands ... a handler
+that is correct only when it detects the harness is hostile code, and local mode assumes a trusted
+checkout." Committing on `store._connection` and reporting through `store._pause` is that class. The other private-state rails do not catch it, for a precise reason: the writes are on the store's
+*own* connection, so `data_version` (which changes only for another connection's commits) never
+moves, and the `total_changes` audit runs only inside `_require`, which the attacker does not call
+again after its commits — the handler calls `store.processed` once (its `_require` passes, nothing
+foreign yet), then commits on `store._connection` and calls `store._pause` directly. Nothing reads
+the commit count, so two commits reported as one look exactly like one. A boundary that is documented but
 whose breach reads as `FIX_PROVEN` rather than `INTEGRITY_ERROR` is the exact claim-above-evidence
 this repository exists to refuse, so it is written down as open, not filed as acceptable.
 
 **Why the obvious fix is wrong.** The reviewer suggested calling `_audit_own_connection()` at the
-top of `_pause()`. It breaks the honest path: a store method runs `_require()` (which settles the
-change counter), executes its own single commit, then calls `_pause()`; at `_pause`'s top the
-connection's `total_changes` is already ahead of the settled baseline by that legitimate commit, so
-the audit would refuse every honest delivery. Row counts cannot tell one transaction of three rows
+top of `_pause()`. It breaks the honest path: a store method runs `_require()` (which *audits* the connection,
+`total_changes` still at the last settled baseline), executes its own single commit (`total_changes`
+now ahead of the baseline), then calls `_pause()`, whose first act is `_settle()`. An
+`_audit_own_connection()` at `_pause`'s top, before that `_settle()`, would see the connection ahead
+of the baseline by the method's own legitimate commit and refuse every honest delivery. Row counts cannot tell one transaction of three rows
 from two transactions of three rows, and `PRAGMA data_version` does not change for a connection's
 own commits, so neither counter distinguishes the attack from an honest method.
 

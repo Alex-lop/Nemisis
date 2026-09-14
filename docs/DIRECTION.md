@@ -181,7 +181,7 @@ store to earn a receipt. That was tested — not against a developer, against an
 fresh headless Claude Code session, given the Nemisis MCP server, the skill, an issue, and one
 instruction, wrote the port, mapped the crash windows, hit `EVIDENCE_INCOMPLETE`, read the remedy,
 fixed the port, reached `FIX_PROVEN_FOR_THIS_CAPSULE`, and applied the fix to the real handler — no
-human input ([the transcript](reports/2026-09-15-agent-demo.md)). The wall the memo found was real;
+human input ([the write-up and the committed tool log and receipt](reports/2026-09-15-agent-demo.md)). The wall the memo found was real;
 it was the wrong customer standing in front of it. For an agent, the port is a five-minute subtask,
 so Direction A's step 1 shipped tonight as the agent surface (the `mcp` server, `map`, the skill),
 not as a human "bring your own scenario" door. The memo's day estimates for A's later steps stand;

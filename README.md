@@ -184,12 +184,13 @@ contract's catalog binding, candidate-blind. See [docs/LIVE_SETUP.md](docs/LIVE_
 The customer is not the person typing `nemisis check`; it is the AI coding agent fixing the retry
 bug, and the person reads the receipt. Nemisis ships a Model Context Protocol server and a skill so
 the agent can prove its fix with no human in the loop. A fresh headless agent, given only the
-server, the skill, an issue, and one instruction, reached `FIX_PROVEN_FOR_THIS_CAPSULE` unaided
-([the transcript](docs/reports/2026-09-15-agent-demo.md)).
+server, the skill, an issue, and one instruction, reached `FIX_PROVEN_FOR_THIS_CAPSULE` unaided in 14 turns
+([the write-up, with the run's tool log and receipt committed beside it](docs/reports/2026-09-15-agent-demo.md)).
 
 ```bash
 # from a checkout today; from PyPI once 0.2.1 ships the server (it merged after 0.2.0):
 claude mcp add nemisis -- uv run --project /path/to/Nemisis nemisis mcp
+mkdir -p .claude/skills/nemisis
 cp /path/to/Nemisis/skills/nemisis/SKILL.md .claude/skills/nemisis/SKILL.md
 # then, in your repo:
 claude -p "Fix the retry bug and prove it is crash-safe with the nemisis MCP tools."
