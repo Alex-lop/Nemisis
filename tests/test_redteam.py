@@ -92,6 +92,18 @@ HF, TB, HC, HR = Op.HEADER_FLAG, Op.TAIL_BYTES, Op.HOME_CHMOD, Op.HOME_RMDIR
         ((HC, A), Expected.INCOMPLETE, "around the store"),
         ((A, HR), Expected.INCOMPLETE, "around the store"),
         ((A, G, HC), Expected.PROVEN, "every kill point"),
+        # The nightly red team's first real finding (runs 34219859012, 34345065158, 34593382316,
+        # 34689225054, 34755449725): bytes past the last page written after the last commit. The
+        # oracle was right; the kernel read the file only after the worker's exit had truncated it.
+        ((E, TB), Expected.INCOMPLETE, "around the store"),
+        ((G, E, TB), Expected.INCOMPLETE, "around the store"),
+        ((G, A, TB, G), Expected.INCOMPLETE, "around the store"),
+        ((G, A, TB), Expected.INCOMPLETE, "around the store"),
+        ((E, TM, TB), Expected.INCOMPLETE, "around the store"),
+        ((A, E, TM, TB), Expected.INCOMPLETE, "around the store"),
+        ((A, A, E, TB), Expected.INCOMPLETE, "around the store"),
+        ((RE, TB), Expected.INCOMPLETE, "around the store"),
+        ((RE, A, A, TB, G), Expected.INCOMPLETE, "around the store"),
         # World detection must be a no-op: every world is named by an opaque id.
         ((D, A), Expected.PROVEN, "every kill point"),
         ((G, D, E, M), Expected.STILL_REPRODUCES, "boundary"),
@@ -170,6 +182,8 @@ def test_ten_generated_handlers_agree_with_the_oracle(tmp_path: Path) -> None:
         ((A,), True, CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE),
         ((G, TM, E), False, CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN),
         ((D, PF, A), True, CrashVerdict.EVIDENCE_INCOMPLETE),
+        # The nightly's finding, in the decrement vocabulary: run 34593382316 case 16 was proven.
+        ((G, A, TB, G), False, CrashVerdict.EVIDENCE_INCOMPLETE),
     ],
 )
 def test_inventory_vocabulary_agrees_with_the_oracle(
@@ -192,3 +206,36 @@ def test_inventory_vocabulary_agrees_with_the_oracle(
 
     assert oracle(ops)[0].value == expected.value
     assert result.verdict is expected, result.summary
+
+
+NIGHTLY_SHAPES = (
+    ((E, TB), False),  # runs 34219859012 case 163 and 34593382316 case 25
+    ((G, E, TB), False),  # run 34593382316 case 11
+    ((G, A, TB, G), False),  # run 34593382316 case 16: FIX_PROVEN_FOR_THIS_CAPSULE
+    ((G, A, TB), True),  # run 34593382316 case 87: FIX_PROVEN_FOR_THIS_CAPSULE, via a helper
+    ((E, TM, TB), False),  # run 34593382316 case 26
+    ((A, E, TM, TB), False),  # run 34345065158 case 211
+    ((A, A, E, TB), False),  # run 34755449725 case 11
+    ((RE, TB), False),  # run 34689225054 case 142
+    ((RE, A, A, TB, G), False),  # run 34219859012 case 97
+)
+
+
+@pytest.mark.parametrize(("ops", "helper"), NIGHTLY_SHAPES, ids=lambda v: str(v))
+def test_the_nightly_shapes_agree_with_the_oracle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, ops: tuple[Op, ...], helper: bool
+) -> None:
+    """Every disagreement the nightly red team reported between 2026-09-08 and 2026-09-13, rerun
+    in the credit vocabulary: the kernel now says what the oracle says."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    tree = tmp_path / "candidate"
+    (tree / "app").mkdir(parents=True)
+    (tree / "app" / "__init__.py").write_text('"""generated"""\n', encoding="utf-8")
+    (tree / "app" / "credits.py").write_text(render(ops, CREDIT, helper=helper), encoding="utf-8")
+
+    result = check(CREDIT.base_ref, tree, CREDIT.scenario_id, mode="local")
+
+    expected, why = oracle(ops)
+    assert expected is Expected.INCOMPLETE, why
+    assert result.verdict.value == expected.value, result.summary
+    assert "before the worker exited" in result.summary, result.summary

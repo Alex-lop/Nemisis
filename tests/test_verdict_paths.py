@@ -21,6 +21,7 @@ from nemisis.crash_fixture import (
     RAW_SQL_REF,
     SCENARIO_ID,
     SHADOW_TABLE_REF,
+    TAIL_BYTES_REF,
     load_issue,
     materialize_fixture,
 )
@@ -1847,3 +1848,60 @@ def test_the_scratch_tree_is_known_by_identity_not_by_name(
 
     with pytest.raises(CrashCheckError, match=fragment):
         check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+
+BYTES_AFTER_THE_LAST_COMMIT = {
+    "effect-then-tail": """def apply_credit(store, event):
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    with open(store._database, "ab") as tail:
+        tail.write(b"\\x5a" * 16)
+""",
+    "guarded-atomic-then-tail": """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    with open(store._database, "ab") as tail:
+        tail.write(b"\\x5a" * 16)
+    if store.processed(event["event_id"]):
+        return
+""",
+}
+
+
+@pytest.mark.parametrize("name", sorted(BYTES_AFTER_THE_LAST_COMMIT))
+def test_bytes_written_after_the_last_commit_forfeit_the_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
+) -> None:
+    """The nightly red team's first real finding (five failing runs, 2026-09-08 to 2026-09-13, ten
+    disagreements, every one this shape): bytes appended past the database file's last page after
+    the handler's last store commit. The engine read the file only after the worker had exited; a
+    worker's clean exit closes its store connection, closing it checkpoints the WAL, and a
+    checkpoint truncates the file back to its page count, so the write was gone before the engine
+    looked. `effect, tail` earned PATCH_FAILED_STILL_REPRODUCES and `guard, atomic, tail, guard`
+    earned FIX_PROVEN_FOR_THIS_CAPSULE (run 34593382316, cases 25 and 16). The controller now reads
+    the database while the worker still holds its connection, before releasing it to exit."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, name, BYTES_AFTER_THE_LAST_COMMIT[name])
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert result.integrity_status.value == "INVALID"
+    assert "before the worker exited" in result.summary, result.summary
+    assert "bytes past the last page" in result.summary, result.summary
+    assert cli._exit_code(result.verdict) == 2
+
+
+def test_tail_bytes_is_a_packaged_zoo_tree_pinned_to_no_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The nightly's false pass ships as fixture:sqlite-credit-v1/tail-bytes, one flag away."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+
+    result = check(BUGGY_REF, TAIL_BYTES_REF, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert result.integrity_status.value == "INVALID"
+    assert "before the worker exited" in result.summary
+    assert "store.credit_and_mark(account_id, event_id, amount_cents)" in result.summary
+    assert cli._exit_code(result.verdict) == 2
