@@ -1369,3 +1369,96 @@ def test_an_incomplete_attempt_requires_a_failure_detail() -> None:
 
     with pytest.raises(ValidationError, match="incomplete attempt requires a failure detail"):
         AttemptReceipt.with_digest(**values)
+
+
+def test_an_attempt_that_began_and_ended_in_the_same_instant_is_accepted() -> None:
+    """The receipt refuses an attempt that ended before it started, and only that. A kill can
+    land inside one clock tick; an attempt whose start and end read the same instant is fast,
+    not incoherent, and refusing it would throw away real evidence."""
+    capsule = _capsule()
+    values = _attempt_values(capsule, _binding(capsule))
+    values["ended_at"] = NOW
+    values["timeline"] = (
+        TimelineEntry(state=TimelineState.PREFLIGHT, timestamp=NOW),
+        TimelineEntry(state=TimelineState.COMPLETE, timestamp=NOW),
+    )
+
+    receipt = AttemptReceipt.with_digest(**values)
+
+    assert receipt.ended_at == receipt.started_at
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["pre_crash_snapshot", "checkpoint_snapshot", "post_kill_snapshot", "final_snapshot"],
+)
+def test_every_snapshot_on_a_revalidated_attempt_is_checked_against_its_digest(
+    field: str,
+) -> None:
+    """Each of the four snapshots is re-hashed when the attempt is validated. Handing an
+    existing receipt back to the model skips every field validator, so the nested snapshot
+    never re-checks itself; the attempt's own loop is what keeps a forged state out, and it
+    has to reach all four positions."""
+    capsule = _capsule()
+    values = _attempt_values(capsule, _binding(capsule))
+    # An incomplete attempt: nothing but the snapshot loop can object to this evidence.
+    values["execution_status"] = ExecutionStatus.SETUP_ERROR
+    values["integrity_status"] = IntegrityStatus.INCOMPLETE
+    values["failure_detail"] = "database seeding failed"
+    assert AttemptReceipt.with_digest(**values)
+
+    honest = values[field]
+    assert isinstance(honest, StateSnapshot)
+    forged = StateSnapshot.model_construct(**{**honest.model_dump(), "digest": HASHES[3]})
+    assert forged.digest != honest.digest
+    values[field] = forged
+
+    # Seal the receipt over the forged payload, so only the nested snapshot lies.
+    unsealed = AttemptReceipt.model_construct(_fields_set=None, digest="0" * 64, **values)
+    values["digest"] = sha256_json(unsealed.model_dump(mode="json", exclude={"digest"}))
+    receipt = AttemptReceipt.model_construct(_fields_set=None, **values)
+
+    with pytest.raises(ValidationError, match="StateSnapshot digest mismatch"):
+        AttemptReceipt.model_validate(receipt)
+
+
+class _ReceiptThatLosesItsPreCrashSnapshot:
+    """A completed receipt whose pre-crash snapshot is gone by the time the narrowing runs.
+
+    Everything is the real receipt except two reads: ``post_execution_tree_digest`` is read
+    once, after the kill/replay evidence gate and before the narrowing, so it marks the gate
+    as passed, and after that the pre-crash snapshot is missing.
+    """
+
+    def __init__(self, receipt: AttemptReceipt) -> None:
+        self._receipt = receipt
+        self._past_the_gate = False
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._receipt, name)
+
+    @property
+    def post_execution_tree_digest(self) -> str | None:
+        self._past_the_gate = True
+        digest: str | None = self._receipt.post_execution_tree_digest
+        return digest
+
+    @property
+    def pre_crash_snapshot(self) -> StateSnapshot | None:
+        return None if self._past_the_gate else self._receipt.pre_crash_snapshot
+
+
+def test_a_completed_attempt_without_a_pre_crash_snapshot_never_reaches_the_seed_check() -> None:
+    """A completed attempt carries all four snapshots, and the narrowing before the seed check
+    is the last guard that says so. Every one of them must be present for the check to run: a
+    missing pre-crash state has to stop the validator there, not be carried into the seed
+    comparison and read as if it were a state."""
+    capsule = _capsule()
+    receipt = AttemptReceipt.with_digest(**_attempt_values(capsule, _binding(capsule)))
+
+    losing_it = _ReceiptThatLosesItsPreCrashSnapshot(receipt)
+    # The validator decorator leaves a descriptor proxy on the class, which is callable at
+    # runtime but not to a type checker; getattr asks for the function it wraps.
+    evidence_is_coherent = getattr(AttemptReceipt, "evidence_is_coherent")  # noqa: B009
+    with pytest.raises(AssertionError):
+        evidence_is_coherent(losing_it)
