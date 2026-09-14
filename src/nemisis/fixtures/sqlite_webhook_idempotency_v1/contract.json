@@ -1,0 +1,16 @@
+{
+  "adapter_id": "webhook-store-v1",
+  "event_digest": "020ff03bf30b0e5d573ebad8ad41c532cecb13a28e55c0ccd7235ed73a7e4337",
+  "event_fixture_id": "evt-whk-88-v1",
+  "fault_intent_id": "first-grant-effect-commit-v1",
+  "issue_digest": "a87a2a71c58fd821753911a8207a474d83aed92bfd6284344e5927b498247ce6",
+  "originating_base_ref": "fixture:sqlite-webhook-idempotency-v1/buggy",
+  "originating_base_tree_digest": "982b7f581adb8601dd244c2bd5662f2c031fe8aafa7832eff37cf7c9db144f0e",
+  "predicate_ids": [
+    "single-grant-and-key-v1"
+  ],
+  "probe_id": "seat-state-v1",
+  "scenario_id": "sqlite-webhook-idempotency-v1",
+  "schema_version": "nemisis.retry-contract.v1",
+  "target": "app.webhooks:handle_webhook"
+}
