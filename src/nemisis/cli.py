@@ -216,6 +216,18 @@ def _parser() -> argparse.ArgumentParser:
         help=f"default: the scenario a fixture candidate names, else {SCENARIO_ID}",
     )
     map_command.add_argument("--json", action="store_true", help="print the map document only")
+
+    commands.add_parser(
+        "mcp",
+        help="run the Model Context Protocol server over stdio, for an AI coding agent",
+        description=(
+            "A stdio MCP server whose tools wrap check, map, doctor, and the Nemotron drafters. "
+            "It runs on your machine, on your checkout, and stores nothing anywhere but the "
+            "artifact root it names (NEMISIS_ARTIFACT_ROOT, default .nemisis); nothing is "
+            "uploaded. The kernel it drives never calls a model. Add it to a client with "
+            "`claude mcp add nemisis -- uvx --from nemisis nemisis mcp`."
+        ),
+    )
     return parser
 
 
@@ -716,6 +728,12 @@ def main() -> None:
                 print(f"handlers and evidence: {args.out.resolve()}")
             if disagreements or len(unknown) > args.max_unknown:
                 raise SystemExit(1)
+            return
+
+        if args.command == "mcp":
+            from nemisis.mcp_server import run as run_mcp
+
+            run_mcp()
             return
 
         if args.command == "map":
