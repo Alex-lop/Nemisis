@@ -166,10 +166,18 @@ contract's catalog binding, candidate-blind. See [docs/LIVE_SETUP.md](docs/LIVE_
 
 ## Point it at your code
 
-The alpha audits one handler shape: a synchronous `module:function(store, event)` that uses a
-scenario's store API against SQLite (`CreditStore`: `processed`, `credit`, `mark_processed`,
-`credit_and_mark`; `InventoryStore`: `reserved`, `reserve`, `mark_reserved`, `reserve_and_mark`).
-Inside that shape, the handler body is anything you like.
+Read this before `init`. The alpha judges one handler shape and nothing else: a top-level
+synchronous `def handler(store, event)` with exactly two positional parameters, no defaults, no
+`*args`, no `**kwargs`, no alias or re-export. Every durable write goes through the store
+CrashCheck injects as the first argument (`CreditStore`: `processed`, `credit`, `mark_processed`,
+`credit_and_mark`; `InventoryStore`: `reserved`, `reserve`, `mark_reserved`, `reserve_and_mark`;
+[the store API](docs/PRODUCT.md#the-store-api)), against the scenario's schema, on the scenario's
+event. Your own connection, your own tables, your own payload are outside it. `init` reads the
+signature and nothing more, so `apply_credit(conn, event)` that runs SQL on `conn` mints a
+contract and then ends at `EVIDENCE_INCOMPLETE`, exit `2`, because the handler raised
+`AttributeError` before the durable checkpoint. That is a narrow shape and most handlers are not
+already in it: porting one means rewriting its storage calls as store calls, and what survives is
+the part with the crash window in it. Inside that shape, the handler body is anything you like.
 
 ```bash
 uv tool install "git+https://github.com/Alex-lop/Nemisis@main"
