@@ -9,6 +9,7 @@ import sys
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from nemisis import __version__
 from nemisis.benchmark import BenchmarkError, BenchmarkResult, run_benchmark
@@ -22,6 +23,9 @@ from nemisis.local import LocalVerification, verify_local
 from nemisis.models import RuntimeMode
 from nemisis.scenario import Scenario
 from nemisis.scenarios import SCENARIOS, scenario_for
+
+if TYPE_CHECKING:
+    from nemisis.mapping import MapResult
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -199,6 +203,19 @@ def _parser() -> argparse.ArgumentParser:
         help="result file, replaced in place; wall-clock timings enter its digest",
     )
     benchmark.add_argument("--json", action="store_true", help="print the result document only")
+
+    map_command = commands.add_parser(
+        "map",
+        help="a verdict-free crash-window map: where can this handler die, and what survives",
+    )
+    map_command.add_argument("candidate", help=f"the tree to map: {ref_help}")
+    map_command.add_argument(
+        "--scenario",
+        default=None,
+        choices=sorted(SCENARIOS),
+        help=f"default: the scenario a fixture candidate names, else {SCENARIO_ID}",
+    )
+    map_command.add_argument("--json", action="store_true", help="print the map document only")
     return parser
 
 
@@ -367,6 +384,42 @@ def _subject_formatter(result: CrashCheckResult) -> Callable[[int], str]:
     except ValueError:
         return str
     return scenario.format_subject
+
+
+def _print_map(result: MapResult, *, as_json: bool) -> None:
+    if as_json:
+        print(canonical_json(result).decode())
+        return
+    try:
+        quantity = scenario_for(result.scenario_id).format_subject
+    except ValueError:
+        quantity = str
+    print(f"NEMISIS MAP — {_truth_label(result.truth_label)}")
+    print(f"scenario: {result.scenario_id}")
+    print(
+        f"candidate: {result.source_ref}"
+        + (f" (tree {result.tree_digest})" if result.tree_digest else "")
+    )
+    print(f"engine code digest: {result.engine_code_digest}")
+    if not result.mappable:
+        print(f"no map: {result.anchor_failure}")
+        return
+    print(f"census: {result.census_status} / {result.census_integrity}")
+    if result.census_refusal is not None:
+        print(f"refused: {result.census_refusal}")
+        print("no crash-window map: the kernel could not attribute this tree's census")
+        return
+    commits = ", ".join(result.commits) or "none observed"
+    print(f"commits: {commits}")
+    print("no verdict is issued; this is where the handler can die, not whether it is fixed")
+    for window in result.windows:
+        post = quantity(window.post_kill.subject_total) if window.post_kill else "no state"
+        retry = quantity(window.after_retry.subject_total) if window.after_retry else "no state"
+        detail = f" — {window.detail}" if window.detail else ""
+        print(
+            f"  kill after commit {window.kill_after_commit} ({window.operation}): "
+            f"{window.execution_status}; killed at {post} -> retry ends {retry}{detail}"
+        )
 
 
 def _print_doctor(result: DoctorResult, *, as_json: bool) -> None:
@@ -663,6 +716,16 @@ def main() -> None:
                 print(f"handlers and evidence: {args.out.resolve()}")
             if disagreements or len(unknown) > args.max_unknown:
                 raise SystemExit(1)
+            return
+
+        if args.command == "map":
+            from nemisis.mapping import map_windows
+
+            scenario_id = _scenario_argument(args.scenario, args.candidate)
+            crash_map = map_windows(args.candidate, scenario_id)
+            _print_map(crash_map, as_json=args.json)
+            if not crash_map.mappable:
+                raise SystemExit(2)
             return
 
         if args.command == "doctor":
