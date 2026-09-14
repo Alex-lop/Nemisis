@@ -2,322 +2,98 @@
 
 # Nemisis
 
-**Nemisis is the crash-safety proof an AI coding agent attaches to its retry fix.**
+**Your AI wrote the retry fix. The tests are green. The next crash still charges the customer twice.**
+
+Nemisis is the proof it won't — and the AI runs the proof itself.
 
 [![CI](https://github.com/Alex-lop/Nemisis/actions/workflows/ci.yml/badge.svg)](https://github.com/Alex-lop/Nemisis/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-3776AB.svg)
 
-Nemisis is the command-line tool; CrashCheck is the check it runs. Your tests call the handler
-once, in one process, with nothing going wrong. CrashCheck runs the patch in a real worker
-process, kills it the moment a write becomes durable, restarts it, replays the same event, and
-reads what actually survived. One command, one verdict, an exit code CI can block on.
+A test calls your handler once, in one process, with nothing going wrong. Nemisis runs the patch in
+a real worker, `SIGKILL`s it the instant a write hits disk, restarts it, replays the same event,
+and reads what actually survived. One verdict, one exit code CI can block on.
 
-A coding agent fixes "retries sometimes credit an order twice". Its patch passes the test suite.
-It passes an ordinary call-it-twice check. Then a worker is `SIGKILL`ed right after the `$25`
-credit hits disk, the retry runs in a fresh process, and the account holds `$50`.
+![Terminal recording: the buggy handler doubles the credit under a crash, the agent's green patch still doubles it, and the atomic fix ends at exactly one credit](docs/assets/screenshots/crashcheck-demo.gif)
 
 ```text
-$ uv run nemisis check --base fixture:sqlite-credit-v1/buggy \
-    --candidate fixture:sqlite-credit-v1/misleading-green --corrected fixture:sqlite-credit-v1/atomic
-
 verdict: PATCH_FAILED_STILL_REPRODUCES
 timeline: $25.00 durable -> SIGKILL -> fresh worker -> $50.00
 ```
 
-![Thirty-second terminal recording: the buggy handler reproduces the double credit, the agent's green patch still reproduces it under the same kill and retry, and the atomic fix ends at exactly one credit](docs/assets/screenshots/crashcheck-demo.gif)
+| Exit | Verdict | Meaning |
+| ---: | --- | --- |
+| `0` | `FIX_PROVEN_FOR_THIS_CAPSULE` | Every kill point ended exactly once. |
+| `1` | `PATCH_FAILED_…` | The money moved twice, or was lost. |
+| `2` | `EVIDENCE_INCOMPLETE` | Something couldn't be observed. Never a guess, never a fallback. |
 
-Exit `1` blocks the merge. The same frozen crash replayed against the real fix exits `0`.
+## The customer is your agent
+
+The person fixing the retry bug is an AI coding agent; the human reads the receipt. Nemisis ships a
+Model Context Protocol server and a skill so the agent proves its own fix, with no human in the loop.
+
+```mermaid
+flowchart LR
+    you["you: fix the retry bug"] --> agent["AI coding agent<br/>(Claude Code)"]
+    agent -->|MCP tools| mcp["nemisis mcp"]
+    mcp --> kernel["CrashCheck<br/>kill · restart · replay"]
+    kernel -->|verdict + receipt| agent
+    agent -->|receipt on the PR| you
+```
+
+A fresh, memory-less agent — given only the server, the skill, a bug report, and one instruction —
+did this unaided, in 14 turns:
+
+```text
+$ claude -p "Fix the double-credit-on-retry bug and prove it is crash-safe with the nemisis MCP tools."
+
+  → list_scenarios          picks sqlite-credit-v1
+  → port_template           gets the store API and a skeleton
+  → writes a port           mirrors the real handler against the store
+  → map                     sees where a crash loses the credit
+  → check                   FIX_PROVEN_FOR_THIS_CAPSULE   (exit 0)
+  → edits app/credits.py    applies the same fix, attaches the receipt
+```
+
+The receipt and the tool log are committed at
+[docs/reports/2026-09-15-agent-demo.md](docs/reports/2026-09-15-agent-demo.md). The kernel that
+decides the verdict never calls a model.
 
 ## Try it
 
-Needs Python 3.12+, [uv](https://docs.astral.sh/uv/), and a POSIX machine (macOS or Linux).
+**Point your agent at it.** From a Nemisis checkout today (from PyPI once `0.2.1` ships the server):
 
 ```bash
-uv tool install nemisis   # 0.2.0 from PyPI; for the tip of main: uv tool install "git+https://github.com/Alex-lop/Nemisis@main"
-nemisis check --base fixture:sqlite-credit-v1/buggy \
-  --candidate fixture:sqlite-credit-v1/misleading-green \
-  --corrected fixture:sqlite-credit-v1/atomic
-```
-
-About two seconds. Then replay the frozen crash against the fix (the `capsule:` path is printed
-by `check`):
-
-```bash
-nemisis replay .nemisis/repros/double-credit/*/capsule.json \
-  --source fixture:sqlite-credit-v1/atomic --role corrected
-```
-
-The checkout is for developing Nemisis and for [Verify the project](#verify-the-project); every
-`uv run nemisis` below is that checkout running the same command an installed `nemisis` runs.
-
-```bash
-git clone https://github.com/Alex-lop/Nemisis.git && cd Nemisis
-uv sync --frozen --dev
-```
-
-## What it does
-
-CrashCheck runs the exact patch in a real worker process and treats every durable write as a place
-the process could die.
-
-1. **Hunt on the base.** Two fixed kill points are tried on the buggy tree before the candidate is
-   even read; the one that reproduces the duplicate is frozen into a content-addressed capsule.
-2. **No-crash control.** The base is delivered the same event twice with no kill. It ends exactly
-   once, so the duplicate needs the crash: this is a crash/retry bug, not a broken handler.
-3. **Kill, restart, replay.** Five fresh worlds per tree. Each one seeds a database, waits until the
-   credit is durably committed, `SIGKILL`s the whole process group, confirms exit `-9`, starts a
-   fresh worker, replays the byte-identical event, and reads the database through an independent
-   read-only connection.
-4. **Sweep every commit of a claimed fix.** A patch that passes step 3 is then killed once after
-   *each* store commit it makes. A handler that marks first and credits second passes step 3 and
-   loses the credit here.
-5. **Decide from durable state and process receipts.** Balance, ledger rows, marker count, PIDs,
-   exit codes, worker nonces, tree digests. Five worlds must agree or there is no verdict.
-
-| Exit | Verdict | Meaning |
-| ---: | --- | --- |
-| `0` | `FIX_PROVEN_FOR_THIS_CAPSULE` | Every kill point, including the frozen one, ended exactly once. |
-| `1` | `PATCH_FAILED_STILL_REPRODUCES` | The money moved twice. |
-| `1` | `PATCH_FAILED_INVARIANT_BROKEN` | The money was lost, tripled, or otherwise wrong. |
-| `1` | `BUG_REPRODUCED` | The base reproduced the capsule (`replay --role base`). |
-| `2` | `EVIDENCE_INCOMPLETE` | Something could not be observed. Never a fallback, never a guess. |
-
-## Try to fool it
-
-The checker was red-teamed by hand until it stopped losing, and CI now red-teams it on every run:
-`nemisis redteam` renders handlers from a grammar over store operations (guard, credit, mark, the
-atomic call, the same calls inside `try`/`except` or a retry loop, and the writes around the store
-that hostile reviews wrote by hand: a file beside, above, under `~` or `$TMPDIR`, a file tidied
-away before returning, a raw SQL write, a table, a pragma, a re-pointed row, a world-detection
-attempt; a quarter of them through a helper function), runs `check` on each, and compares the
-verdict with an oracle computed from the operation sequence alone, in either scenario's
-vocabulary (`--scenario`). Ten fixed-seed cases run in the normal suite; a nightly workflow runs
-three hundred per scenario. Three hand-written handlers that fooled an earlier engine ship as
-fixture refs, so the claim above is one flag away for anyone:
-
-| Candidate | Unit test | Called twice | Kill + retry | Verdict |
-| --- | :-: | :-: | --- | --- |
-| `buggy` | green | `$25` | `$50` | `BUG_REPRODUCED` |
-| `misleading-green` | green | `$25` | `$50` | `PATCH_FAILED_STILL_REPRODUCES` |
-| `mark-first` | green | `$25` | `$0`, marked done | `PATCH_FAILED_INVARIANT_BROKEN` |
-| `leftover-credit` | red (`$50` on one call) | `$50` | `$50` | `PATCH_FAILED_STILL_REPRODUCES` |
-| `never-marks` | green | `$50` | `$50`, no marker | `PATCH_FAILED_STILL_REPRODUCES` |
-| `atomic` | green | `$25` | `$25` | `FIX_PROVEN_FOR_THIS_CAPSULE` |
-| `raw-sql` | red (needs SQLite) | n/a | no kill point | `EVIDENCE_INCOMPLETE`, names the one-line change |
-| `shadow-table` | red (needs SQLite) | n/a | `$0`, in-flight forever | `EVIDENCE_INCOMPLETE`, the schema changed |
-| `tail-bytes` | red (needs SQLite) | n/a | `$25`, then bytes past the file's last page | `EVIDENCE_INCOMPLETE`, a write around the store |
-
-```bash
-uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/mark-first
-```
-
-Or generate a hundred and read the disagreements (there should be none; one is a checker or
-oracle bug and the most valuable thing you can send):
-
-```bash
-uv run nemisis redteam --cases 100 --seed 1 --out ./redteam
-```
-
-Or write your own in thirty seconds:
-
-```bash
-uv run nemisis export fixture:sqlite-credit-v1/buggy ./my-candidate
-$EDITOR ./my-candidate/app/credits.py
-uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate ./my-candidate
-```
-
-See where a handler can die before you fix it, with no verdict and no capsule:
-
-```bash
-uv run nemisis map fixture:sqlite-credit-v1/mark-first
-```
-
-`map` runs the same commit sweep `check` runs and reports, for each store commit, the durable
-state a crash there leaves and the state after the retry. A tree the kernel cannot attribute (a
-write around the store) gets its census refusal, not a map.
-
-A handler that writes outside the store still runs. It forfeits the verdict instead of earning one.
-`raw-sql` is the textbook fix written as one raw SQL transaction on the store's database: correct,
-and unjudgeable, because a write the store did not make has no kill point. CrashCheck names the
-write and the store call that expresses the same fix (`store.credit_and_mark(...)`, see [the store
-API](docs/PRODUCT.md#the-store-api)) instead of guessing a verdict. `shadow-table` keeps its dedup
-flag in a table it creates inside the store's own database: an earlier engine blessed it while a
-crash between that write and the credit left the customer unpaid forever. `tail-bytes` is the guarded
-atomic fix (`processed`, then `credit_and_mark`) followed by sixteen bytes appended past the
-database file's last page: the nightly red team
-caught the engine issuing verdicts on it for five nights, and blessing it twice (SQLite's own close
-had tidied the bytes away before the engine looked); the engine now reads the file before the
-worker may exit, pins the file whole during a delivery, and holds the write-ahead log to its frames. Attribution now reads the
-whole database file (schema, the header fields a commit never changes, every row with its rowid)
-and the whole world the worker runs in (its working directory and the two above it, `HOME`,
-`TMPDIR`, the bound tree entry by entry, with every entry's permission bits, flags, attributes,
-and modification time), before and after every delivery, and the raw header and length of the
-database file itself. Three hostile reviews found forty-eight handlers an earlier engine blessed;
-twenty-eight of those shapes are pinned as refusals. What it cannot read it does not claim;
-[the boundary](docs/SECURITY.md) lists the channels that remain.
-
-## Let Nemotron write the patch
-
-The hackathon story, made literal. NVIDIA's Nemotron on Nebius Token Factory plays the coding
-agent: it gets the bug report, the buggy module, and the store API, and nothing about how
-CrashCheck kills or judges. Its module is accepted only after deterministic checks (signature,
-imports, no private attributes), becomes an ordinary candidate tree, and is judged like any other.
-
-The `--issue` path below is inside the checkout. `export` copies a fixture tree, not the issue
-text, and no other command prints it, so this section needs the clone from [Try it](#try-it).
-
-```bash
-export NEBIUS_API_KEY=...   # without it: exit 2, nothing written
-uv run nemisis propose-patch --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
-  --base fixture:sqlite-credit-v1/buggy --out ./nemotron-candidate
-uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate ./nemotron-candidate
-```
-
-The report gains a **Candidate author** card with the model's receipt. It is labelled `LIVE` only
-for a real Token Factory call; injected clients are `MOCKED` and say so. This tree has no key, so no
-`LIVE` receipt exists yet. `init --nemotron` is the second, smaller model job: proposing the
-contract's catalog binding, candidate-blind. See [docs/LIVE_SETUP.md](docs/LIVE_SETUP.md).
-
-## Point your agent at it
-
-The customer is not the person typing `nemisis check`; it is the AI coding agent fixing the retry
-bug, and the person reads the receipt. Nemisis ships a Model Context Protocol server and a skill so
-the agent can prove its fix with no human in the loop. A fresh headless agent, given only the
-server, the skill, an issue, and one instruction, reached `FIX_PROVEN_FOR_THIS_CAPSULE` unaided in 14 turns
-([the write-up, with the run's tool log and receipt committed beside it](docs/reports/2026-09-15-agent-demo.md)).
-
-```bash
-# from a checkout today; from PyPI once 0.2.1 ships the server (it merged after 0.2.0):
 claude mcp add nemisis -- uv run --project /path/to/Nemisis nemisis mcp
-mkdir -p .claude/skills/nemisis
-cp /path/to/Nemisis/skills/nemisis/SKILL.md .claude/skills/nemisis/SKILL.md
-# then, in your repo:
+mkdir -p .claude/skills/nemisis && cp /path/to/Nemisis/skills/nemisis/SKILL.md .claude/skills/nemisis/
 claude -p "Fix the retry bug and prove it is crash-safe with the nemisis MCP tools."
 ```
 
-The agent lists the scenarios, gets a port template, writes a minimal **port** of its real handler
-against the scenario's store under `.nemisis/port/<scenario>/`, maps the crash windows, and
-iterates `check` until `FIX_PROVEN_FOR_THIS_CAPSULE`. `EVIDENCE_INCOMPLETE` is never a pass — the
-tool returns the remedy and the agent fixes its port, never the kernel. Then it applies the same
-change to the real handler and attaches the receipt and a port ledger to the PR. The kernel never
-calls a model; only `draft_contract` and `propose_patch` do, and both are `BLOCKED` without a Token
-Factory key. See `skills/nemisis/SKILL.md` and [`AGENTS.md`](AGENTS.md).
-
-### The shape a port must take
-
-`init` and the port both judge one handler shape: a top-level synchronous
-`def handler(store, event)` with exactly two positional parameters, no defaults, no `*args`, no
-`**kwargs`, no alias or re-export. Every durable write goes through the store Nemisis injects as
-the first argument (`CreditStore`: `processed`, `credit`, `mark_processed`, `credit_and_mark`;
-`InventoryStore`: `reserved`, `reserve`, `mark_reserved`, `reserve_and_mark`;
-[the store API](docs/PRODUCT.md#the-store-api)), against the scenario's schema, on the scenario's
-event. Your own connection, your own tables, your own payload are outside it. `init` reads the
-signature and nothing more, so `apply_credit(conn, event)` that runs SQL on `conn` mints a contract
-and then ends at `EVIDENCE_INCOMPLETE`, exit `2`, because the handler raised `AttributeError` before
-the durable checkpoint. Porting a handler means rewriting its storage calls as store calls, and
-what survives is the part with the crash window in it. For an agent that is a five-minute subtask;
-inside that shape, the handler body is anything you like.
-
-### The human path (`init` by hand)
-
-The contract pins the base tree digest, so the fix lives on a branch while the base branch stays
-at the tree the contract was accepted for. Commit the fix on `main` and `check --base main` exits
-`2`: `contract originating base digest differs from the supplied base`. Committing the contract is
-safe; `.nemisis/` is outside the digest.
+**Or run one check yourself.** Needs Python 3.12+ and [uv](https://docs.astral.sh/uv/) on macOS or Linux:
 
 ```bash
-nemisis init --issue issue.md --target app.credits:apply_credit --base main
-nemisis init --issue issue.md --target app.credits:apply_credit --base main \
-  --accept-contract PASTE_PRINTED_DIGEST
-git checkout -b fix-double-credit   # the fix is committed here, not on main
-nemisis check --base main --candidate HEAD --scenario .nemisis/config.json
+uv tool install "git+https://github.com/Alex-lop/Nemisis@main"
+nemisis check --base fixture:sqlite-credit-v1/buggy \
+  --candidate fixture:sqlite-credit-v1/misleading-green --corrected fixture:sqlite-credit-v1/atomic
 ```
 
-Commit the accepted `.nemisis/config.json` on the base branch, then copy
-[the example workflow](.github/examples/crashcheck.yml) into `.github/workflows/` to run it on every
-pull request. Without a checkout, take it from `main`:
-
-```bash
-curl -o .github/workflows/crashcheck.yml \
-  https://raw.githubusercontent.com/Alex-lop/Nemisis/main/.github/examples/crashcheck.yml
-```
-
-Every wall-clock wait in the kernel is one budget, ten seconds re-armed for each phase of each
-world (the worker's hello, reaching the next store commit, finishing the delivery), and its expiry
-is an `EVIDENCE_INCOMPLETE` whose message names the phase, the commits seen so far, and the
-budget. On a slow or loaded machine, `NEMISIS_WORKER_TIMEOUT_SECONDS=30` raises it; no receipt
-depends on the value, and a value outside 1 to 600 is refused rather than clamped.
-
-## Two scenarios, one kernel
-
-The kernel is written once; a scenario is one object (schema, seed, store, probe, predicate, words).
-`sqlite-inventory-v1` is the second: an order reserves two units of a SKU, stock goes 10 to 8, and
-a crash between the decrement and its marker oversells to 6. It is the bug the original
-differential verifier could only mark `UNRESOLVED`, decided:
-
-| Scenario | Effect | Buggy | Agent's rewrite | Atomic | `mark-first` |
-| --- | --- | --- | --- | --- | --- |
-| `sqlite-credit-v1` | `$0` to `$25` | `$50` | `$50` | `$25` | `$0`, marked done |
-| `sqlite-inventory-v1` | 10 to 8 units | 6 units | 6 units | 8 units | 10 units, marked reserved |
-
-```bash
-uv run nemisis check --base fixture:sqlite-inventory-v1/buggy --candidate fixture:sqlite-inventory-v1/mark-first
-```
-
-The scenario is inferred from a fixture base ref; `init --scenario sqlite-inventory-v1` binds your
-own `app.inventory:reserve_inventory` the same way the credit contract does.
+About two seconds: the green patch fails, the atomic fix passes. Curious how it decides, or want to
+try to fool it? → **[How it works](docs/HOW_IT_WORKS.md).**
 
 ## What it never does
 
-- Never pushes, merges, comments, or touches your git history. It writes `.nemisis/` and exits.
-- Never upgrades a label. Local runs are `LOCAL`, the packaged case is `FIXTURE`, injected model
-  clients are `MOCKED`, `LIVE` needs a genuine provider receipt. Missing evidence fails closed.
-- Never lets a model near the verdict. Models write patches or propose catalog IDs; deterministic
-  code owns probes, kill points, and decisions.
-- Not a sandbox. Local mode is for a trusted checkout; the GitHub Action refuses fork PRs until
-  the kernel runs inside a Token Factory Sandbox. Kill points are store commits, so durable state a
-  handler keeps outside the store (a dedup file, another database) has windows CrashCheck cannot
-  reach, and says so.
-
-## Verify the project
-
-From the checkout in [Try it](#try-it); an installed tool ships no tests to run.
-
-```bash
-uv run ruff format --check src tests && uv run ruff check src tests
-uv run mypy src tests
-uv run pytest
-```
-
-The claims below name the tests that prove them, and `tests/test_readme_truth.py` fails if a link,
-an image, or a test count here goes stale:
-
-| Claim | The test that proves it |
-| --- | --- |
-| A real worker is killed at the durable write, a fresh one replays the same event, five worlds must agree | [`tests/test_sqlite_runner.py`](tests/test_sqlite_runner.py), [`tests/test_crashcheck.py`](tests/test_crashcheck.py) |
-| A claimed fix is killed once after every store commit it makes (`mark-first` loses the credit) | [`tests/test_verdict_paths.py`](tests/test_verdict_paths.py) |
-| Every durable change is attributed: raw SQL, a shadow table, a pragma, a file, an empty directory, `~`, `TMPDIR` forfeit the verdict | [`tests/test_verdict_paths.py`](tests/test_verdict_paths.py) |
-| Complete-but-wrong is a failed patch, never missing evidence | [`tests/test_crash_models.py`](tests/test_crash_models.py), [`tests/test_verdict_paths.py`](tests/test_verdict_paths.py) |
-| The second scenario has its own seed, direction, and predicate and earns the same four verdicts | [`tests/test_inventory_scenario.py`](tests/test_inventory_scenario.py) |
-| Generated handlers agree with an oracle that only knows their operation sequence | [`tests/test_redteam.py`](tests/test_redteam.py) |
-| The README's `init` → accept → `check` sequence runs on a real git repository through the CLI | [`tests/test_point_at_your_code.py`](tests/test_point_at_your_code.py) |
-| Truth labels come from code; a config, capsule, or tree cannot claim `LIVE` or an author | [`tests/test_trust_boundaries.py`](tests/test_trust_boundaries.py), [`tests/test_agent_patch.py`](tests/test_agent_patch.py) |
-| The docs quote the installed engine digest, the reviewed action pin, and the collected test count | [`tests/test_docs_identity.py`](tests/test_docs_identity.py), [`tests/test_readme_truth.py`](tests/test_readme_truth.py) |
-| The committed hero evidence validates against the current strict models | [`tests/test_static_hero.py`](tests/test_static_hero.py) |
-| Every `git` command the engine runs is read-only, and a patch is only ever applied inside an isolated world | [`tests/test_claims_readme_md.py`](tests/test_claims_readme_md.py) |
-
-The terminal captures are regenerated by the `vhs` tapes in
-[docs/assets/screenshots/](docs/assets/screenshots/).
+- **Never touches your repo.** It writes `.nemisis/` and exits — no pushes, merges, or comments.
+- **Never lets a model near the verdict.** Models write patches; deterministic code owns the kill
+  points and the decision.
+- **Never upgrades a label.** `LOCAL` / `FIXTURE` / `MOCKED` / `LIVE` are earned; missing evidence
+  fails closed, never a fallback.
+- **Never claims what it can't see.** Durable state a handler keeps outside the store has crash
+  windows Nemisis can't reach, and it says so instead of guessing.
 
 ## Docs
 
-[Product contract](docs/PRODUCT.md) · [Architecture](docs/ARCHITECTURE.md) ·
-[Security boundary](docs/SECURITY.md) · [Proof ledger](docs/PROOF.md) ·
-[Benchmark](docs/BENCHMARK.md) · [two-and-a-half-minute demo](docs/DEMO.md) · [Pitch](docs/PITCH.md) ·
-[Live setup](docs/LIVE_SETUP.md) · [Status](docs/STATUS.md) · [Decisions](docs/DECISIONS.md)
-
-The original differential verifier (`nemisis verify --fixture idempotency-retry`) is still shipped;
-it is where CrashCheck's crash-retry row comes back `UNRESOLVED` and CrashCheck begins.
+**[How it works](docs/HOW_IT_WORKS.md)** · [Product](docs/PRODUCT.md) · [Security boundary](docs/SECURITY.md) ·
+[Proof ledger](docs/PROOF.md) · [Skill](skills/nemisis/SKILL.md) · [Agent guide](AGENTS.md) ·
+[Direction](docs/DIRECTION.md) · [Decisions](docs/DECISIONS.md) · [Pitch](docs/PITCH.md)
 
 Apache-2.0. See [LICENSE](LICENSE).
