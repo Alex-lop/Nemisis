@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import signal
 import socket
+import sqlite3
 import subprocess
 import sys
 from collections.abc import Iterator
@@ -38,6 +39,7 @@ from nemisis.sqlite_runner import (
     _ledger,
     _probe,
     _receive,
+    _require_unchanged,
     _seed_database,
     _Spawn,
     _spawn_receipt,
@@ -512,3 +514,32 @@ def test_a_worker_that_exited_before_the_kill_landed_is_a_wait_error(
 
     assert failure.value.status is ExecutionStatus.WAIT_ERROR
     assert failure.value.detail == "worker did not exit from SIGKILL"
+
+
+def test_a_write_after_the_worker_died_forfeits_the_post_kill_checkpoint(tmp_path: Path) -> None:
+    """The checkpoint is read twice: once at the kill, once after the worker is gone. Between
+    them nothing may write, because a detached child, an exit hook, or a connection the store
+    does not own would be moving the money after the crash the receipt claims to describe."""
+    event = {"account_id": "acct_7", "amount_cents": 2500, "event_id": "evt_1042"}
+    database = tmp_path / "post-kill.sqlite3"
+    _seed_database(CREDIT, database, event)
+    at_the_kill = _ledger(CREDIT, database, event)
+
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "INSERT INTO credit_ledger(event_id, account_id, amount_cents) "
+            "VALUES ('evt_1042', 'acct_7', 2500)"
+        )
+        connection.commit()
+
+    with pytest.raises(_AttemptFailure) as failure:
+        _require_unchanged(
+            CREDIT, database, event, at_the_kill, "durable checkpoint changed after worker death"
+        )
+
+    assert failure.value.status is ExecutionStatus.INTEGRITY_ERROR
+    assert failure.value.integrity is IntegrityStatus.INVALID
+    assert failure.value.detail == (
+        "durable checkpoint changed after worker death: rows that belong to other accounts "
+        "or events changed (or this event's own rows did) in credit_ledger"
+    )
