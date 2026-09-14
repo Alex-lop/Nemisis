@@ -123,7 +123,12 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 595 tests, and package build: pass locally on
+- the mutation ledger at this engine,
+  [`docs/reports/2026-09-14-mutation-ledger.md`](reports/2026-09-14-mutation-ledger.md): 288
+  mutants of the kernel's refusals, 243 killed, 45 survived (24 equivalent with the reason, 21 holes
+  each naming the test it is owed); `mutants.yml` reruns the thirteen targets monthly and fails on a
+  survivor the newest ledger does not list;
+- locked dependency sync, formatter, Ruff, mypy, 615 tests, and package build: pass locally on
   Python 3.12.13; CI runs the same gate on CPython 3.12, 3.13, and 3.14 (the 3.14 leg first ran
   green on a real runner at
   [run 34093138705](https://github.com/Alex-lop/Nemisis/actions/runs/34093138705), where the only

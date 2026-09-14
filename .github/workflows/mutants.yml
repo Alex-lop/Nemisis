@@ -1,0 +1,100 @@
+# Monthly mutation run: the checker of the checker, so the published ledger's number cannot rot
+# unseen. Each operator of the kernel's refusals is flipped one at a time (tools/mutants.py) and
+# the fast-to-slow test selection is run with -x. One job per target, bounded. The last job merges
+# the per-target ledgers, prints the totals in the step summary, uploads them, and fails if a
+# mutant survived that the newest ledger under docs/reports/ does not list as a survivor: a new
+# survivor is either a new hole (owed a test) or a new equivalent (owed a reason in the ledger),
+# and either way the number changed. Classifying it is a person's job; noticing it is this one's.
+name: Mutants
+
+on:
+  schedule:
+    - cron: "41 5 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - src/nemisis/sqlite_runner.py::_require_only_the_store_wrote
+          - src/nemisis/sqlite_runner.py::_finish_replay
+          - src/nemisis/crash_models.py::AttemptReceipt.evidence_is_coherent
+          - src/nemisis/sqlite_runner.py::_attributed_probe
+          - src/nemisis/crashcheck.py::_schedule_split
+          - src/nemisis/sqlite_runner.py::_HEADER_PRAGMAS
+          - src/nemisis/crash_models.py::classify_final
+          - src/nemisis/sqlite_runner.py::_read_content
+          - src/nemisis/sqlite_runner.py::_require_unchanged
+          - src/nemisis/sqlite_runner.py::_kill_and_wait
+          - src/nemisis/crash_models.py::classify_delivery
+          - src/nemisis/sqlite_runner.py::_xattrs
+          - src/nemisis/sqlite_runner.py::_SEED_MODE
+    name: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.29"
+          python-version: "3.12"
+      - run: uv sync --frozen --dev
+      - name: Flip every operator of the target and run the selection against each
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          uv run python tools/mutants.py --target "$TARGET" \
+            --tests tests/test_scenario.py tests/test_crash_models.py tests/test_sqlite_runner.py \
+                    tests/test_inventory_scenario.py tests/test_crashcheck.py tests/test_verdict_paths.py \
+            --out "$RUNNER_TEMP/ledger.json"
+          echo "name=$(echo "$TARGET" | tr '/:' '__')" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: ledger-${{ env.name }}
+          path: ${{ runner.temp }}/ledger.json
+          if-no-files-found: error
+          retention-days: 90
+
+  compare:
+    needs: mutate
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          pattern: ledger-*
+          path: ledgers
+      - name: Compare every survivor with the newest published ledger
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 - <<'EOF' | tee -a "$GITHUB_STEP_SUMMARY"
+          import glob, json, re, sys
+          ledger = sorted(glob.glob("docs/reports/*-mutation-ledger.md"))[-1]
+          known = set(re.findall(r"^\| \d+ \| (`[^|]*`) \| survived \|", open(ledger).read(), re.M))
+          results = [r for p in sorted(glob.glob("ledgers/*/ledger.json")) for r in json.load(open(p))["results"]]
+          counts = {s: sum(r["status"] == s for r in results) for s in ("killed", "survived", "timeout")}
+          print(f"## Mutants\n\n{len(results)} run: {counts}; the published ledger is `{ledger}`\n")
+          unlisted = [r for r in results if r["status"] != "killed"
+                      and "`" + r["description"][:80].replace("`", "'") + "`" not in known]
+          for r in unlisted:
+              print(f"- NEW SURVIVOR `{r['target']}:{r['line']}` {r['operator']} `{r['description'][:80]}` ({r['status']})")
+          sys.exit(1 if unlisted else 0)
+          EOF
+      - name: Every target's job must have finished
+        if: needs.mutate.result != 'success'
+        run: |
+          echo "a target's job failed or timed out (${{ needs.mutate.result }}); its ledger is partial" >&2
+          exit 1
