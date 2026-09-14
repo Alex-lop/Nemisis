@@ -64,6 +64,13 @@ after a push to `main` that changed what the action runs without moving the pin,
 bump itself, with auto-merge, once the repository setting "Allow GitHub Actions to create and
 approve pull requests" is on. Never move the pin to a commit that is not in `main`'s history.
 
+`tools/mutants.py` is the checker of the checker: it flips one operator at a time in the kernel's
+refusal functions and runs the fast-to-slow test selection against each. Its results are the
+mutation ledger under `docs/reports/`; a survivor there is either provably equivalent, with the
+reason, or a hole owed a test. `.github/workflows/mutants.yml` reruns the thirteen targets monthly
+(and on demand) and fails when a mutant survives that the newest ledger does not list, so the
+number cannot rot unseen; a new survivor is classified by reading it, never by relabelling.
+
 ## Truth labels
 
 `LOCAL`, `FIXTURE`, `MOCKED`, `BLOCKED`, and `LIVE` are not interchangeable. A pull request that
