@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -30,6 +32,7 @@ from nemisis.crash_models import (
     CrashObservation,
     CrashVerdict,
     ExecutionStatus,
+    IntegrityStatus,
     RetryContract,
     WorldRole,
 )
@@ -45,6 +48,12 @@ from nemisis.crashcheck import (
 from nemisis.hashing import canonical_json
 from nemisis.models import TruthLabel
 from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
+from nemisis.sqlite_runner import (
+    _AttemptFailure,
+    _attributed_probe,
+    _ledger,
+    _seed_database,
+)
 
 TARGET = "app.credits:apply_credit"
 
@@ -2184,3 +2193,70 @@ def test_a_private_reader_left_open_does_not_cost_an_honest_handler_its_verdict(
 
     assert result.verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE, result.summary
     assert result.integrity_status.value == "VALID"
+
+
+# The log the probe pins is the one the ledger recorded, however short. A stray byte beside the
+# database before the first commit is a one-byte log with no frames (the wal-index is gone, so
+# the read calls its frames' end min(size, 32) and the lengths agree), and the next commit does
+# not append to that byte, it overwrites it with a real log header. One byte is a log.
+def test_a_one_byte_write_ahead_log_is_a_log_the_probe_still_reads(tmp_path: Path) -> None:
+    """Pins the prefix rule's floor: it runs for every log the ledger recorded, down to a single
+    byte. Raise the floor to two bytes and the rewrite of a one-byte log goes unexamined, and a
+    handler that overwrote the log before its first commit keeps its verdict."""
+    event = {"account_id": "acct_7", "amount_cents": 2500, "event_id": "evt_1042"}
+    database = tmp_path / "probe.sqlite3"
+    _seed_database(CREDIT, database, event)
+
+    wal = database.with_name(database.name + "-wal")
+    wal.write_bytes(b"\x00")
+    database.with_name(database.name + "-shm").unlink(missing_ok=True)
+    recorded = _ledger(CREDIT, database, event)
+    assert recorded.content["file"]["wal"] == {  # type: ignore[index]
+        "sha256": hashlib.sha256(b"\x00").hexdigest(),
+        "size": 1,
+        "frames_size": 1,
+    }
+
+    with sqlite3.connect(database) as connection:
+        connection.execute("INSERT INTO processed_events(event_id) VALUES ('evt_1042')")
+        connection.commit()
+    assert wal.read_bytes()[:1] != b"\x00"
+
+    with pytest.raises(_AttemptFailure, match="first 1 bytes changed") as refused:
+        _attributed_probe(CREDIT, database, event, recorded, {"operation": "mark_processed"})
+    assert refused.value.status is ExecutionStatus.INTEGRITY_ERROR
+    assert refused.value.integrity is IntegrityStatus.INVALID
+
+
+# The lens aimed between two commits: the log is rewritten in place, at the same length, inside a
+# frame the store's own commit wrote. Nothing grows, nothing shrinks, the wal-index still says
+# where the frames end, and the rows still read as the operation predicts. Only the prefix rule
+# sees it, and only because a store commit may append and may do nothing else.
+WAL_FRAME_OVERWRITE_BETWEEN_COMMITS = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    with open(str(store._database) + "-wal", "r+b") as handle:
+        handle.seek(32 + 24 + 2000)
+        handle.write(b"NEMISIS-MARKER!!")
+    store.mark_processed(event["event_id"])
+"""
+
+
+def test_a_log_rewritten_in_place_between_two_commits_costs_the_candidate_its_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Pins the prefix rule itself, the one refusal that survives a rewrite which changes no
+    length: the frames the ledger recorded must still hash to what it recorded. Drop the rule, or
+    ask for a shrunken log as well as a changed prefix, and sixteen bytes rewritten inside a
+    committed frame between two store calls earn FIX_PROVEN_FOR_THIS_CAPSULE."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "wal-rewrite-between-commits", WAL_FRAME_OVERWRITE_BETWEEN_COMMITS)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert result.integrity_status.value == "INVALID"
+    assert "bytes changed across" in result.summary, result.summary
+    assert "a store commit only appends frames" in result.summary, result.summary
+    assert cli._exit_code(result.verdict) == 2
