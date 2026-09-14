@@ -8,11 +8,12 @@ import socket
 import sqlite3
 import subprocess
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import closing, contextmanager, suppress
 from datetime import UTC, datetime
 from pathlib import Path
 from time import monotonic, sleep
+from types import SimpleNamespace
 from typing import cast
 
 import pytest
@@ -42,14 +43,17 @@ from nemisis.sqlite_runner import (
     _finish_replay,
     _kill_and_wait,
     _ledger,
+    _make_sandbox,
     _probe,
     _read_content,
     _read_only,
     _receive,
+    _require_only_the_store_wrote,
     _require_unchanged,
     _seed_database,
     _Spawn,
     _spawn_receipt,
+    _stat_entry,
     _xattrs,
     bind_anchor,
     capsule_event,
@@ -776,3 +780,167 @@ def test_a_replay_worker_that_exits_nonzero_after_done_is_a_replay_error(tmp_pat
 
     assert failure.value.status is ExecutionStatus.REPLAY_ERROR
     assert failure.value.detail == "replay worker returned nonzero"
+
+
+def test_the_world_audit_names_a_removed_home_before_a_touched_sandbox(tmp_path: Path) -> None:
+    """`home` and `sandbox` sit at the same depth, so the order the audit walks them in is what
+    decides which refusal a judge reads. Depth alone leaves the tie to the order the entries
+    happened to be recorded in, and the run names a permission bit on `sandbox` while a whole
+    removed HOME goes unreported. The path name breaks the tie, and the removal is named."""
+    world = _make_sandbox(tmp_path / "world")
+    (world.root / "home").rmdir()
+    (world.root / "sandbox").chmod(0o700)
+
+    with pytest.raises(_AttemptFailure) as failure:
+        _require_only_the_store_wrote(world, world.root / "sandbox" / "cwd" / "store.sqlite3")
+
+    assert failure.value.status is ExecutionStatus.UNSUPPORTED
+    assert failure.value.detail == (
+        "the handler removed home from its world; that is durable state no store commit made, "
+        "so no verdict is issued"
+    )
+    assert "sandbox" not in failure.value.detail
+
+
+def test_a_sidecar_replaced_by_a_directory_is_state_no_store_commit_made(tmp_path: Path) -> None:
+    """The store's own `-wal` and `-shm` names are excluded from the extra-entry scan, because
+    SQLite creates and removes them for legitimate reasons. That exclusion is a hole a handler
+    can park durable state in: a directory or a FIFO at a sidecar name is not the store's
+    sidecar, and this kind check is the only refusal in the audit that ever looks at it."""
+    event = {"account_id": "acct_7", "amount_cents": 2500, "event_id": "evt_1042"}
+    world = _make_sandbox(tmp_path / "world")
+    database = world.root / "sandbox" / "cwd" / "store.sqlite3"
+    _seed_database(CREDIT, database, event)
+    world = world.with_database(database)
+
+    database.with_name(f"{database.name}-shm").mkdir()
+
+    with pytest.raises(_AttemptFailure) as failure:
+        _require_only_the_store_wrote(world, database)
+
+    assert failure.value.status is ExecutionStatus.UNSUPPORTED
+    assert failure.value.detail == (
+        "the handler replaced sandbox/cwd/store.sqlite3-shm with something that is not a regular "
+        "file; that is durable state no store commit made, so no verdict is issued"
+    )
+
+
+def test_xattrs_answers_through_the_os_door_when_the_build_has_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """On a CPython built with `os.listxattr` that door is the one `_xattrs` answers through, and
+    it must answer with the names, sorted, read without following the symlink. A branch that
+    makes the call and then reports nothing is the inert reader the third hostile review found,
+    moved one platform over: on Linux every world would then compare equal."""
+    path = tmp_path / "flagged"
+    path.write_bytes(b"")
+    seen: list[tuple[str, bool]] = []
+
+    def listxattr(target: object, *, follow_symlinks: bool = True) -> list[str]:
+        seen.append((os.fspath(cast(Path, target)), follow_symlinks))
+        return ["user.nemisis.seen", "user.nemisis.flag"]
+
+    monkeypatch.setattr(os, "listxattr", listxattr, raising=False)
+
+    assert _xattrs(path) == ["user.nemisis.flag", "user.nemisis.seen"]
+    assert seen == [(str(path), False)]
+
+
+def test_a_world_entry_on_a_platform_with_neither_xattr_door_reads_as_having_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Neither `os.listxattr` nor darwin's libc: a platform the kernel cannot ask about extended
+    attributes still has to produce an entry, and "no door" has to read as "no attributes", not
+    as "no answer". An entry that answers with nothing at all is not a comparable world, and the
+    audit that compares it raises a TypeError instead of a verdict."""
+    monkeypatch.delattr(os, "listxattr", raising=False)
+    monkeypatch.setattr(sys, "platform", "sunos5")
+    path = tmp_path / "world"
+    path.mkdir()
+
+    entry = _stat_entry(path, pin_mtime=False)
+
+    assert entry.kind == "dir"
+    assert entry.xattrs == ()
+
+
+def _use_the_libc_xattr_door(
+    monkeypatch: pytest.MonkeyPatch, call: Callable[[bytes, object, int, int], int]
+) -> None:
+    """Send `_xattrs` down the macOS branch, with `call` standing in for libc's `listxattr`."""
+    monkeypatch.delattr(os, "listxattr", raising=False)
+    monkeypatch.setattr(sys, "platform", "darwin")
+    monkeypatch.setattr(ctypes, "CDLL", lambda *_a, **_k: SimpleNamespace(listxattr=call))
+
+
+def test_xattrs_reads_a_file_with_no_attributes_through_the_libc_door_as_clean(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Zero is what libc answers for a file with no extended attributes, and it is not an error.
+    A guard that treats the size answer as a failure at zero turns every clean file on macOS into
+    an OSError with errno 0, and the audit refuses a world that nothing wrote to."""
+    path = tmp_path / "plain"
+    path.write_bytes(b"")
+
+    def listxattr(encoded: bytes, buffer: object, size: int, options: int) -> int:
+        return 0
+
+    _use_the_libc_xattr_door(monkeypatch, listxattr)
+
+    assert _xattrs(path) == []
+
+
+def test_xattrs_answers_a_zero_length_listing_without_reading_the_path_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """libc is asked for the size first and for the names second, and the two calls are not one
+    atomic read: a handler that unlinks its own file between them turns the second into ENOENT.
+    When the first call already said "no extended attributes" there is nothing left to fetch, so
+    returning on the zero is what keeps a clean file reported as clean instead of as a failed
+    read that stops the run."""
+    path = tmp_path / "vanishing"
+    path.write_bytes(b"")
+    sizes: list[int] = []
+    libc = ctypes.CDLL(None, use_errno=True)
+    real = libc.listxattr
+    real.restype = ctypes.c_ssize_t
+    real.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int]
+
+    def listxattr(encoded: bytes, buffer: object, size: int, options: int) -> int:
+        sizes.append(size)
+        if len(sizes) == 1:
+            path.unlink()
+            return 0
+        return int(real(encoded, buffer, size, options))
+
+    _use_the_libc_xattr_door(monkeypatch, listxattr)
+
+    assert _xattrs(path) == []
+    assert sizes == [0]
+
+
+def test_xattrs_tells_a_listing_that_shrank_apart_from_a_read_that_failed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The names come back from a second call, and what it answers is either a length or a
+    failure. Both arms are staged here, because confusing them costs the audit in both
+    directions: a handler that removed its attribute between the two calls answers zero, and
+    that is a clean file and not a refusal, while the -1 of a real failure must stop the run
+    instead of being read as a length that slices the buffer into a shorter listing."""
+    path = tmp_path / "shrinking"
+    path.write_bytes(b"")
+
+    def libc_answering(second: int) -> Callable[[bytes, object, int, int], int]:
+        answers = iter([len(b"user.nemisis.seen\0"), second])
+
+        def listxattr(encoded: bytes, buffer: object, size: int, options: int) -> int:
+            return next(answers)
+
+        return listxattr
+
+    _use_the_libc_xattr_door(monkeypatch, libc_answering(0))
+    assert _xattrs(path) == []
+
+    _use_the_libc_xattr_door(monkeypatch, libc_answering(-1))
+    with pytest.raises(OSError):
+        _xattrs(path)

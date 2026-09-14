@@ -321,11 +321,16 @@ def _pytest(root: Path, tests: Sequence[str], timeout: float) -> tuple[str, str 
     output = done.stdout + done.stderr
     if done.returncode == 0:
         return "survived", None, seconds, output
-    return "killed", _first_failure(output), seconds, output
+    killed_by = _first_failure(output)
+    if done.returncode != 1 or killed_by is None:
+        # pytest exits 1 for a failing test; anything else (a collection error, an interpreter
+        # that could not start, a machine out of memory) is not evidence against the mutant.
+        return "error", None, seconds, output
+    return "killed", killed_by, seconds, output
 
 
 def _machine_noise(status: str, output: str) -> bool:
-    return status == "timeout" or any(marker in output for marker in _FLAKY_MARKERS)
+    return status in ("timeout", "error") or any(marker in output for marker in _FLAKY_MARKERS)
 
 
 def _run_one(
@@ -447,6 +452,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "killed": sum(1 for item in results if item["status"] == "killed"),
             "survived": sum(1 for item in results if item["status"] == "survived"),
             "timeout": sum(1 for item in results if item["status"] == "timeout"),
+            "error": sum(1 for item in results if item["status"] == "error"),
         }
         arguments.out.parent.mkdir(parents=True, exist_ok=True)
         arguments.out.write_text(json.dumps(ledger, indent=2) + "\n", encoding="utf-8")
