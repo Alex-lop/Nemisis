@@ -4,6 +4,7 @@ agrees with it in both scenario vocabularies."""
 from __future__ import annotations
 
 import ast
+import json
 import sys
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from nemisis.redteam import (
     HAZARD_OPS,
     INVENTORY,
     STORE_OPS,
+    Case,
     Expected,
     Op,
     Vocabulary,
@@ -26,6 +28,7 @@ from nemisis.redteam import (
     run,
     vocabulary_for,
 )
+from nemisis.sqlite_runner import WORKER_TIMEOUT_VARIABLE
 
 G, E, M, A = Op.GUARD, Op.EFFECT, Op.MARK, Op.ATOMIC
 TM, RE = Op.TRY_MARK, Op.RETRY_EFFECT
@@ -239,3 +242,65 @@ def test_the_nightly_shapes_agree_with_the_oracle(
     assert expected is Expected.INCOMPLETE, why
     assert result.verdict.value == expected.value, result.summary
     assert "before the worker exited" in result.summary, result.summary
+
+
+def _case(index: int, expected: Expected, verdict: str, summary: str) -> Case:
+    return Case(index, (A,), False, expected, "why", verdict, summary)
+
+
+def test_a_wall_clock_refusal_is_unknown_not_agreement_and_not_disagreement() -> None:
+    """The machine, not the handler: a summary that names the budget knob is neither side."""
+    timed_out = _case(
+        1,
+        Expected.INCOMPLETE,
+        CrashVerdict.EVIDENCE_INCOMPLETE.value,
+        f"the replay delivery's next store commit did not arrive within 10 s; "
+        f"{WORKER_TIMEOUT_VARIABLE} raises the budget on a slow machine",
+    )
+    assert timed_out.unknown
+    assert timed_out.agrees  # the verdict strings match, which is exactly what must not count
+    assert not timed_out.disagrees
+    real = _case(2, Expected.INCOMPLETE, CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE.value, "proven")
+    assert not real.unknown and real.disagrees
+    fine = _case(3, Expected.PROVEN, CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE.value, "proven")
+    assert not fine.unknown and fine.agrees and not fine.disagrees
+
+
+def test_the_cli_counts_unknown_apart_and_fails_only_above_the_threshold(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import nemisis.redteam as redteam
+
+    cases = [
+        _case(1, Expected.PROVEN, CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE.value, "proven"),
+        _case(
+            2,
+            Expected.PROVEN,
+            CrashVerdict.EVIDENCE_INCOMPLETE.value,
+            f"the census delivery's hello did not arrive within 10 s; {WORKER_TIMEOUT_VARIABLE} "
+            "raises the budget on a slow machine",
+        ),
+    ]
+    monkeypatch.setattr(redteam, "run", lambda *args, **kwargs: cases)
+
+    def main(*extra: str) -> int:
+        out = tmp_path / f"rt-{len(extra)}"
+        argv = ["nemisis", "redteam", "--cases", "2", "--out", str(out), *extra]
+        monkeypatch.setattr(sys, "argv", argv)
+        try:
+            cli.main()
+        except SystemExit as exit_info:
+            return int(exit_info.code or 0)
+        return 0
+
+    assert main() == 1
+    printed = capsys.readouterr().out
+    assert (
+        "0 disagreements; 1 unknown (the kernel ran out of wall clock; --max-unknown 0)" in printed
+    )
+    assert "case 2: UNKNOWN, the machine:" in printed
+    assert main("--max-unknown", "1") == 0
+    assert main("--max-unknown", "1", "--json") == 0
+    payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert payload["unknown"] == 1 and payload["disagreements"] == 0
+    assert [case["unknown"] for case in payload["cases"]] == [False, True]

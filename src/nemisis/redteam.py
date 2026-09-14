@@ -31,6 +31,7 @@ from pathlib import Path
 from nemisis.crash_models import CrashVerdict
 from nemisis.crashcheck import check
 from nemisis.scenarios import scenario_for
+from nemisis.sqlite_runner import WORKER_TIMEOUT_VARIABLE
 
 
 class Op(StrEnum):
@@ -526,6 +527,21 @@ class Case:
     @property
     def agrees(self) -> bool:
         return self.verdict == self.expected.value
+
+    @property
+    def unknown(self) -> bool:
+        """The machine, not the handler: the kernel ran out of wall clock and said so.
+
+        Every wall-clock refusal in the kernel names the budget knob, so a summary that names it
+        is a load-induced ``EVIDENCE_INCOMPLETE``, which is neither agreement nor disagreement:
+        counted as agreement it would hide a real disagreement the oracle expected to be
+        incomplete, and counted as disagreement it would blame the checker for a slow runner.
+        """
+        return WORKER_TIMEOUT_VARIABLE in self.summary
+
+    @property
+    def disagrees(self) -> bool:
+        return not self.agrees and not self.unknown
 
 
 def run(cases: int, seed: int, out: Path, scenario_id: str = CREDIT.scenario_id) -> list[Case]:
