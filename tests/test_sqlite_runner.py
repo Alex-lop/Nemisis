@@ -549,8 +549,9 @@ def test_a_write_after_the_worker_died_forfeits_the_post_kill_checkpoint(tmp_pat
     assert failure.value.status is ExecutionStatus.INTEGRITY_ERROR
     assert failure.value.integrity is IntegrityStatus.INVALID
     assert failure.value.detail == (
-        "durable checkpoint changed after worker death: rows that belong to other accounts "
-        "or events changed (or this event's own rows did) in credit_ledger"
+        "durable checkpoint changed after worker death: rows that belong to other accounts or "
+        "events changed (or this event's own rows did) in credit_ledger; the write-ahead log "
+        "changed with no store commit to explain it"
     )
 
 
@@ -746,8 +747,9 @@ def test_a_replay_worker_that_reports_done_and_does_not_exit_runs_out_of_time(
 
     assert failure.value.status is ExecutionStatus.TIMEOUT
     assert failure.value.detail == (
-        "the replay delivery worker reported done but did not exit within 1 s; a non-daemon "
-        "thread or child kept it alive"
+        "the replay delivery worker did not exit within 1 s of its release; a non-daemon thread "
+        "or child kept it alive, or the store's close took longer; NEMISIS_WORKER_TIMEOUT_SECONDS "
+        "raises the budget on a slow machine"
     )
 
 
