@@ -73,8 +73,10 @@ count its header states), reads all of it at that instant, and refuses anything 
 reads again after the kill, after the worker's final message while the worker still holds its
 store connection open (closing that connection checkpoints the WAL, and a checkpoint truncates
 the file to its page count, so a read that waited for the exit missed bytes a handler appended
-after its last commit; the nightly red team found that on 2026-09-08 and the worker now exits
-only when released), and once more after the worker has exited. The seed leaves the file in WAL
+after its last commit; the nightly red team found that on 2026-09-08, the worker now exits
+only when released, and the store's connection never checkpoints on close, so what a handler
+wrote to the file outlives the worker whenever the garbage collector closes that connection),
+and once more after the worker has exited. The seed leaves the file in WAL
 mode so the journal bits are constant for the run. A handler that moves money through its own
 SQLite connection, creates a table for its dedup flag, stores a flag in a header field (read or
 reserved), in a rowid, in the free-page count, or in bytes past the last page, re-points a ledger

@@ -16,7 +16,7 @@ Committed hero evidence (regenerated 2026-09-07 at engine `c339aa9`, the third h
 
 Current tree:
 
-- engine code digest: `00f25f238193cd6f1c203fe483d5b91fbdab78cca7b4d3169db743e0eefd61ed`
+- engine code digest: `bda984236ee2591fad3daa63a1f0f6858deda32ff28a881234a69dc2756ffcd3`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
@@ -116,7 +116,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 554 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 555 tests, and package build: pass locally on
   Python 3.12.13; CI runs the same gate on CPython 3.12, 3.13, and 3.14 (the 3.14 leg first ran
   green on a real runner at
   [run 34093138705](https://github.com/Alex-lop/Nemisis/actions/runs/34093138705), where the only

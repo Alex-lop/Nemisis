@@ -147,6 +147,14 @@ def connect(path: Path) -> sqlite3.Connection:
         connection.close()
         raise sqlite3.OperationalError("worker could not enable WAL")
     connection.execute("PRAGMA synchronous=FULL")
+    # Closing the last connection would checkpoint the WAL, and a checkpoint that backfills
+    # frames truncates the file to its page count, which erased bytes a handler appended past
+    # the last page before the controller could read them; when that close happens is decided
+    # by CPython's cyclic garbage collector, not by the handler. The store's connection never
+    # checkpoints on close, so what a handler wrote to the file outlives the worker and the
+    # controller reads it. The sidecars it leaves are the store's own, and the world scan allows
+    # them by name.
+    connection.setconfig(sqlite3.SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, True)
     return connection
 
 

@@ -482,6 +482,18 @@ above: the channel was never usable as a flag. What it does not establish is tha
 bless a write it can see. The third refuter's lens was SQLite itself; its finding is in
 MORNING.md's ledger.
 
+The third refuter's lens was SQLite itself, and it found the gap in the fix as first written:
+the read before the exit is one checkpoint away from blind, because the store's connection can
+be closed by the garbage collector between the append and the final message, and that close
+checkpointed. A handler that appends and then calls `gc.collect()` earned
+`FIX_PROVEN_FOR_THIS_CAPSULE` on the branch. So the store's connection is opened with
+`SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE`: it never checkpoints on close, the appended bytes outlive the
+worker no matter when the connection closes, and the read after the exit sees them as well as
+the read before it. The sidecars a world is left with are the store's own, which the world scan
+already allows by name. The one checkpoint that remains is SQLite's automatic one inside a store
+commit when the WAL passes a thousand pages, and a write it erases was reverted before the next
+store commit, which is the boundary SECURITY already names.
+
 Two decisions about the nightly itself. A case whose summary names the wall-clock budget
 (`NEMISIS_WORKER_TIMEOUT_SECONDS`) is the machine, not the handler: `nemisis redteam` now counts it
 as `unknown`, apart from agreement and disagreement, prints it, and fails above `--max-unknown`
