@@ -162,7 +162,8 @@ def connect(path: Path) -> sqlite3.Connection:
     # so the main database file is byte-identical to the seed for the whole delivery and the
     # controller pins it whole (a flag in the header's change counter, which a checkpoint would
     # rewrite and the probe used to mask, is caught at the next commit). The store's close, after
-    # the controller's release, is the only checkpoint.
+    # the controller's release, is the only checkpoint the store runs; one a handler runs itself
+    # changes the main file and is refused.
     connection.execute("PRAGMA wal_autocheckpoint=0")
     return connection
 

@@ -52,7 +52,7 @@ TREE_DIGESTS: Mapping[str, str] = {
     "never-marks": "7a9fda4e62e304c3aaa604b97ee1ea4f68c92edbe3fc1e90228b01af6dcd862d",
     "raw-sql": "09e6dc5d9abafa8736c934516a30a9811b53f710b07fe19bff6882cfdc88bc67",
     "shadow-table": "b24b45be51d7380e9ffe582f6d3cdd4e5a92acca1ab15d9b62cd231aa0a8abdf",
-    "tail-bytes": "112c9084ae46f32b81d745899b7b6373b236bea31d2c75f5feb186b9ddc77596",
+    "tail-bytes": "0aca18aed86aa53cef268bc38474d89d4e869d1050d6de15dbd1c39908af571e",
 }
 
 # What a handler that wrote around the store is told, on the first run, in the summary and report.

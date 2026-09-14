@@ -1984,11 +1984,95 @@ def apply_credit(store, event):
 """
 
 
+# Round two of the lenses aimed at the read after the exit, which follows the store's own
+# checkpoint and used to compare only a masked header. An exit hook runs after the release and
+# the close: it appends a whole page and bumps the header's page count; it writes the change
+# counter the checkpoint just rewrote; it writes into the log. The file after the exit must now
+# be the logical image the last read saw through the log, and the log must be empty.
+EXIT_HOOK_PAGE = """import atexit
+
+
+def _append_page(path):
+    with open(path, "r+b") as handle:
+        header = bytearray(handle.read(100))
+        pages = int.from_bytes(header[28:32], "big")
+        handle.seek(0, 2)
+        handle.write(b"\\x5a" * 4096)
+        handle.seek(28)
+        handle.write((pages + 1).to_bytes(4, "big"))
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    atexit.register(_append_page, str(store._database))
+"""
+
+EXIT_HOOK_CHANGE_COUNTER = """import atexit
+
+
+def _flag(path):
+    with open(path, "r+b") as handle:
+        handle.seek(24)
+        handle.write(b"\\xde\\xad\\xbe\\xef")
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    atexit.register(_flag, str(store._database))
+"""
+
+EXIT_HOOK_SIDECAR = """import atexit
+
+
+def _sidecar(path):
+    with open(path + "-wal", "wb") as handle:
+        handle.write(b"\\x5a" * 32)
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    atexit.register(_sidecar, str(store._database))
+"""
+
+# Sixteen bytes overwritten inside a frame the store already wrote: the log's length is its
+# frames' and SQLite's checkpoint would copy the page into the main file. The log may only grow.
+WAL_FRAME_OVERWRITE = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    with open(str(store._database) + "-wal", "r+b") as handle:
+        handle.seek(32 + 24 + 2000)
+        handle.write(b"NEMISIS-MARKER!!")
+"""
+
+# A decoy connection handed to the store's close: the real one is never closed at the protocol
+# point, so the sidecars outlive the worker.
+CONNECTION_SWAP = """import sqlite3
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    store._connection = sqlite3.connect(":memory:")
+"""
+
+
 @pytest.mark.parametrize(
     ("name", "source", "fragment"),
     [
         ("change-counter-flag", CHANGE_COUNTER_FLAG, "a header field a checkpoint rewrites"),
         ("own-checkpoint-after-tail", OWN_CHECKPOINT_AFTER_TAIL, "with no store commit to explain"),
+        ("exit-hook-page", EXIT_HOOK_PAGE, "is not the"),
+        ("exit-hook-change-counter", EXIT_HOOK_CHANGE_COUNTER, "is not the"),
+        ("exit-hook-sidecar", EXIT_HOOK_SIDECAR, "write-ahead log still holds"),
+        ("wal-frame-overwrite", WAL_FRAME_OVERWRITE, "write-ahead log"),
         ("wal-tail-after-commit", WAL_TAIL_AFTER_COMMIT, "write-ahead log is"),
         ("wal-garbage-before-commit", WAL_GARBAGE_BEFORE_COMMIT, "write-ahead log is"),
     ],

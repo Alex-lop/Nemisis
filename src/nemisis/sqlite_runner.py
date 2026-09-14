@@ -987,15 +987,12 @@ class _Ledger:
 def _file_identity(path: Path) -> dict[str, object]:
     """The database file itself, and the write-ahead log beside it.
 
-    During a delivery the main file never changes: every store commit lives in the WAL (automatic
-    checkpoints are off), so its whole content is pinned by digest and length. After the worker's
-    exit its close checkpoints the WAL, which rewrites three header fields (the change counter,
-    the page count, the version-valid-for number) and extends the file; for that one read the
-    header is compared with those fields blanked and the length against the header's own page
-    count. A flag in any header byte, in the reserved bytes, or past the last page is therefore
-    caught at the next commit, after a kill, and at the worker's final message, and a flag in the
-    three rewritten fields is caught everywhere but after the exit, where a checkpoint has just
-    overwritten it.
+    During a delivery no automatic checkpoint runs, so the main file's whole content is pinned by
+    digest and length at every commit, after a kill, and at the worker's final message; a
+    checkpoint a handler runs itself changes the file and is the refused write. After the
+    worker's exit its close checkpoints the WAL: the file must then be exactly the logical image
+    the last read saw through the log (``_require_image``), and no sidecar may remain. The masked
+    header and the page-count rule are kept for the sentence that names what moved.
 
     The WAL is the store's own sidecar and grows only at store commits; its length must be exactly
     its header plus the frames the wal-index says it holds, so bytes appended past the last frame
@@ -1021,36 +1018,81 @@ def _file_identity(path: Path) -> dict[str, object]:
 
 
 def _wal_identity(path: Path, page_size: int) -> dict[str, object]:
-    """The write-ahead log's length, and the length its frame count says it should have."""
+    """The write-ahead log beside the file: its bytes, its length, and the length its frame
+    count says it should have (the wal-index header in the shm sidecar, native byte order:
+    iVersion, unused, iChange, isInit, bigEndCksum, szPage, mxFrame, nPage, ...). Opening a
+    connection creates an empty log and an shm before any commit, so an empty log is no log."""
     wal = path.with_name(path.name + "-wal")
     shm = path.with_name(path.name + "-shm")
     try:
-        size = wal.stat().st_size
+        with open(wal, "rb") as handle:
+            data = handle.read()
     except FileNotFoundError:
-        return {"size": 0, "frames_size": 0}
+        data = b""
+    if not data:
+        return {"sha256": "", "size": 0, "frames_size": 0}
     frames = 0
     try:
         with open(shm, "rb") as handle:
             index = handle.read(48)
         if len(index) == 48:
-            # WalIndexHdr, native byte order: iVersion, unused, iChange, isInit, bigEndCksum,
-            # szPage, mxFrame, nPage, ...
             frames = int.from_bytes(index[16:20], sys.byteorder)
     except FileNotFoundError:
         frames = 0
-    frames_size = 32 + frames * (24 + page_size) if frames else min(size, 32)
-    return {"size": size, "frames_size": frames_size}
+    frames_size = 32 + frames * (24 + page_size) if frames else min(len(data), 32)
+    return {
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size": len(data),
+        "frames_size": frames_size,
+    }
+
+
+def _wal_prefix_digest(path: Path, length: int) -> str:
+    """The digest of the write-ahead log's first ``length`` bytes, or "" if it is shorter."""
+    wal = path.with_name(path.name + "-wal")
+    try:
+        with open(wal, "rb") as handle:
+            data = handle.read(length)
+    except FileNotFoundError:
+        return ""
+    return hashlib.sha256(data).hexdigest() if len(data) == length else ""
 
 
 def _after_exit(content: dict[str, object]) -> dict[str, object]:
-    """What can still be compared once the worker's close has checkpointed the WAL: the content,
-    the header with the three rewritten fields blanked, and the length rule; not the whole-file
-    digest and not the WAL, which the checkpoint rewrote and removed."""
-    file = cast(dict[str, object], content["file"])
-    return {
-        **content,
-        "file": {"header": file["header"], "bytes_beyond_pages": file["bytes_beyond_pages"]},
-    }
+    """Once the worker's close has checkpointed the WAL, the content is still comparable; the
+    file itself is compared against the logical image the last read saw (see _require_image)."""
+    return {name: value for name, value in content.items() if name != "file"}
+
+
+def _require_image(
+    scenario: Scenario, observed: dict[str, object], ledger: dict[str, object]
+) -> None:
+    """After a clean exit the main file must be exactly the logical database the last read saw
+    through the WAL (SQLite's own serialization of it), and the log must be empty: the close's
+    checkpoint writes that image and empties the log, so anything else was written after the
+    worker's last reported commit, by an exit hook, a thread, a child, or a decoy close."""
+    file = cast(dict[str, object], observed["file"])
+    wanted = cast(dict[str, object], ledger["file"])
+    wal = cast(dict[str, object], file["wal"])
+    problems: list[str] = []
+    if file["sha256"] != wanted["image_sha256"] or file["size"] != wanted["image_size"]:
+        problems.append(
+            f"the database file is not the {wanted['image_size']}-byte image the last read saw "
+            f"through the write-ahead log (it is {file['size']} bytes)"
+        )
+    # The close leaves an empty log and the shm behind on some builds (the seed deletes the same
+    # two); an empty log carries nothing, and the shm's bytes are on the honest list.
+    if cast(int, wal["size"]) > 0:
+        problems.append(f"the write-ahead log still holds {wal['size']} bytes after the close")
+    if problems:
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            "the database changed after the worker's last reported store commit and after the "
+            "worker exited; something wrote around the trusted store (an exit hook, a thread, a "
+            f"child, or a connection the store did not close): {'; '.join(problems)}. "
+            + scenario.store_remedy,
+            integrity=IntegrityStatus.INVALID,
+        )
 
 
 def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -> dict[str, object]:
@@ -1074,17 +1116,22 @@ def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -
                 name: [[_json_safe(value) for value in row] for row in rows]
                 for name, rows in scenario.tables(connection).items()
             }
+            # The logical database as SQLite sees it through the log: what a checkpoint writes.
+            image = connection.serialize()
     except (sqlite3.Error, OSError) as error:
         raise _AttemptFailure(
             ExecutionStatus.PROBE_ERROR, f"read-only state probe failed ({error})"
         ) from error
-    wal = cast(dict[str, int], identity["wal"])
+    identity["image_sha256"] = hashlib.sha256(image).hexdigest()
+    identity["image_size"] = len(image)
+    wal = cast(dict[str, object], identity["wal"])
     if wal["size"] != wal["frames_size"]:
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
-            f"the database's write-ahead log is {wal['size']} bytes but its frames end at "
-            f"{wal['frames_size']}; something wrote to the store's sidecar around the store, and "
-            "a later worker could read what SQLite ignores. " + scenario.store_remedy,
+            f"the database's write-ahead log is {wal['size']} bytes and its wal-index says its "
+            f"frames end at {wal['frames_size']}; something wrote to the store's sidecar around "
+            "the store, and a later worker could read what SQLite ignores. "
+            + scenario.store_remedy,
             integrity=IntegrityStatus.INVALID,
         )
     return {"file": identity, "header": header, "schema": schema, "tables": tables}
@@ -1140,6 +1187,8 @@ def _file_difference(expected: dict[str, object], observed: dict[str, object]) -
         return "a header field no store commit rewrites changed (the reserved bytes or a pragma)"
     if after.get("wal") != before.get("wal"):
         return "the write-ahead log changed with no store commit to explain it"
+    if after.get("image_sha256") != before.get("image_sha256"):
+        return "the database's logical image changed with no store commit to explain it"
     return (
         "the database file's bytes changed with no store commit to explain them (a header field "
         "a checkpoint rewrites, or a page written around the store)"
@@ -1483,6 +1532,7 @@ def _finish_replay(
     if return_code != 0:
         raise _AttemptFailure(ExecutionStatus.REPLAY_ERROR, "replay worker returned nonzero")
     observed = _ledger(scenario, database, event)
+    _require_image(scenario, observed.content, ledger.content)
     if sha256_json(_after_exit(observed.content)) != sha256_json(_after_exit(ledger.content)):
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
@@ -1521,12 +1571,31 @@ def _attributed_probe(
         )
     predicted_tables = scenario.apply(cast(Tables, ledger.content["tables"]), operation, normalized)
     observed = _ledger(scenario, database, event)
-    # The store's commit appended frames to the WAL, and that is the only growth allowed here;
-    # the main file must be exactly what it was.
+    # The store's commit appended frames to the WAL, and that is the only change allowed here:
+    # the log keeps every byte it had, the main file is exactly what it was, and the logical image
+    # moves with the rows.
     ledger_file = cast(dict[str, object], ledger.content["file"])
     observed_file = cast(dict[str, object], observed.content["file"])
+    before = cast(dict[str, object], ledger_file["wal"])
+    after = cast(dict[str, object], observed_file["wal"])
+    if cast(int, before["size"]) > 0 and (
+        cast(int, after["size"]) < cast(int, before["size"])
+        or _wal_prefix_digest(database, cast(int, before["size"])) != before["sha256"]
+    ):
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            f"the write-ahead log's first {before['size']} bytes changed across {operation}; a "
+            "store commit only appends frames, so something rewrote the log around the store. "
+            + scenario.store_remedy,
+            integrity=IntegrityStatus.INVALID,
+        )
     predicted = {
-        "file": {**ledger_file, "wal": observed_file["wal"]},
+        "file": {
+            **ledger_file,
+            "wal": observed_file["wal"],
+            "image_sha256": observed_file["image_sha256"],
+            "image_size": observed_file["image_size"],
+        },
         "header": ledger.content["header"],
         "schema": ledger.content["schema"],
         "tables": predicted_tables,

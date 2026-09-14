@@ -16,7 +16,7 @@ Committed hero evidence (regenerated 2026-09-07 at engine `c339aa9`, the third h
 
 Current tree:
 
-- engine code digest: `c7253a7f74e97dcc4d9631007e59faad1fe28f61efcdb9437da28e95f82ea31a`
+- engine code digest: `595b765f9dd5d5f21811f1f229ffbcbf5f8d55b600a8d62a3f726e239d3f7f8c`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
@@ -76,7 +76,7 @@ New since 2026-09-05, from `overnight/hardening` and the `overnight2/*` branches
   `tests/test_verdict_paths.py`; the table one ships as `fixture:sqlite-credit-v1/shadow-table`.
   The nightly red team then caught a fourth-round shape on its own: bytes appended past the
   database's last page after the handler's last commit earned a verdict for five nights and
-  `FIX_PROVEN_FOR_THIS_CAPSULE` once (runs 34219859012, 34345065158, 34593382316, 34689225054, 34755449725; ten cases,
+  `FIX_PROVEN_FOR_THIS_CAPSULE` twice, in one run (runs 34219859012, 34345065158, 34593382316, 34689225054, 34755449725; ten cases,
   twenty lines, each case in both scenarios), because SQLite's close-time checkpoint truncated
   the file before the engine's read; the engine now reads after the worker's final message and
   before it may exit, pins the main file whole during a delivery, holds the write-ahead log to
@@ -123,7 +123,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 560 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 564 tests, and package build: pass locally on
   Python 3.12.13; CI runs the same gate on CPython 3.12, 3.13, and 3.14 (the 3.14 leg first ran
   green on a real runner at
   [run 34093138705](https://github.com/Alex-lop/Nemisis/actions/runs/34093138705), where the only
