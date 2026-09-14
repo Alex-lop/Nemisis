@@ -50,35 +50,48 @@ def _git(*args: str) -> str:
     return completed.stdout.strip()
 
 
-def test_the_pinned_engine_is_the_engine_where_this_branch_left_main() -> None:
-    """The pin must not rot: `src/nemisis` at the pinned commit is `src/nemisis` at the commit
-    where this branch left `main` (on `main` itself, HEAD). An engine change on a branch stays
-    green while the branch is open; `main` goes red the moment an engine change lands without the
-    pin following it. `.github/workflows/pin-bump.yml` moves the pin; this test says so when that
-    workflow is off. A shallow clone cannot answer the question and fails here, never skips."""
+# What `uses: Alex-lop/Nemisis@<sha>` actually runs: the engine, the action's contract, and the
+# locked environment it installs. A pin that lags any of these hands a copier a different tool.
+ACTION_RUNTIME = ("src/nemisis", "action.yml", "pyproject.toml", "uv.lock")
+
+
+def test_the_pinned_action_is_main_s_action() -> None:
+    """The pin must not rot. Everywhere: the pinned commit is an ancestor of HEAD, so it lies in
+    this history and not on a stray branch. On `main` itself (HEAD is `origin/main`): the engine,
+    `action.yml`, `pyproject.toml`, and `uv.lock` at the pinned commit are byte-identical to
+    HEAD's, so `main` goes red the moment any of them changes without the pin following. A branch
+    is not held to that, because a branch cannot pin a commit `main` does not have yet; an engine
+    pull request may carry its own bump (pin its last engine commit) or leave the bump to
+    `.github/workflows/pin-bump.yml`, which opens it after the merge. A shallow clone cannot
+    answer the question and fails here; it never skips."""
     pinned = re.findall(
         r"uses: Alex-lop/Nemisis@([0-9a-f]{40})\n", EXAMPLE_WORKFLOW.read_text(encoding="utf-8")
     )
     assert len(pinned) == 1
     pin = pinned[0]
     try:
-        base = _git("merge-base", "HEAD", "origin/main")
-        pinned_engine = _git("rev-parse", f"{pin}:src/nemisis")
-        base_engine = _git("rev-parse", f"{base}:src/nemisis")
+        head = _git("rev-parse", "HEAD")
+        main = _git("rev-parse", "origin/main")
+        _git("cat-file", "-e", f"{pin}^{{commit}}")
     except subprocess.CalledProcessError as error:
         raise AssertionError(
-            "git could not resolve the pinned commit or origin/main; fetch the full history "
-            "(fetch-depth: 0 in CI, `git fetch --unshallow origin` locally): "
+            "git could not resolve HEAD, origin/main, or the pinned commit; fetch the full "
+            "history (fetch-depth: 0 in CI; locally "
+            "`git fetch --unshallow origin +refs/heads/main:refs/remotes/origin/main`): "
             f"{error.stderr.strip()}"
         ) from error
     ancestor = subprocess.run(
-        ["git", "merge-base", "--is-ancestor", pin, base], cwd=ROOT, check=False
+        ["git", "merge-base", "--is-ancestor", pin, head], cwd=ROOT, check=False
     )
-    assert ancestor.returncode == 0, (
-        f"the pinned commit {pin[:12]} is not an ancestor of {base[:12]}"
-    )
-    assert pinned_engine == base_engine, (
-        f"the example pins {pin[:12]}, whose src/nemisis tree ({pinned_engine[:12]}) differs from "
-        f"the tree at {base[:12]} ({base_engine[:12]}), where this branch left main: the pin has "
-        "rotted and pin-bump.yml has not moved it"
+    assert ancestor.returncode == 0, f"the pinned commit {pin[:12]} is not in HEAD's history"
+    if head != main:
+        return  # a branch: the strict comparison belongs to main, where the bot keeps it true
+    differing = [
+        path
+        for path in ACTION_RUNTIME
+        if _git("rev-parse", f"{pin}:{path}") != _git("rev-parse", f"{head}:{path}")
+    ]
+    assert not differing, (
+        f"the example pins {pin[:12]}, but {', '.join(differing)} changed on main since then: "
+        "the pin has rotted and pin-bump.yml has not moved it"
     )
