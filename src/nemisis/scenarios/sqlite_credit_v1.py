@@ -7,7 +7,7 @@ from collections.abc import Mapping
 
 from nemisis.crash_models import CrashVerdict, FaultBoundary, StateSnapshot
 from nemisis.display import money
-from nemisis.scenario import Event, Scenario, StoreBase, Tables
+from nemisis.scenario import Event, Scenario, StoreBase, Tables, connect
 
 SCENARIO_ID = "sqlite-credit-v1"
 SCHEMA = """
@@ -35,14 +35,7 @@ CONTRACT_RESOURCE_DIGEST = "e364533418ea5060fb6abb17b0aa84ab633315d51b7f02646acb
 # raw-sql, which is the textbook fix a judge writes as one SQL transaction and which earns a
 # remedy, not a verdict.
 HERO_VARIANTS = ("buggy", "misleading-green", "atomic")
-ZOO_VARIANTS = (
-    "mark-first",
-    "leftover-credit",
-    "never-marks",
-    "raw-sql",
-    "shadow-table",
-    "tail-bytes",
-)
+ZOO_VARIANTS = ("mark-first", "leftover-credit", "never-marks", "raw-sql", "shadow-table")
 TREE_DIGESTS: Mapping[str, str] = {
     "buggy": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
     "misleading-green": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f",
@@ -52,7 +45,6 @@ TREE_DIGESTS: Mapping[str, str] = {
     "never-marks": "7a9fda4e62e304c3aaa604b97ee1ea4f68c92edbe3fc1e90228b01af6dcd862d",
     "raw-sql": "09e6dc5d9abafa8736c934516a30a9811b53f710b07fe19bff6882cfdc88bc67",
     "shadow-table": "b24b45be51d7380e9ffe582f6d3cdd4e5a92acca1ab15d9b62cd231aa0a8abdf",
-    "tail-bytes": "0aca18aed86aa53cef268bc38474d89d4e869d1050d6de15dbd1c39908af571e",
 }
 
 # What a handler that wrote around the store is told, on the first run, in the summary and report.
@@ -75,16 +67,15 @@ class CreditStore(StoreBase):
 
     def processed(self, event_id: str) -> bool:
         self._require(event_id=event_id)
-        with self._connection as connection:
+        with connect(self._database) as connection:
             row = connection.execute(
                 "SELECT 1 FROM processed_events WHERE event_id = ?", (event_id,)
             ).fetchone()
-        self._settle()
         return row is not None
 
     def credit(self, account_id: str, event_id: str, amount_cents: int) -> None:
         self._require(account_id=account_id, event_id=event_id, amount_cents=amount_cents)
-        with self._connection as connection:
+        with connect(self._database) as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 "UPDATE accounts SET balance_cents = balance_cents + ? WHERE account_id = ?",
@@ -99,7 +90,7 @@ class CreditStore(StoreBase):
 
     def mark_processed(self, event_id: str) -> None:
         self._require(event_id=event_id)
-        with self._connection as connection:
+        with connect(self._database) as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute("INSERT INTO processed_events(event_id) VALUES (?)", (event_id,))
             connection.commit()
@@ -107,7 +98,7 @@ class CreditStore(StoreBase):
 
     def credit_and_mark(self, account_id: str, event_id: str, amount_cents: int) -> None:
         self._require(account_id=account_id, event_id=event_id, amount_cents=amount_cents)
-        with self._connection as connection:
+        with connect(self._database) as connection:
             connection.execute("BEGIN IMMEDIATE")
             if connection.execute(
                 "SELECT 1 FROM processed_events WHERE event_id = ?", (event_id,)

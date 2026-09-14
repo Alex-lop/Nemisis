@@ -34,11 +34,12 @@ Current tree:
   `src/nemisis`, `action.yml`, `pyproject.toml`, or `uv.lock` at the pinned commit differs from
   `main`'s; an engine pull request carries its own bump, and
   [`pin-bump.yml`](../.github/workflows/pin-bump.yml) opens one after any engine merge that did
-  not, once the repository allows Actions to open pull requests; its guard has run on two merges
-  ([34807643729](https://github.com/Alex-lop/Nemisis/actions/runs/34807643729),
-  [34820543033](https://github.com/Alex-lop/Nemisis/actions/runs/34820543033): nothing to bump,
-  both pull requests carried their own), and it has never opened a pull request, because the
-  repository setting is off)
+  not, once the repository allows Actions to open pull requests; its guard has run on every merge
+  since it landed, five so far (the first:
+  [34807643729](https://github.com/Alex-lop/Nemisis/actions/runs/34807643729); the engine merge:
+  [34820543033](https://github.com/Alex-lop/Nemisis/actions/runs/34820543033)), each time "nothing
+  to bump" because the engine pull request carried its own; it has never opened a pull request,
+  because the repository setting is off)
 
 ## Product state
 

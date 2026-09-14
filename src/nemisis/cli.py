@@ -170,16 +170,6 @@ def _parser() -> argparse.ArgumentParser:
         default="sqlite-credit-v1",
         help="which audited scenario's vocabulary the grammar speaks",
     )
-    redteam.add_argument(
-        "--max-unknown",
-        type=_non_negative,
-        default=0,
-        help=(
-            "how many cases may end in a wall-clock refusal (a world's execution status is "
-            "TIMEOUT) before the run fails; those are the machine, not the checker, and are "
-            "counted apart from disagreements"
-        ),
-    )
     redteam.add_argument("--json", action="store_true")
 
     doctor_command = commands.add_parser("doctor", help="check CrashCheck prerequisites")
@@ -482,13 +472,6 @@ def _fail(message: str, *, as_json: bool = False, crashcheck: bool = True) -> No
     raise SystemExit(2)
 
 
-def _non_negative(value: str) -> int:
-    number = int(value)
-    if number < 0:
-        raise argparse.ArgumentTypeError("--max-unknown must be 0 or more")
-    return number
-
-
 def main() -> None:
     args = _parser().parse_args()
     try:
@@ -608,8 +591,7 @@ def main() -> None:
                 cases = run_redteam(args.cases, args.seed, args.out, args.scenario)
             except ValueError as error:
                 _fail(str(error), crashcheck=False)
-            disagreements = [case for case in cases if case.disagrees]
-            unknown = [case for case in cases if case.unknown]
+            disagreements = [case for case in cases if not case.agrees]
             if args.json:
                 print(
                     canonical_json(
@@ -618,7 +600,6 @@ def main() -> None:
                                 {
                                     "agrees": case.agrees,
                                     "expected": case.expected.value,
-                                    "unknown": case.unknown,
                                     "helper": case.helper,
                                     "index": case.index,
                                     "ops": [op.value for op in case.ops],
@@ -629,10 +610,8 @@ def main() -> None:
                                 for case in cases
                             ],
                             "disagreements": len(disagreements),
-                            "max_unknown": args.max_unknown,
                             "scenario": args.scenario,
                             "seed": args.seed,
-                            "unknown": len(unknown),
                         }
                     ).decode()
                 )
@@ -644,24 +623,19 @@ def main() -> None:
                         ops += " (helper)"
                     print(
                         f"{case.index:<5} {ops:<48} {case.expected.value:<32} "
-                        f"{case.verdict:<32} "
-                        f"{'unknown' if case.unknown else 'yes' if case.agrees else 'NO'}"
+                        f"{case.verdict:<32} {'yes' if case.agrees else 'NO'}"
                     )
                 print(
                     f"generated {len(cases)} handlers from seed {args.seed}; "
-                    f"{len(disagreements)} disagreement{'s' if len(disagreements) != 1 else ''}; "
-                    f"{len(unknown)} unknown (the kernel ran out of wall clock; "
-                    f"--max-unknown {args.max_unknown})"
+                    f"{len(disagreements)} disagreement{'s' if len(disagreements) != 1 else ''}"
                 )
                 for case in disagreements:
                     print(
                         f"  case {case.index}: oracle says {case.reason}; checker said: "
                         f"{case.summary}"
                     )
-                for case in unknown:
-                    print(f"  case {case.index}: UNKNOWN, the machine: {case.summary}")
                 print(f"handlers and evidence: {args.out.resolve()}")
-            if disagreements or len(unknown) > args.max_unknown:
+            if disagreements:
                 raise SystemExit(1)
             return
 
