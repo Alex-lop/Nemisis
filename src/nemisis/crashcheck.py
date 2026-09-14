@@ -92,11 +92,14 @@ _ENGINE_RESOURCES = (
     "scenarios/__init__.py",
     "scenarios/sqlite_credit_v1.py",
     "scenarios/sqlite_inventory_v1.py",
+    "scenarios/sqlite_webhook_idempotency_v1.py",
     "sqlite_runner.py",
     "fixtures/sqlite_credit_v1/contract.json",
     "fixtures/sqlite_credit_v1/event.json",
     "fixtures/sqlite_inventory_v1/contract.json",
     "fixtures/sqlite_inventory_v1/event.json",
+    "fixtures/sqlite_webhook_idempotency_v1/contract.json",
+    "fixtures/sqlite_webhook_idempotency_v1/event.json",
 )
 _HYPOTHESES = (
     (1, "effect-commit-v1", FaultBoundary.EFFECT_COMMIT, 1),
