@@ -175,9 +175,9 @@ def _parser() -> argparse.ArgumentParser:
         type=_non_negative,
         default=0,
         help=(
-            "how many cases may end in a wall-clock refusal (the kernel's summary names "
-            "NEMISIS_WORKER_TIMEOUT_SECONDS) before the run fails; those are the machine, not "
-            "the checker, and are counted apart from disagreements"
+            "how many cases may end in a wall-clock refusal (a world's execution status is "
+            "TIMEOUT) before the run fails; those are the machine, not the checker, and are "
+            "counted apart from disagreements"
         ),
     )
     redteam.add_argument("--json", action="store_true")

@@ -517,6 +517,7 @@ def _timed_out(result: object) -> bool:
     """Did any world of this check end in the kernel's wall-clock refusal?"""
     statuses = [getattr(result, "execution_status", None)]
     statuses += [a.execution_status for a in getattr(result, "attempts", ())]
+    statuses += [h.attempt.execution_status for h in getattr(result, "hypothesis_receipts", ())]
     for sweep in getattr(result, "sweeps", ()):
         statuses.append(sweep.census.execution_status)
         statuses += [a.execution_status for a in sweep.attempts]
