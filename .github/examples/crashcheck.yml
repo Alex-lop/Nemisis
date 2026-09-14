@@ -37,7 +37,7 @@ jobs:
       - name: Run CrashCheck
         if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         id: crashcheck
-        uses: Alex-lop/Nemisis@4db42137ce137b53a8239403a8b0c3e17a24489d
+        uses: Alex-lop/Nemisis@a0c4a9f211a42c68a6e222c238ee14bda01bd902
         with:
           base: ${{ github.event.pull_request.base.sha }}
           candidate: ${{ github.event.pull_request.head.sha }}
