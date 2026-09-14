@@ -74,7 +74,10 @@ New since 2026-09-05, from `overnight/hardening` and the `overnight2/*` branches
   verdict with an oracle, in either scenario's vocabulary; ten cases run in the normal suite,
   three hundred per scenario nightly. The nightly's first GitHub run is
   [34086693284](https://github.com/Alex-lop/Nemisis/actions/runs/34086693284) (300 handlers, seed
-  20260907, 0 disagreements, on the engine before this grammar).
+  20260907, 0 disagreements, on the engine before this grammar); the first run at the engine that
+  refuses what the nightly found is
+  [34820657707](https://github.com/Alex-lop/Nemisis/actions/runs/34820657707) (300 per scenario,
+  seed 34820657707, 0 disagreements, 0 unknown, with the 30 s worker budget and `--max-unknown 3`).
 - Attribution reads the whole database file (schema, every durable header field a commit never
   changes, every row with its rowid) and the whole per-world directory (cwd, its two parents,
   `HOME`, `TMPDIR`, the bound tree entry by entry) after the kill, between the census deliveries,
@@ -140,7 +143,10 @@ provider run.
 - the nightly red team's first run on GitHub's Linux:
   [run 34086693284](https://github.com/Alex-lop/Nemisis/actions/runs/34086693284), 300 generated
   handlers at seed 20260907, 0 disagreements, on the engine before tonight's grammar and fixes;
-  two local sweeps of 300 per scenario at the post-fix engine also had 0 disagreements;
+  two local sweeps of 300 per scenario at the post-fix engine also had 0 disagreements; the first
+  run at the engine that refuses the tail-bytes shape, dispatched on `main` at `5b216a1`:
+  [run 34820657707](https://github.com/Alex-lop/Nemisis/actions/runs/34820657707), 300 handlers
+  per scenario at seed 34820657707, 0 disagreements, 0 unknown;
 - a second, independent measurement of the hero on GitHub's Linux (CPython 3.12.3, SQLite 3.45.1,
   x86_64): [run 34092142968](https://github.com/Alex-lop/Nemisis/actions/runs/34092142968), the
   `Evidence` workflow at engine `228430389f…`, verdict `PATCH_FAILED_STILL_REPRODUCES`, engine and
