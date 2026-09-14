@@ -69,11 +69,19 @@ New since 2026-09-05, from `overnight/hardening` and the `overnight2/*` branches
   free-page count, a re-pointed row, a renamed table, files and directories beside, above, under
   `~`, under `TMPDIR`, in the bound tree, deleted on exit). Each is pinned in
   `tests/test_verdict_paths.py`; the table one ships as `fixture:sqlite-credit-v1/shadow-table`.
+  The nightly red team then caught a fourth-round shape on its own: bytes appended past the
+  database's last page after the handler's last commit earned `FIX_PROVEN_FOR_THIS_CAPSULE` for
+  five nights (runs 34219859012, 34345065158, 34593382316, 34689225054, 34755449725; ten cases,
+  twenty lines, each case in both scenarios), because SQLite's close-time checkpoint truncated
+  the file before the engine's read; the engine now reads after the worker's final message and
+  before it may exit, and the shape ships as `fixture:sqlite-credit-v1/tail-bytes`.
   A third review on 2026-09-07 confirmed thirty-seven more (a header field the probe never read,
   the reserved header bytes, bytes past the last page, a file flag, an extended attribute on the
   platform where the guard was inert, the mode and mtime of the world's own directories, HOME
   removed or replaced, a directory made unlistable, a scratch-tree whitelist built from names, the
-  store patched at import); the probe now reads the file's raw header and length, the world scan
+  store patched at import); the probe now reads the file's raw header and length (which closed
+  the orderings where the bytes outlive the worker; the ordering after the last commit waited
+  for the nightly, below), the world scan
   pins every entry's metadata and refuses what it cannot list, the scratch root is known by
   recorded identity, and the worker refuses a patched store. Thirteen shapes are pinned; the
   channels that remain are listed in `docs/SECURITY.md`.

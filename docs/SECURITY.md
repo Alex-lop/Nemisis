@@ -70,7 +70,11 @@ changes (journal mode, the schema cookie, the free-page count, page size, vacuum
 `default_cache_size`, `user_version`, `application_id`), and the file's own identity (its 100-byte
 header, except the three fields a commit rewrites, and its length, which must be exactly the page
 count its header states), reads all of it at that instant, and refuses anything that differs; it
-reads again after the kill and after the worker's final message. The seed leaves the file in WAL
+reads again after the kill, after the worker's final message while the worker still holds its
+store connection open (closing that connection checkpoints the WAL, and a checkpoint truncates
+the file to its page count, so a read that waited for the exit missed bytes a handler appended
+after its last commit; the nightly red team found that on 2026-09-08 and the worker now exits
+only when released), and once more after the worker has exited. The seed leaves the file in WAL
 mode so the journal bits are constant for the run. A handler that moves money through its own
 SQLite connection, creates a table for its dedup flag, stores a flag in a header field (read or
 reserved), in a rowid, in the free-page count, or in bytes past the last page, re-points a ledger

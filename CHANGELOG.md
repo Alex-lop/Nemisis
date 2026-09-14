@@ -45,6 +45,15 @@ plumbing. Unreleased until a `v0.2.0` tag is pushed.
 
 ### Fixed
 
+- The controller reads the database after the worker's final message while the worker still
+  holds its store connection, and releases it to exit only then: closing the connection
+  checkpoints the WAL and truncates the file to its page count, which tidied away bytes a handler
+  appended past the last page after its last commit before the read that waited for the exit.
+  The nightly red team reported that shape in five runs (ten cases, each in both scenarios); it ships as
+  `fixture:sqlite-credit-v1/tail-bytes` and is pinned to `EVIDENCE_INCOMPLETE`.
+- `nemisis redteam` counts a case whose summary names the wall-clock budget as `unknown`, apart
+  from agreement and disagreement, and fails above `--max-unknown`; the nightly allows three
+  and runs with a 30 s worker budget.
 - Attribution is the whole database and the whole world the worker runs in, not the rows the
   scenario happens to name.
 - The side channels a second hostile review found are closed, and a run refuses a split schedule.

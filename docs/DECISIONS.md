@@ -424,3 +424,74 @@ provider-owned receipts, a live CrashCheck run cannot carry the same claims as a
 that is why `doctor` stays `BLOCKED` and no path from `BLOCKED` to a run is written: a
 fail-closed skeleton with an injected client is honest, a transport that reports `LIVE` with
 weaker receipts is not.
+
+## The read after the final message happens before the worker may exit (2026-09-14)
+
+The nightly red team failed on five of the six nights after the third hostile round (runs
+34219859012, 34345065158, 34593382316, 34689225054, 34755449725; the seed is the run id), twenty
+disagreement lines in all, ten cases each seen in both scenarios, every one the same shape: a handler that appends bytes past the
+database file's last page after its last store commit, in either scenario's vocabulary. The
+oracle said the write forfeits the verdict; the engine said `PATCH_FAILED_STILL_REPRODUCES`,
+`PATCH_FAILED_INVARIANT_BROKEN`, and, for `guard, atomic, tail, guard`, `FIX_PROVEN_FOR_THIS_CAPSULE`.
+It reproduces on a laptop in two seconds. The mechanism, proven with a standalone `sqlite3`
+experiment on 3.53.1 and by the triage on the runner's 3.45: the worker's clean exit closes its
+store connection, closing the last connection checkpoints the WAL, and a checkpoint that
+backfills frames truncates the file to `page_count * page_size`. `_finish_replay` waited for
+the exit and only then read the file, so the bytes were gone before it looked, while
+`docs/SECURITY.md` said the engine reads "after the worker's final message".
+
+Five independent triagers, one per run, classified all twenty lines as an oracle bug: the bytes
+were neither durable nor readable by the time the engine read, so under "what the controller
+cannot read, it does not claim" the engine was right. The reconciler that read their five
+reports, and the coordinator before it, classified them as a checker false pass in the reading
+schedule: the controller could read the bytes, at the moment its own documentation names, and
+read later instead. The reconciler instrumented that instant and found the sixteen bytes on
+disk in every affected line, and found why the window is not even a stable boundary: the store
+opens its connection with `with connect(...) as connection:`, whose exit ends the transaction
+and leaves the handle open, so the connection that will checkpoint at exit lives on past the
+store call only until CPython's cyclic garbage collector runs. One `gc.collect()` before the
+same append turns the unpatched engine's `FIX_PROVEN_FOR_THIS_CAPSULE` into
+`EVIDENCE_INCOMPLETE`. A refusal that depends on whether the garbage collector ran is not a
+rule. A handler that writes around the store and is blessed because SQLite tidied up after it
+is exactly what "a write the store did not make forfeits the verdict" exists to refuse, and
+modelling SQLite's backfill state in the oracle (the bytes survive the close when there was
+nothing to backfill, so `atomic, tail` is refused in the census while `guard, atomic, tail,
+guard` was not) would have put SQLite internals into a predictor that is supposed to know only
+the sequence, and would have turned a live false pass into a permanent blind spot with a green
+nightly. The fix is therefore in the kernel and the
+oracle is unchanged: after `done`, the controller reads the database while the worker still holds
+its connection, refuses any content the ledger does not explain (`INTEGRITY_ERROR`, `INVALID`,
+the sentence names bytes past the last page), sends `release`, waits for the exit, and reads once
+more for exit hooks, threads, and children. The worker exits only when released; a worker that
+finished without reaching the checkpoint is released before the refusal is raised, so its exit
+code is what it was. Nothing about verdict semantics changes: the same handlers earn the same
+verdicts, except that a write around the store after the last commit now forfeits it in every
+world instead of in the worlds where SQLite happened to leave it in place. The shape ships as
+`fixture:sqlite-credit-v1/tail-bytes`; the nine distinct nightly shapes are pinned in
+`tests/test_redteam.py` and the two worst in `tests/test_verdict_paths.py`.
+
+Three refuters then attacked that classification. Two made the same objection, and it deserves
+its answer here: the appended bytes cannot carry a bit to the next delivery (if they survive,
+the engine catches them; if they are erased, nothing can read them), so `guard, atomic, tail,
+guard` is a correct fix carrying a useless write, and refusing it is a false fail. It is not. A
+verdict here has never meant "exactly once"; it has meant "exactly once, and every durable
+change explained by a store commit". `raw-sql` is correct and refused; `shadow-table` deduplicates
+and is refused; a handler that appends to the store's own database file is refused on the same
+ground, and the sentence it gets names the write. What the objection does establish is recorded
+above: the channel was never usable as a flag. What it does not establish is that the engine may
+bless a write it can see. The third refuter's lens was SQLite itself; its finding is in
+MORNING.md's ledger.
+
+Two decisions about the nightly itself. A case whose summary names the wall-clock budget
+(`NEMISIS_WORKER_TIMEOUT_SECONDS`) is the machine, not the handler: `nemisis redteam` now counts it
+as `unknown`, apart from agreement and disagreement, prints it, and fails above `--max-unknown`
+(default 0). The nightly passes `--max-unknown 3` (one percent of a 300-case sweep) and runs with
+`NEMISIS_WORKER_TIMEOUT_SECONDS=30`, the knob's documented use on a slower machine; the local
+default stays 10 s. A load-induced refusal is never counted as agreement, and a real
+disagreement is never counted as load, because the classification reads the kernel's own
+sentence and nothing else.
+
+Revert: the `release` handshake is the block after `break` in `_finish_replay` and the
+`worker_receive` call after `done` in `_worker`; the nightly knobs are two lines in
+`nightly.yml`; the `unknown` count is one property on `Case` and the `--max-unknown` flag.
+
