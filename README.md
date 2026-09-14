@@ -34,9 +34,9 @@ Exit `1` blocks the merge. The same frozen crash replayed against the real fix e
 Needs Python 3.12+, [uv](https://docs.astral.sh/uv/), and a POSIX machine (macOS or Linux).
 
 ```bash
-git clone https://github.com/Alex-lop/Nemisis.git && cd Nemisis
-uv sync --frozen --dev
-uv run nemisis check --base fixture:sqlite-credit-v1/buggy \
+uv tool install "git+https://github.com/Alex-lop/Nemisis@main"
+# or, once 0.2.0 is published: uv tool install nemisis
+nemisis check --base fixture:sqlite-credit-v1/buggy \
   --candidate fixture:sqlite-credit-v1/misleading-green \
   --corrected fixture:sqlite-credit-v1/atomic
 ```
@@ -45,8 +45,16 @@ About two seconds. Then replay the frozen crash against the fix (the `capsule:` 
 by `check`):
 
 ```bash
-uv run nemisis replay .nemisis/repros/double-credit/*/capsule.json \
+nemisis replay .nemisis/repros/double-credit/*/capsule.json \
   --source fixture:sqlite-credit-v1/atomic --role corrected
+```
+
+The checkout is for developing Nemisis and for [Verify the project](#verify-the-project); every
+`uv run nemisis` below is that checkout running the same command an installed `nemisis` runs.
+
+```bash
+git clone https://github.com/Alex-lop/Nemisis.git && cd Nemisis
+uv sync --frozen --dev
 ```
 
 ## What it does
@@ -141,6 +149,9 @@ agent: it gets the bug report, the buggy module, and the store API, and nothing 
 CrashCheck kills or judges. Its module is accepted only after deterministic checks (signature,
 imports, no private attributes), becomes an ordinary candidate tree, and is judged like any other.
 
+The `--issue` path below is inside the checkout. `export` copies a fixture tree, not the issue
+text, and no other command prints it, so this section needs the clone from [Try it](#try-it).
+
 ```bash
 export NEBIUS_API_KEY=...   # without it: exit 2, nothing written
 uv run nemisis propose-patch --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
@@ -155,22 +166,40 @@ contract's catalog binding, candidate-blind. See [docs/LIVE_SETUP.md](docs/LIVE_
 
 ## Point it at your code
 
-The alpha audits one handler shape: a synchronous `module:function(store, event)` that uses a
-scenario's store API against SQLite (`CreditStore`: `processed`, `credit`, `mark_processed`,
-`credit_and_mark`; `InventoryStore`: `reserved`, `reserve`, `mark_reserved`, `reserve_and_mark`).
-Inside that shape, the handler body is anything you like.
+Read this before `init`. The alpha judges one handler shape and nothing else: a top-level
+synchronous `def handler(store, event)` with exactly two positional parameters, no defaults, no
+`*args`, no `**kwargs`, no alias or re-export. Every durable write goes through the store
+CrashCheck injects as the first argument (`CreditStore`: `processed`, `credit`, `mark_processed`,
+`credit_and_mark`; `InventoryStore`: `reserved`, `reserve`, `mark_reserved`, `reserve_and_mark`;
+[the store API](docs/PRODUCT.md#the-store-api)), against the scenario's schema, on the scenario's
+event. Your own connection, your own tables, your own payload are outside it. `init` reads the
+signature and nothing more, so `apply_credit(conn, event)` that runs SQL on `conn` mints a
+contract and then ends at `EVIDENCE_INCOMPLETE`, exit `2`, because the handler raised
+`AttributeError` before the durable checkpoint. That is a narrow shape and most handlers are not
+already in it: porting one means rewriting its storage calls as store calls, and what survives is
+the part with the crash window in it. Inside that shape, the handler body is anything you like.
+
+The contract pins the base tree digest, so the fix lives on a branch while the base branch stays
+at the tree the contract was accepted for. Commit the fix on `main` and `check --base main` exits
+`2`: `contract originating base digest differs from the supplied base`. Committing the contract is
+safe; `.nemisis/` is outside the digest.
 
 ```bash
-uv tool install "git+https://github.com/Alex-lop/Nemisis@main"
 nemisis init --issue issue.md --target app.credits:apply_credit --base main
 nemisis init --issue issue.md --target app.credits:apply_credit --base main \
   --accept-contract PASTE_PRINTED_DIGEST
+git checkout -b fix-double-credit   # the fix is committed here, not on main
 nemisis check --base main --candidate HEAD --scenario .nemisis/config.json
 ```
 
-Commit the accepted `.nemisis/config.json` on the base branch, then drop
+Commit the accepted `.nemisis/config.json` on the base branch, then copy
 [the example workflow](.github/examples/crashcheck.yml) into `.github/workflows/` to run it on every
-pull request.
+pull request. Without a checkout, take it from `main`:
+
+```bash
+curl -o .github/workflows/crashcheck.yml \
+  https://raw.githubusercontent.com/Alex-lop/Nemisis/main/.github/examples/crashcheck.yml
+```
 
 Every wall-clock wait in the kernel is one budget, ten seconds re-armed for each phase of each
 world (the worker's hello, reaching the next store commit, finishing the delivery), and its expiry
@@ -210,6 +239,8 @@ own `app.inventory:reserve_inventory` the same way the credit contract does.
   reach, and says so.
 
 ## Verify the project
+
+From the checkout in [Try it](#try-it); an installed tool ships no tests to run.
 
 ```bash
 uv run ruff format --check src tests && uv run ruff check src tests
