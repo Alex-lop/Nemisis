@@ -430,26 +430,33 @@ weaker receipts is not.
 The copyable workflow pins the action to a full commit SHA, as every action in `.github/` is
 pinned, and that pin was ninety-five commits and three hostile rounds behind `main` by the time
 anyone looked. The reminder to bump it was written down twice and done neither time, so the bump
-is now a machine's job and the rot is a test's job.
+is now a rule with a test, and a machine is the backstop.
 
-The test (`tests/test_docs_identity.py`) compares trees, not digests: `git rev-parse
-<pin>:src/nemisis` must equal the same tree at `git merge-base HEAD origin/main`. On `main` that
-is `HEAD`, so `main` is red the moment an engine change lands without the pin. On a branch it is
-the point the branch left `main`, so an engine change stays green while its pull request is open,
-which is the only way an engine pull request can be green at all: a commit cannot pin its own
-SHA. CI checks out with `fetch-depth: 0` so the pinned commit is present; a shallow clone fails
-the test with a sentence that says to fetch, and never skips.
+What the pin must track is what `uses: Alex-lop/Nemisis@<sha>` runs: `src/nemisis`, `action.yml`
+(the action's contract and its own pinned actions), `pyproject.toml`, and `uv.lock`. A first draft
+compared only the engine tree; an independent reader showed a pin nineteen commits behind, one
+action output short, passing every check. The test (`tests/test_docs_identity.py`) requires the
+pinned commit to be in HEAD's history everywhere, and on `main` (HEAD is `origin/main`) requires
+those four paths at the pinned commit to be byte-identical to HEAD's. A branch is not held to the
+strict comparison: a branch cannot pin a commit `main` does not have, and a first draft that
+compared against the branch point would have turned every open pull request red whenever `main`'s
+pin lagged, with the ruleset then blocking every merge. The visibility the test exists for is
+`main` red, and only `main`.
 
-The bot (`.github/workflows/pin-bump.yml`) runs on every push to `main`. If `git diff --quiet
-<pin>..HEAD -- src/nemisis` is quiet it exits, which is what keeps it from reacting to its own
-bump commit, since a bump touches only the example and STATUS. Otherwise it rewrites both lines
-to the new head on a `pin/<sha>` branch, opens a pull request, dispatches `ci.yml` on that
-branch (a pull request opened with the repository token starts no workflow run on its own, and
-`workflow_dispatch` is the documented exception; the check runs land on the same head SHA the
-ruleset reads), and enables auto-merge. `ci.yml` gained `workflow_dispatch` for that reason and
-nothing else. If a `pin/` pull request is already open the bot waits for the next push. What
-this cannot do: the pin lags `main` by one bot pull request, minutes on a normal day, and during
-that window `main` is red on this one test, which is the visibility the test exists to give.
+A pull request that changes any of the four paths ends with a commit that moves the pin to its
+last such commit; that commit is an ancestor of the merge, so the strict comparison on `main` is
+green immediately. The bot (`.github/workflows/pin-bump.yml`) is the backstop for a merge that
+forgot: on every push to `main`, if `git diff --quiet <pin>..HEAD -- <the four paths>` is quiet it
+exits (which is also what keeps it from reacting to its own bump commits), otherwise it moves both
+lines on a `pin/<sha>` branch, closes and replaces any older bump of its own (so two engine merges
+in a row end with the newer pin and a failed run cannot wedge the next one), opens the pull
+request, enables auto-merge before anything that can fail, and dispatches `ci.yml` on the branch,
+because a pull request opened with the repository token gets a `pull_request` run that is held
+for approval and the dispatched run is the one that reports on the head SHA. `ci.yml` gained
+`workflow_dispatch` and `fetch-depth: 0` for that and for nothing else. The bot cannot open a pull
+request until the repository setting "Allow GitHub Actions to create and approve pull requests"
+is on (`can_approve_pull_request_reviews`); it checks that first and names the setting when it
+is off. Until its first recorded run it is a design.
 
 Revert: delete the workflow and the test, restore the sentence in STATUS, and the pin is a
 manual step again.

@@ -54,13 +54,15 @@ fix the checker.
 
 `.github/examples/crashcheck.yml` pins the Nemisis action to one full `main` commit, and
 `docs/STATUS.md` names the same SHA as the reviewed action pin. `tests/test_docs_identity.py`
-requires the two to agree and requires `src/nemisis` at that commit to equal `src/nemisis` at the
-commit where your branch left `main`, so an engine change stays green while its pull request is
-open and `main` goes red the moment an engine change lands without the pin following it.
-`.github/workflows/pin-bump.yml` does the following: after every push to `main` whose engine
-differs from the pinned commit's, it opens a pull request that moves both lines to the new head,
-dispatches CI on that branch, and enables auto-merge. Do not move the pin by hand; if the
-workflow is broken, fix the workflow.
+requires the two to agree, requires the pinned commit to be in the current history, and, on
+`main`, requires `src/nemisis`, `action.yml`, `pyproject.toml`, and `uv.lock` at that commit to be
+byte-identical to `main`'s, so `main` goes red the moment any of them changes without the pin
+following. A pull request that changes any of those files ends with one commit that moves both
+lines to its last such commit (that commit is in the pull request's history, so the test is green
+on the branch and on `main` after the merge). `.github/workflows/pin-bump.yml` is the backstop:
+after a push to `main` that changed what the action runs without moving the pin, it opens the
+bump itself, with auto-merge, once the repository setting "Allow GitHub Actions to create and
+approve pull requests" is on. Never move the pin to a commit that is not in `main`'s history.
 
 ## Truth labels
 

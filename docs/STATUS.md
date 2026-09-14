@@ -23,10 +23,12 @@ Current tree:
 - interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence
 - reviewed action pin: `a0c4a9f211a42c68a6e222c238ee14bda01bd902`, the exact `main` commit that
   [`.github/examples/crashcheck.yml`](../.github/examples/crashcheck.yml) runs
-  (`tests/test_docs_identity.py` fails when the two differ, and fails when `src/nemisis` at the
-  pinned commit is not `src/nemisis` at the commit where the current branch left `main`;
-  [`pin-bump.yml`](../.github/workflows/pin-bump.yml) opens the bump after every engine merge, so
-  nobody has to remember it and anyone who copies the example gets the engine `main` runs)
+  (`tests/test_docs_identity.py` fails when the two differ, and fails on `main` when
+  `src/nemisis`, `action.yml`, `pyproject.toml`, or `uv.lock` at the pinned commit differs from
+  `main`'s; an engine pull request carries its own bump, and
+  [`pin-bump.yml`](../.github/workflows/pin-bump.yml) is written to open one after any engine
+  merge that did not, once the repository allows Actions to open pull requests; until its first
+  run is recorded in `MORNING.md` it is a design, not a proof)
 
 ## Product state
 
