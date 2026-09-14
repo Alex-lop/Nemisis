@@ -75,12 +75,14 @@ for the worker's life and closes it only after that read and the controller's re
 closing a connection checkpoints the WAL and a checkpoint truncates the file to its page count;
 the nightly red team found on 2026-09-08 that a per-call connection closed by the garbage
 collector had erased bytes a handler appended after its last commit before the engine looked),
-and once more after the worker has exited. During a delivery no checkpoint runs, so the main
-database file is byte-identical to the seed and is pinned whole, by digest and length; only
-the read after the exit, which follows the store's own checkpoint, compares the header with
-the three fields a checkpoint rewrites blanked and the length against the header's page count.
-The write-ahead log beside the file grows only at store commits and its length must be exactly
-its frames', so bytes appended past the last frame are refused wherever the file is read. The seed leaves the file in WAL
+and once more after the worker has exited. During a delivery no automatic checkpoint runs, so
+the main database file is byte-identical to the seed and is pinned whole, by digest and length
+(a checkpoint a handler runs itself changes the file and is the refused write); after the exit,
+which follows the store's own checkpoint, the file must be exactly the logical database the
+last read saw through the log, and the log must be empty. The write-ahead log grows only at
+store commits, keeps every byte it had (a commit appends frames), and its length must be
+exactly its frames', so bytes appended past the last frame, rewritten inside a frame, or written
+after the close are refused wherever the file is read. The seed leaves the file in WAL
 mode so the journal bits are constant for the run. A handler that moves money through its own
 SQLite connection, creates a table for its dedup flag, stores a flag in a header field (read,
 reserved, or one a checkpoint rewrites), in a rowid, in the free-page count, in bytes past the last
@@ -103,7 +105,9 @@ that under-reports its commits is refused as `TrustedStorePatched`.
 
 What the controller cannot read, it does not claim. These stay outside what local mode can see,
 and are the honest list: a flag the store's own next commit overwrites (the database file's
-modification time); the bytes of the shm sidecar, which every reader rewrites; a flag at the sidecar names the store owns
+modification time); the shm sidecar, whose header the kernel reads for the log's frame count
+and whose other bytes every reader rewrites and nothing pins, and which a close leaves behind
+on some builds; a flag at the sidecar names the store owns
 (`<database>-wal`, `<database>-shm`), whose presence after a kill a handler can also read as "the
 last delivery crashed"; a write through a private connection that is reverted before the next
 store commit, because attribution samples the database at commits and not between them (the kill

@@ -54,10 +54,11 @@ plumbing. Unreleased until a `v0.2.0` tag is pushed.
   `fixture:sqlite-credit-v1/tail-bytes` and is pinned to `EVIDENCE_INCOMPLETE`.
 - During a delivery the main database file is pinned whole (automatic checkpoints are off), so a
   flag in the header's change counter, which the probe used to mask, is refused; the write-ahead
-  log's length must be its frames', so bytes appended past the last frame are refused too.
-- `nemisis redteam` counts a case whose summary names the wall-clock budget as `unknown`, apart
-  from agreement and disagreement, and fails above `--max-unknown`; the nightly allows three
-  and runs with a 30 s worker budget.
+  log may only grow by whole frames at store commits, keeping every byte it had; after the exit
+  the file must be the logical image the last read saw and the log must be empty.
+- `nemisis redteam` counts a case a world of which the kernel ended on the clock (execution
+  status `TIMEOUT`) as `unknown`, apart from agreement and disagreement, and fails above
+  `--max-unknown`; the nightly allows three and runs with a 30 s worker budget.
 - Attribution is the whole database and the whole world the worker runs in, not the rows the
   scenario happens to name.
 - The side channels a second hostile review found are closed, and a run refuses a split schedule.

@@ -129,7 +129,7 @@ flag in a table it creates inside the store's own database: an earlier engine bl
 crash between that write and the credit left the customer unpaid forever. `tail-bytes` is the guarded
 atomic fix (`processed`, then `credit_and_mark`) followed by sixteen bytes appended past the
 database file's last page: the nightly red team
-caught the engine issuing verdicts on it for five nights, and blessing it once (SQLite's own close
+caught the engine issuing verdicts on it for five nights, and blessing it twice (SQLite's own close
 had tidied the bytes away before the engine looked); the engine now reads the file before the
 worker may exit, pins the file whole during a delivery, and holds the write-ahead log to its frames. Attribution now reads the
 whole database file (schema, the header fields a commit never changes, every row with its rowid)

@@ -504,9 +504,11 @@ more for exit hooks, threads, and children, comparing what a checkpoint leaves c
 its receipt records the exit it earned; the exit has its own budget, the knob's, because it now
 includes the store's close and the checkpoint inside it. A worker that finished without
 reaching the checkpoint is not released and is killed with its group at cleanup, as a worker
-paused inside a commit report is. Nothing about verdict semantics changes: the same handlers earn the same
-verdicts, except that a write around the store after the last commit now forfeits it in every
-world instead of in the worlds where SQLite happened to leave it in place. The shape ships as
+paused inside a commit report is. Verdict semantics do not change: the same handlers earn the same verdicts, except that a write
+around the store after the last commit now forfeits it in every world instead of in the worlds
+where SQLite happened to leave it in place, and two shapes that were never wrong about the money
+move with the store's connection (the journal-mode flag, whose PRAGMA now raises; a checkpoint
+through the handler's own connection, now the refused write). The shape ships as
 `fixture:sqlite-credit-v1/tail-bytes`; the nine distinct nightly shapes are pinned in
 `tests/test_redteam.py` and the two worst in `tests/test_verdict_paths.py`. One older pin moved
 with the store's connection: a handler that switches the journal mode through its own connection
@@ -544,8 +546,21 @@ frames the wal-index says it holds, so bytes appended past the last frame, which
 and a later worker in a kill world could read, are refused wherever the file is read. The shm
 sidecar's bytes stay on the honest list: every reader rewrites them. Both shapes are pinned.
 
-Two decisions about the nightly itself. A case whose summary names the wall-clock budget
-(`NEMISIS_WORKER_TIMEOUT_SECONDS`) is the machine, not the handler: `nemisis redteam` now counts it
+A second round of lenses on that redesign found the read after the exit still soft: it followed
+the store's checkpoint, so it compared only a masked header and a page-count rule, and an exit
+hook that ran after the release could append a whole page and bump the header's page count, write
+the change counter, or recreate a sidecar, and a handler could rewrite bytes inside a frame the
+store had already written (the log's length was pinned, its bytes were not) and let the checkpoint
+copy them into the main file. Now every read records SQLite's own serialization of the logical
+database (what a checkpoint writes), the file after the exit must be exactly that image and the
+log must be empty, and the log may only grow by whole frames at store commits, keeping every byte
+it had. The same round showed a hunt-phase timeout was invisible to the nightly's `unknown` (the
+published attempt says `SETUP_ERROR`); the hunt receipts are read now. The shm sidecar stays on
+the honest list, and so does a close that leaves it and an empty log behind, which this build
+does and the seed already cleans up. Five more shapes are pinned.
+
+Two decisions about the nightly itself. A case a world of which the kernel ended on the clock (its execution status is `TIMEOUT`, in
+the hunt, a boundary world, the census, or the sweep) is the machine, not the handler: `nemisis redteam` now counts it
 as `unknown`, apart from agreement and disagreement, prints it, and fails above `--max-unknown`
 (default 0). The nightly passes `--max-unknown 3` (one percent of a 300-case sweep) and runs with
 `NEMISIS_WORKER_TIMEOUT_SECONDS=30`, the knob's documented use on a slower machine; the local
