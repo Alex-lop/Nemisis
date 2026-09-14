@@ -192,9 +192,14 @@ git checkout -b fix-double-credit   # the fix is committed here, not on main
 nemisis check --base main --candidate HEAD --scenario .nemisis/config.json
 ```
 
-Commit the accepted `.nemisis/config.json` on the base branch, then drop
+Commit the accepted `.nemisis/config.json` on the base branch, then copy
 [the example workflow](.github/examples/crashcheck.yml) into `.github/workflows/` to run it on every
-pull request.
+pull request. Without a checkout, take it from `main`:
+
+```bash
+curl -o .github/workflows/crashcheck.yml \
+  https://raw.githubusercontent.com/Alex-lop/Nemisis/main/.github/examples/crashcheck.yml
+```
 
 Every wall-clock wait in the kernel is one budget, ten seconds re-armed for each phase of each
 world (the worker's hello, reaching the next store commit, finishing the delivery), and its expiry
