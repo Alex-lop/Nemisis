@@ -1,0 +1,16 @@
+{
+  "adapter_id": "outbox-store-v1",
+  "event_digest": "d068de76d1045815954ad7c56097a6ff0a487764eaeb4ec045dff51925997410",
+  "event_fixture_id": "msg-1-v1",
+  "fault_intent_id": "first-send-effect-commit-v1",
+  "issue_digest": "140c6316da4c11c6c0ea88ac03caf9950db6a2e7f369d26ac2e2f162348ea1dd",
+  "originating_base_ref": "fixture:sqlite-outbox-v1/buggy",
+  "originating_base_tree_digest": "9e1810d97379db3acfc750958364058da13db41cb1916fa13dc43eb8b99bf552",
+  "predicate_ids": [
+    "single-send-and-marker-v1"
+  ],
+  "probe_id": "outbox-state-v1",
+  "scenario_id": "sqlite-outbox-v1",
+  "schema_version": "nemisis.retry-contract.v1",
+  "target": "app.outbox:dispatch_outbox"
+}
