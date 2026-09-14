@@ -39,6 +39,7 @@ from nemisis.sqlite_runner import (
     _attributed_probe,
     _cleanup,
     _collect,
+    _finish_replay,
     _kill_and_wait,
     _ledger,
     _probe,
@@ -51,6 +52,7 @@ from nemisis.sqlite_runner import (
     _spawn_receipt,
     _xattrs,
     bind_anchor,
+    capsule_event,
     execute_attempt,
     worker_timeout_seconds,
 )
@@ -670,3 +672,105 @@ def test_xattrs_raises_instead_of_answering_for_a_path_it_cannot_read(tmp_path: 
         _xattrs(tmp_path / "not-there")
 
     assert failure.value.errno == errno.ENOENT
+
+
+def _replay_world(tmp_path: Path) -> tuple[ReproCapsule, Path, dict[str, str | int]]:
+    """A sealed capsule and a freshly seeded database for it: what `_finish_replay` reads."""
+    capsule = _seal_capsule(_audited_contract(CREDIT))
+    event = capsule_event(capsule)
+    database = tmp_path / "replay.sqlite3"
+    _seed_database(CREDIT, database, event)
+    return capsule, database, event
+
+
+def _say_done(worker: socket.socket, capsule: ReproCapsule, execution_nonce: str) -> None:
+    worker.sendall(
+        canonical_json(
+            {
+                "event_digest": capsule.event_digest,
+                "execution_nonce": execution_nonce,
+                "type": "done",
+            }
+        )
+        + b"\n"
+    )
+
+
+def test_a_malformed_replay_completion_is_a_protocol_error(tmp_path: Path) -> None:
+    """The `done` frame is what binds this worker's finish to this attempt's event and nonce. A
+    frame that does not match exactly is a worker the controller cannot account for, and
+    accepting it would let a second delivery of some other event close this one's evidence."""
+    capsule, database, event = _replay_world(tmp_path)
+    ledger = _ledger(CREDIT, database, event)
+
+    with _bare_spawn("raise SystemExit(0)") as (spawn, worker):
+        _say_done(worker, capsule, "a-different-execution")
+        with pytest.raises(_AttemptFailure) as failure:
+            _finish_replay(
+                CREDIT,
+                spawn,
+                capsule,
+                "this-execution",
+                5.0,
+                database=database,
+                event=event,
+                ledger=ledger,
+            )
+
+    assert failure.value.status is ExecutionStatus.PROTOCOL_ERROR
+    assert failure.value.detail == "replay completion was malformed"
+
+
+def test_a_replay_worker_that_reports_done_and_does_not_exit_runs_out_of_time(
+    tmp_path: Path,
+) -> None:
+    """The message names it and, until now, nothing proved it: a worker that says it finished and
+    then keeps running has a non-daemon thread or a child still alive, and whatever that thread
+    writes lands after the evidence was read."""
+    capsule, database, event = _replay_world(tmp_path)
+    ledger = _ledger(CREDIT, database, event)
+
+    with _bare_spawn("import time; time.sleep(30)") as (spawn, worker):
+        _say_done(worker, capsule, "this-execution")
+        with pytest.raises(_AttemptFailure) as failure:
+            _finish_replay(
+                CREDIT,
+                spawn,
+                capsule,
+                "this-execution",
+                1.0,
+                database=database,
+                event=event,
+                ledger=ledger,
+            )
+
+    assert failure.value.status is ExecutionStatus.TIMEOUT
+    assert failure.value.detail == (
+        "the replay delivery worker reported done but did not exit within 1 s; a non-daemon "
+        "thread or child kept it alive"
+    )
+
+
+def test_a_replay_worker_that_exits_nonzero_after_done_is_a_replay_error(tmp_path: Path) -> None:
+    """A redelivery has to return normally to be exactly once. A worker that reported done and
+    then exited nonzero raised on the way out, and the run cannot say the second delivery
+    succeeded."""
+    capsule, database, event = _replay_world(tmp_path)
+    ledger = _ledger(CREDIT, database, event)
+
+    with _bare_spawn("raise SystemExit(3)") as (spawn, worker):
+        _say_done(worker, capsule, "this-execution")
+        with pytest.raises(_AttemptFailure) as failure:
+            _finish_replay(
+                CREDIT,
+                spawn,
+                capsule,
+                "this-execution",
+                5.0,
+                database=database,
+                event=event,
+                ledger=ledger,
+            )
+
+    assert failure.value.status is ExecutionStatus.REPLAY_ERROR
+    assert failure.value.detail == "replay worker returned nonzero"
