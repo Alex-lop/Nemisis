@@ -196,6 +196,25 @@ public candidate requires CrashCheck ConTree isolation, which is not implemented
 Pin the Nemisis composite action and all third-party actions to reviewed full commit SHAs. Accepted
 configuration is loaded from the exact base commit, not a candidate replacement.
 
+## The MCP server
+
+`nemisis mcp` is a stdio Model Context Protocol server for an AI coding agent. It runs on the
+developer's machine, on the developer's checkout. The local tools (`check`, `map`, `list_scenarios`,
+`port_template`, `doctor`) upload nothing and write only under the artifact root they name
+(`NEMISIS_ARTIFACT_ROOT`, default `.nemisis`). Each tool carries the truth label of the thing it
+wraps and never upgrades it; where the wrapped path has a `--json` flag the tool returns the same
+JSON it prints, and `list_scenarios`/`port_template` are new deterministic read-only views. The
+kernel the tools drive never calls a model. `draft_contract` and `propose_patch` are the only tools
+that do: with a key they send the issue text and the base handler you name to the Token Factory
+endpoint, `propose_patch` also writes an author receipt under `.nemisis/agent-patches/` in the
+working directory (kernel behavior), and both write their draft or candidate under the artifact
+root; without `NEBIUS_API_KEY` they are `BLOCKED` and write nothing, never mocked. Model-tier
+selection for those two is by `NEMISIS_MODEL_ID` passed verbatim as the model id (Super, the
+packaged default, when none is given); the exact catalog ids come from the Token Factory listing,
+not from the server. A `FIX_PROVEN` receipt proves the ported handler the agent supplied, not the
+agent's real handler; the port ledger the skill requires is where the agent states the
+correspondence, and a receipt without one is a claim above its evidence.
+
 ## Provider and credential separation
 
 Token Factory credentials may be sent only to an official Nebius HTTPS `/v1` global or regional

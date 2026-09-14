@@ -216,6 +216,21 @@ def _parser() -> argparse.ArgumentParser:
         help=f"default: the scenario a fixture candidate names, else {SCENARIO_ID}",
     )
     map_command.add_argument("--json", action="store_true", help="print the map document only")
+
+    commands.add_parser(
+        "mcp",
+        help="run the Model Context Protocol server over stdio, for an AI coding agent",
+        description=(
+            "A stdio MCP server whose tools wrap check, map, doctor, and the Nemotron drafters. "
+            "It runs on your machine, on your checkout. The local tools upload nothing and write "
+            "only under the artifact root they name (NEMISIS_ARTIFACT_ROOT, default .nemisis); the "
+            "kernel never calls a model. draft_contract and propose_patch are the exceptions: with "
+            "a key they send the issue text and the base handler you name to Token Factory, and "
+            "are BLOCKED without one. Add it from a checkout with `claude mcp add nemisis -- uv "
+            "run --project <nemisis-checkout> nemisis mcp` (the `uvx --from nemisis` form works "
+            "once a release ships the server)."
+        ),
+    )
     return parser
 
 
@@ -716,6 +731,12 @@ def main() -> None:
                 print(f"handlers and evidence: {args.out.resolve()}")
             if disagreements or len(unknown) > args.max_unknown:
                 raise SystemExit(1)
+            return
+
+        if args.command == "mcp":
+            from nemisis.mcp_server import run as run_mcp
+
+            run_mcp()
             return
 
         if args.command == "map":
