@@ -79,6 +79,7 @@ class CreditStore(StoreBase):
             row = connection.execute(
                 "SELECT 1 FROM processed_events WHERE event_id = ?", (event_id,)
             ).fetchone()
+        self._settle()
         return row is not None
 
     def credit(self, account_id: str, event_id: str, amount_cents: int) -> None:

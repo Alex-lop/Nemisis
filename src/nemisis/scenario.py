@@ -100,6 +100,10 @@ class Scenario:
         return (*self.hero_variants, *self.zoo_variants)
 
 
+class WroteAroundTheStore(RuntimeError):
+    """SQL was committed to the store's database around the store's methods."""
+
+
 class StoreBase:
     """What every trusted store shares: exact-value checks and the commit report to the controller.
 
@@ -121,18 +125,63 @@ class StoreBase:
         # a handler appended past the last page before the controller looked (the nightly red
         # team, 2026-09-08). Now the close is a protocol step, after the read.
         self._connection = connect(database)
+        # SQLite's data_version changes only when ANOTHER connection commits; total_changes counts
+        # the rows THIS connection changed. Together they say whether any SQL ran around the
+        # store's methods, through any connection, whatever bytes it left: a row inserted and
+        # deleted again leaves its bytes in the page's free space and no trace in any row.
+        self._data_version = self._read_data_version()
+        self._changes = self._connection.total_changes
+
+    def _read_data_version(self) -> int:
+        return int(self._connection.execute("PRAGMA data_version").fetchone()[0])
+
+    def audit(self) -> None:
+        """Refuse the delivery if SQL was committed around the store's methods.
+
+        Both checks run before the worker reports done. Between store calls they are split so
+        the controller's own probe, which names what changed, speaks first: statements on the
+        store's connection are noticed before the next method acts (nothing else can name
+        them), and another connection's commit is noticed in ``_pause`` once the controller has
+        accepted this method's commit (a table or a row it left is already named by the probe;
+        bytes in a page's free space are not, and this is what names them).
+        """
+        self._audit_own_connection()
+        self._audit_other_connections()
+
+    def _audit_own_connection(self) -> None:
+        if self._connection.total_changes != self._changes:
+            raise WroteAroundTheStore(
+                "statements ran on the store's connection outside its methods"
+            )
+
+    def _audit_other_connections(self) -> None:
+        if self._read_data_version() != self._data_version:
+            raise WroteAroundTheStore("another connection committed to the store's database")
+
+    def _settle(self) -> None:
+        """Record the store's own changes after one of its methods, so they are not foreign."""
+        self._changes = self._connection.total_changes
 
     def close(self) -> None:
-        """Close the store's connection; the worker calls this after the controller's release."""
+        """Checkpoint and close the store's connection; the worker calls this after the release.
+
+        The checkpoint is explicit so the state after the exit does not depend on whether this
+        was the last connection: a handler that opened one of its own and let it fall out of scope
+        would otherwise leave the log full and the file behind the image, and be refused for a
+        write it never made.
+        """
+        self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
         self._connection.close()
 
     def _require(self, **supplied: object) -> None:
-        """Every supplied value must be the event's exact value and exact type.
+        """Every supplied value must be the event's exact value and exact type, and nothing may
+        have been committed around the store since it last spoke.
 
         ``type(x) is type(expected)`` (not ``isinstance``, not ``==`` alone) so a ``str`` subclass
         with a lying ``__eq__``, an object with ``__conform__``, a ``bool``, or ``None`` cannot
         smuggle a different row or a NULL into the trusted store's own SQL.
         """
+        self._audit_own_connection()
         for name, value in supplied.items():
             if name not in self._event:
                 raise ValueError("handler attempted an event outside the accepted contract")
@@ -141,6 +190,7 @@ class StoreBase:
                 raise ValueError("handler attempted an event outside the accepted contract")
 
     def _pause(self, operation: str) -> None:
+        self._settle()
         self._sequence += 1
         worker_send(
             self._channel,
@@ -149,6 +199,7 @@ class StoreBase:
         message = worker_receive(self._channel)
         if message != {"type": "continue"}:
             raise RuntimeError("controller returned an invalid commit acknowledgement")
+        self._audit_other_connections()
 
 
 def connect(path: Path) -> sqlite3.Connection:
@@ -187,6 +238,7 @@ def worker_receive(channel: socket.socket) -> dict[str, object]:
 
 __all__ = [
     "MAX_MESSAGE_BYTES",
+    "WroteAroundTheStore",
     "Event",
     "Scenario",
     "StoreBase",

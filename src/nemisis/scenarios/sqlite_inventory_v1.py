@@ -68,6 +68,7 @@ class InventoryStore(StoreBase):
             row = connection.execute(
                 "SELECT 1 FROM reserved_orders WHERE event_id = ?", (event_id,)
             ).fetchone()
+        self._settle()
         return row is not None
 
     def reserve(self, sku: str, event_id: str, quantity: int) -> None:

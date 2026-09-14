@@ -2051,16 +2051,55 @@ WAL_FRAME_OVERWRITE = """def apply_credit(store, event):
         handle.write(b"NEMISIS-MARKER!!")
 """
 
-# A decoy connection handed to the store's close: the real one is never closed at the protocol
-# point, so the sidecars outlive the worker.
-CONNECTION_SWAP = """import sqlite3
+# Round three of the lenses: a dedup flag in a page's free space. A long row inserted and deleted
+# again, through any connection, leaves its bytes in the page and no trace in any row, rides the
+# log across a kill and the checkpoint across a clean exit, and every rule about the file's bytes
+# still holds. The store now refuses it itself: SQLite's data_version changes only when another
+# connection commits, and total_changes counts what the store's own connection changed, so any
+# SQL committed around the store's methods is named at the next moment the store speaks.
+FREE_SPACE_FLAG = """import sqlite3
+
+TOKEN = "NEMISIS-FREE-SPACE-FLAG-" * 8
+
+
+def _planted(path):
+    with open(path, "rb") as handle:
+        data = handle.read()
+    with open(path + "-wal", "rb") as handle:
+        data += handle.read()
+    return TOKEN.encode() in data
 
 
 def apply_credit(store, event):
     if store.processed(event["event_id"]):
         return
-    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
-    store._connection = sqlite3.connect(":memory:")
+    if _planted(str(store._database)):
+        store.mark_processed(event["event_id"])
+        return
+    with sqlite3.connect(store._database, isolation_level=None) as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        connection.execute(
+            "INSERT INTO accounts(account_id, balance_cents) VALUES (?, 0)", (TOKEN,)
+        )
+        connection.execute("DELETE FROM accounts WHERE account_id = ?", (TOKEN,))
+        connection.commit()
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+FREE_SPACE_FLAG_ON_THE_STORE = """TOKEN = "NEMISIS-FREE-SPACE-FLAG-" * 8
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    connection = store._connection
+    connection.execute("BEGIN IMMEDIATE")
+    connection.execute("INSERT INTO accounts(account_id, balance_cents) VALUES (?, 0)", (TOKEN,))
+    connection.execute("DELETE FROM accounts WHERE account_id = ?", (TOKEN,))
+    connection.commit()
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
 """
 
 
@@ -2068,11 +2107,13 @@ def apply_credit(store, event):
     ("name", "source", "fragment"),
     [
         ("change-counter-flag", CHANGE_COUNTER_FLAG, "a header field a checkpoint rewrites"),
-        ("own-checkpoint-after-tail", OWN_CHECKPOINT_AFTER_TAIL, "with no store commit to explain"),
-        ("exit-hook-page", EXIT_HOOK_PAGE, "is not the"),
-        ("exit-hook-change-counter", EXIT_HOOK_CHANGE_COUNTER, "is not the"),
+        ("own-checkpoint-after-tail", OWN_CHECKPOINT_AFTER_TAIL, "the store refused"),
+        ("exit-hook-page", EXIT_HOOK_PAGE, "image the last read saw"),
+        ("exit-hook-change-counter", EXIT_HOOK_CHANGE_COUNTER, "image the last read saw"),
         ("exit-hook-sidecar", EXIT_HOOK_SIDECAR, "write-ahead log still holds"),
         ("wal-frame-overwrite", WAL_FRAME_OVERWRITE, "write-ahead log"),
+        ("free-space-flag", FREE_SPACE_FLAG, "the store refused"),
+        ("free-space-flag-on-the-store", FREE_SPACE_FLAG_ON_THE_STORE, "the store refused"),
         ("wal-tail-after-commit", WAL_TAIL_AFTER_COMMIT, "write-ahead log is"),
         ("wal-garbage-before-commit", WAL_GARBAGE_BEFORE_COMMIT, "write-ahead log is"),
     ],
@@ -2093,3 +2134,34 @@ def test_the_file_and_its_log_are_pinned_whole_during_a_delivery(
     assert result.integrity_status.value == "INVALID"
     assert fragment in result.summary, result.summary
     assert cli._exit_code(result.verdict) == 2
+
+
+PRIVATE_READER_LEFT_OPEN = """import sqlite3
+
+_reader = None
+
+
+def apply_credit(store, event):
+    global _reader
+    _reader = sqlite3.connect(f"file:{store._database}?mode=ro", uri=True)
+    _reader.execute("SELECT count(*) FROM accounts").fetchone()
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+"""
+
+
+def test_a_private_reader_left_open_does_not_cost_an_honest_handler_its_verdict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The sqlite-semantics lens: a handler that opens a connection of its own and lets it live
+    past the handler writes nothing, but its handle used to keep the store's close from being the
+    last one, so no checkpoint ran and the read after the exit refused a write that never was.
+    The store's close checkpoints explicitly now, and the honest handler keeps its verdict."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, "private-reader", PRIVATE_READER_LEFT_OPEN)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE, result.summary
+    assert result.integrity_status.value == "VALID"
