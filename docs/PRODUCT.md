@@ -1,8 +1,10 @@
 # Product contract
 
-Nemisis CrashCheck is counterexample CI for stateful Python patches. It gives a backend developer
-or reviewer deterministic evidence before trusting a retry/idempotency patch produced by a human or
-coding agent.
+Nemisis CrashCheck is counterexample CI for stateful Python patches. Its customer is the AI coding
+agent fixing a retry/idempotency bug: through the `nemisis mcp` server and skill the agent ports
+its fix to the audited store, proves it against a frozen kill/restart/replay capsule, and attaches
+the receipt; the human reads the receipt. A backend developer or reviewer can run the same check by
+hand.
 
 The alpha answers one scoped question:
 

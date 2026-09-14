@@ -171,3 +171,18 @@ more than the five preceding sections prove. If this stops here, nothing is owed
 changes the cold judge's stalls asked for (the install line at the top, the fixture path in
 `propose-patch`, the branch rule for `--base main --candidate HEAD`, and the sentence that says
 what the judge learned the hard way) merged in #26.
+
+---
+
+## Postscript, 2026-09-15: the riskiest assumption, tested against an agent
+
+The memo's riskiest assumption was that a developer would hand-port a real handler to a four-method
+store to earn a receipt. That was tested — not against a developer, against an AI coding agent. A
+fresh headless Claude Code session, given the Nemisis MCP server, the skill, an issue, and one
+instruction, wrote the port, mapped the crash windows, hit `EVIDENCE_INCOMPLETE`, read the remedy,
+fixed the port, reached `FIX_PROVEN_FOR_THIS_CAPSULE`, and applied the fix to the real handler — no
+human input ([the transcript](reports/2026-09-15-agent-demo.md)). The wall the memo found was real;
+it was the wrong customer standing in front of it. For an agent, the port is a five-minute subtask,
+so Direction A's step 1 shipped tonight as the agent surface (the `mcp` server, `map`, the skill),
+not as a human "bring your own scenario" door. The memo's day estimates for A's later steps stand;
+what changed is who the door is for.

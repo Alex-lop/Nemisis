@@ -2,7 +2,7 @@
 
 # Nemisis
 
-**CrashCheck proves an AI patch survives a real crash, not just that its tests pass.**
+**Nemisis is the crash-safety proof an AI coding agent attaches to its retry fix.**
 
 [![CI](https://github.com/Alex-lop/Nemisis/actions/workflows/ci.yml/badge.svg)](https://github.com/Alex-lop/Nemisis/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
@@ -179,20 +179,46 @@ for a real Token Factory call; injected clients are `MOCKED` and say so. This tr
 `LIVE` receipt exists yet. `init --nemotron` is the second, smaller model job: proposing the
 contract's catalog binding, candidate-blind. See [docs/LIVE_SETUP.md](docs/LIVE_SETUP.md).
 
-## Point it at your code
+## Point your agent at it
 
-Read this before `init`. The alpha judges one handler shape and nothing else: a top-level
-synchronous `def handler(store, event)` with exactly two positional parameters, no defaults, no
-`*args`, no `**kwargs`, no alias or re-export. Every durable write goes through the store
-CrashCheck injects as the first argument (`CreditStore`: `processed`, `credit`, `mark_processed`,
-`credit_and_mark`; `InventoryStore`: `reserved`, `reserve`, `mark_reserved`, `reserve_and_mark`;
+The customer is not the person typing `nemisis check`; it is the AI coding agent fixing the retry
+bug, and the person reads the receipt. Nemisis ships a Model Context Protocol server and a skill so
+the agent can prove its fix with no human in the loop. A fresh headless agent, given only the
+server, the skill, an issue, and one instruction, reached `FIX_PROVEN_FOR_THIS_CAPSULE` unaided
+([the transcript](docs/reports/2026-09-15-agent-demo.md)).
+
+```bash
+# from a checkout today; from PyPI once 0.2.1 ships the server (it merged after 0.2.0):
+claude mcp add nemisis -- uv run --project /path/to/Nemisis nemisis mcp
+cp /path/to/Nemisis/skills/nemisis/SKILL.md .claude/skills/nemisis/SKILL.md
+# then, in your repo:
+claude -p "Fix the retry bug and prove it is crash-safe with the nemisis MCP tools."
+```
+
+The agent lists the scenarios, gets a port template, writes a minimal **port** of its real handler
+against the scenario's store under `.nemisis/port/<scenario>/`, maps the crash windows, and
+iterates `check` until `FIX_PROVEN_FOR_THIS_CAPSULE`. `EVIDENCE_INCOMPLETE` is never a pass — the
+tool returns the remedy and the agent fixes its port, never the kernel. Then it applies the same
+change to the real handler and attaches the receipt and a port ledger to the PR. The kernel never
+calls a model; only `draft_contract` and `propose_patch` do, and both are `BLOCKED` without a Token
+Factory key. See `skills/nemisis/SKILL.md` and [`AGENTS.md`](AGENTS.md).
+
+### The shape a port must take
+
+`init` and the port both judge one handler shape: a top-level synchronous
+`def handler(store, event)` with exactly two positional parameters, no defaults, no `*args`, no
+`**kwargs`, no alias or re-export. Every durable write goes through the store Nemisis injects as
+the first argument (`CreditStore`: `processed`, `credit`, `mark_processed`, `credit_and_mark`;
+`InventoryStore`: `reserved`, `reserve`, `mark_reserved`, `reserve_and_mark`;
 [the store API](docs/PRODUCT.md#the-store-api)), against the scenario's schema, on the scenario's
 event. Your own connection, your own tables, your own payload are outside it. `init` reads the
-signature and nothing more, so `apply_credit(conn, event)` that runs SQL on `conn` mints a
-contract and then ends at `EVIDENCE_INCOMPLETE`, exit `2`, because the handler raised
-`AttributeError` before the durable checkpoint. That is a narrow shape and most handlers are not
-already in it: porting one means rewriting its storage calls as store calls, and what survives is
-the part with the crash window in it. Inside that shape, the handler body is anything you like.
+signature and nothing more, so `apply_credit(conn, event)` that runs SQL on `conn` mints a contract
+and then ends at `EVIDENCE_INCOMPLETE`, exit `2`, because the handler raised `AttributeError` before
+the durable checkpoint. Porting a handler means rewriting its storage calls as store calls, and
+what survives is the part with the crash window in it. For an agent that is a five-minute subtask;
+inside that shape, the handler body is anything you like.
+
+### The human path (`init` by hand)
 
 The contract pins the base tree digest, so the fix lives on a branch while the base branch stays
 at the tree the contract was accepted for. Commit the fix on `main` and `check --base main` exits
