@@ -161,7 +161,36 @@ INVENTORY = Vocabulary(
         '(event["event_id"],)',
     ),
 )
-VOCABULARIES = {CREDIT.scenario_id: CREDIT, INVENTORY.scenario_id: INVENTORY}
+WEBHOOK = Vocabulary(
+    scenario_id="sqlite-webhook-idempotency-v1",
+    base_ref="fixture:sqlite-webhook-idempotency-v1/buggy",
+    handler_file="app/webhooks.py",
+    function="handle_webhook",
+    guard="processed",
+    effect="grant",
+    mark="mark_processed",
+    atomic="grant_and_mark",
+    effect_arguments='event["workspace_id"], event["event_id"], event["seats"]',
+    raw_effect_sql=(
+        (
+            "UPDATE workspaces SET seats = seats + ? WHERE workspace_id = ?",
+            '(event["seats"], event["workspace_id"])',
+        ),
+        (
+            "INSERT INTO seat_grants(event_id, workspace_id, seats) VALUES (?, ?, ?)",
+            '(event["event_id"], event["workspace_id"], event["seats"])',
+        ),
+    ),
+    repoint_sql=(
+        "UPDATE seat_grants SET workspace_id = 'ws-other' WHERE event_id = ?",
+        '(event["event_id"],)',
+    ),
+)
+VOCABULARIES = {
+    CREDIT.scenario_id: CREDIT,
+    INVENTORY.scenario_id: INVENTORY,
+    WEBHOOK.scenario_id: WEBHOOK,
+}
 
 
 def vocabulary_for(scenario_id: str) -> Vocabulary:
@@ -599,6 +628,7 @@ __all__ = [
     "INVENTORY",
     "STORE_OPS",
     "VOCABULARIES",
+    "WEBHOOK",
     "Case",
     "Expected",
     "Op",
