@@ -7,7 +7,7 @@ from collections.abc import Mapping
 
 from nemisis.crash_models import CrashVerdict, FaultBoundary, StateSnapshot
 from nemisis.display import money
-from nemisis.scenario import Event, Scenario, StoreBase, Tables, connect
+from nemisis.scenario import Event, Scenario, StoreBase, Tables
 
 SCENARIO_ID = "sqlite-credit-v1"
 SCHEMA = """
@@ -75,7 +75,7 @@ class CreditStore(StoreBase):
 
     def processed(self, event_id: str) -> bool:
         self._require(event_id=event_id)
-        with connect(self._database) as connection:
+        with self._connection as connection:
             row = connection.execute(
                 "SELECT 1 FROM processed_events WHERE event_id = ?", (event_id,)
             ).fetchone()
@@ -83,7 +83,7 @@ class CreditStore(StoreBase):
 
     def credit(self, account_id: str, event_id: str, amount_cents: int) -> None:
         self._require(account_id=account_id, event_id=event_id, amount_cents=amount_cents)
-        with connect(self._database) as connection:
+        with self._connection as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 "UPDATE accounts SET balance_cents = balance_cents + ? WHERE account_id = ?",
@@ -98,7 +98,7 @@ class CreditStore(StoreBase):
 
     def mark_processed(self, event_id: str) -> None:
         self._require(event_id=event_id)
-        with connect(self._database) as connection:
+        with self._connection as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute("INSERT INTO processed_events(event_id) VALUES (?)", (event_id,))
             connection.commit()
@@ -106,7 +106,7 @@ class CreditStore(StoreBase):
 
     def credit_and_mark(self, account_id: str, event_id: str, amount_cents: int) -> None:
         self._require(account_id=account_id, event_id=event_id, amount_cents=amount_cents)
-        with connect(self._database) as connection:
+        with self._connection as connection:
             connection.execute("BEGIN IMMEDIATE")
             if connection.execute(
                 "SELECT 1 FROM processed_events WHERE event_id = ?", (event_id,)

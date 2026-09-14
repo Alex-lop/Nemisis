@@ -985,17 +985,25 @@ class _Ledger:
 
 
 def _file_identity(path: Path) -> dict[str, object]:
-    """The bytes of the database file that SQLite carries but never reads back for a commit.
+    """The database file itself, and the write-ahead log beside it.
 
-    The 100-byte header is compared whole, except the three fields a commit rewrites (the change
-    counter, the page count, and the version-valid-for number); the file must be exactly as many
-    pages long as its own header says. A flag in a header field the store never rewrites
-    (``default_cache_size``, the twenty reserved bytes), or in bytes past the last page, is
-    durable, invisible to every PRAGMA and every row, and caught here.
+    During a delivery the main file never changes: every store commit lives in the WAL (automatic
+    checkpoints are off), so its whole content is pinned by digest and length. After the worker's
+    exit its close checkpoints the WAL, which rewrites three header fields (the change counter,
+    the page count, the version-valid-for number) and extends the file; for that one read the
+    header is compared with those fields blanked and the length against the header's own page
+    count. A flag in any header byte, in the reserved bytes, or past the last page is therefore
+    caught at the next commit, after a kill, and at the worker's final message, and a flag in the
+    three rewritten fields is caught everywhere but after the exit, where a checkpoint has just
+    overwritten it.
+
+    The WAL is the store's own sidecar and grows only at store commits; its length must be exactly
+    its header plus the frames the wal-index says it holds, so bytes appended past the last frame
+    (which SQLite ignores and a later worker could read) are refused wherever the file is read.
     """
     with open(path, "rb") as handle:
-        header = bytearray(handle.read(100))
-        size = os.fstat(handle.fileno()).st_size
+        data = handle.read()
+    header = bytearray(data[:100])
     if len(header) < 100 or header[:16] != b"SQLite format 3\0":
         raise sqlite3.DatabaseError("the database file has no SQLite header")
     page_size = int.from_bytes(header[16:18], "big")
@@ -1003,7 +1011,46 @@ def _file_identity(path: Path) -> dict[str, object]:
     pages = int.from_bytes(header[28:32], "big")
     header[24:32] = bytes(8)
     header[92:96] = bytes(4)
-    return {"header": header.hex(), "bytes_beyond_pages": size - pages * page_size}
+    return {
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size": len(data),
+        "header": header.hex(),
+        "bytes_beyond_pages": len(data) - pages * page_size,
+        "wal": _wal_identity(path, page_size),
+    }
+
+
+def _wal_identity(path: Path, page_size: int) -> dict[str, object]:
+    """The write-ahead log's length, and the length its frame count says it should have."""
+    wal = path.with_name(path.name + "-wal")
+    shm = path.with_name(path.name + "-shm")
+    try:
+        size = wal.stat().st_size
+    except FileNotFoundError:
+        return {"size": 0, "frames_size": 0}
+    frames = 0
+    try:
+        with open(shm, "rb") as handle:
+            index = handle.read(48)
+        if len(index) == 48:
+            # WalIndexHdr, native byte order: iVersion, unused, iChange, isInit, bigEndCksum,
+            # szPage, mxFrame, nPage, ...
+            frames = int.from_bytes(index[16:20], sys.byteorder)
+    except FileNotFoundError:
+        frames = 0
+    frames_size = 32 + frames * (24 + page_size) if frames else min(size, 32)
+    return {"size": size, "frames_size": frames_size}
+
+
+def _after_exit(content: dict[str, object]) -> dict[str, object]:
+    """What can still be compared once the worker's close has checkpointed the WAL: the content,
+    the header with the three rewritten fields blanked, and the length rule; not the whole-file
+    digest and not the WAL, which the checkpoint rewrote and removed."""
+    file = cast(dict[str, object], content["file"])
+    return {
+        **content,
+        "file": {"header": file["header"], "bytes_beyond_pages": file["bytes_beyond_pages"]},
+    }
 
 
 def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -> dict[str, object]:
@@ -1031,6 +1078,15 @@ def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -
         raise _AttemptFailure(
             ExecutionStatus.PROBE_ERROR, f"read-only state probe failed ({error})"
         ) from error
+    wal = cast(dict[str, int], identity["wal"])
+    if wal["size"] != wal["frames_size"]:
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            f"the database's write-ahead log is {wal['size']} bytes but its frames end at "
+            f"{wal['frames_size']}; something wrote to the store's sidecar around the store, and "
+            "a later worker could read what SQLite ignores. " + scenario.store_remedy,
+            integrity=IntegrityStatus.INVALID,
+        )
     return {"file": identity, "header": header, "schema": schema, "tables": tables}
 
 
@@ -1074,6 +1130,22 @@ def _probe(scenario: Scenario, path: Path, event: Mapping[str, object]) -> State
     return _ledger(scenario, path, event).snapshot
 
 
+def _file_difference(expected: dict[str, object], observed: dict[str, object]) -> str:
+    """Which bytes of the database file itself moved, from most to least specific."""
+    before = cast(dict[str, object], expected.get("file") or {})
+    after = cast(dict[str, object], observed.get("file") or {})
+    if after.get("bytes_beyond_pages") != before.get("bytes_beyond_pages"):
+        return f"{after.get('bytes_beyond_pages')} bytes past the database file's last page"
+    if after.get("header") != before.get("header"):
+        return "a header field no store commit rewrites changed (the reserved bytes or a pragma)"
+    if after.get("wal") != before.get("wal"):
+        return "the write-ahead log changed with no store commit to explain it"
+    return (
+        "the database file's bytes changed with no store commit to explain them (a header field "
+        "a checkpoint rewrites, or a page written around the store)"
+    )
+
+
 def _content_difference(
     expected: dict[str, object], observed: dict[str, object], scenario: Scenario
 ) -> str:
@@ -1087,10 +1159,7 @@ def _content_difference(
             "default_cache_size)"
         )
     if observed.get("file") != expected.get("file"):
-        parts.append(
-            "the database file's bytes changed outside SQLite's content (a header field no store "
-            "commit rewrites, or bytes past the last page)"
-        )
+        parts.append(_file_difference(expected, observed))
     expected_tables = cast(Tables, expected["tables"])
     observed_tables = cast(Tables, observed["tables"])
     differing = sorted(
@@ -1284,8 +1353,6 @@ def _wait_for_checkpoint(
                     f"the handler raised {message.get('error', 'an exception')} before the "
                     f"durable {scenario.effect_noun} checkpoint"
                 )
-            if kind == "done":
-                _send(spawn.channel, {"type": "release"})
             raise _AttemptFailure(ExecutionStatus.CHECKPOINT_NOT_REACHED, detail)
         else:
             raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "unexpected worker message")
@@ -1386,8 +1453,9 @@ def _finish_replay(
     # bytes appended past the last page after the last commit would be tidied away before a read
     # that waited for the exit. The nightly red team found exactly that on 2026-09-08.
     observed = _ledger(scenario, database, event)
+    refusal: _AttemptFailure | None = None
     if sha256_json(observed.content) != sha256_json(ledger.content):
-        raise _AttemptFailure(
+        refusal = _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
             "the database changed after the worker's last reported store commit and before the "
             "worker exited; something wrote around the trusted store (a direct connection or a "
@@ -1396,20 +1464,26 @@ def _finish_replay(
             + scenario.store_remedy,
             integrity=IntegrityStatus.INVALID,
         )
+    # Released either way: a worker that finished is not killed for what it wrote, and its
+    # receipt records the exit it earned. The exit has its own budget, because it now includes
+    # the store's close and the checkpoint that runs inside it.
     _send(spawn.channel, {"type": "release"})
     try:
-        return_code = spawn.process.wait(timeout=max(1.0, deadline - monotonic()))
+        return_code = spawn.process.wait(timeout=timeout_seconds)
     except subprocess.TimeoutExpired as error:
         raise _AttemptFailure(
             ExecutionStatus.TIMEOUT,
-            f"the {spawn.phase} delivery worker reported done but did not exit within "
-            f"{timeout_seconds:g} s; a non-daemon thread or child kept it alive",
+            f"the {spawn.phase} delivery worker did not exit within {timeout_seconds:g} s of its "
+            "release; a non-daemon thread or child kept it alive, or the store's close took "
+            f"longer; {WORKER_TIMEOUT_VARIABLE} raises the budget on a slow machine",
         ) from error
     _collect(spawn)
+    if refusal is not None:
+        raise refusal
     if return_code != 0:
         raise _AttemptFailure(ExecutionStatus.REPLAY_ERROR, "replay worker returned nonzero")
     observed = _ledger(scenario, database, event)
-    if sha256_json(observed.content) != sha256_json(ledger.content):
+    if sha256_json(_after_exit(observed.content)) != sha256_json(_after_exit(ledger.content)):
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
             "the database changed after the worker's last reported store commit and after the "
@@ -1446,13 +1520,17 @@ def _attributed_probe(
             f"worker reported an unknown store operation {operation!r}",
         )
     predicted_tables = scenario.apply(cast(Tables, ledger.content["tables"]), operation, normalized)
+    observed = _ledger(scenario, database, event)
+    # The store's commit appended frames to the WAL, and that is the only growth allowed here;
+    # the main file must be exactly what it was.
+    ledger_file = cast(dict[str, object], ledger.content["file"])
+    observed_file = cast(dict[str, object], observed.content["file"])
     predicted = {
-        "file": ledger.content["file"],
+        "file": {**ledger_file, "wal": observed_file["wal"]},
         "header": ledger.content["header"],
         "schema": ledger.content["schema"],
         "tables": predicted_tables,
     }
-    observed = _ledger(scenario, database, event)
     if sha256_json(observed.content) == sha256_json(predicted):
         return observed
     wanted = scenario.snapshot(predicted_tables, normalized)
@@ -1671,8 +1749,12 @@ def _worker(argv: list[str]) -> int:
         # Closing it checkpoints the WAL, and a checkpoint truncates the file to its page count,
         # so bytes a handler appended past the last page after its last commit were gone before
         # a controller that waited for the exit could look (the nightly red team, 2026-09-08).
+        # Bounded by the knob's maximum: a controller that is gone closes the channel and ends
+        # this at once; one that is alive but never releases cannot keep the worker forever.
+        channel.settimeout(_WORKER_TIMEOUT_BOUNDS[1])
         if worker_receive(channel) != {"type": "release"}:
             raise RuntimeError("controller returned an invalid completion acknowledgement")
+        store.close()
         return 0
     except Exception as error:  # Candidate exceptions are bounded protocol evidence.
         with suppress(OSError):

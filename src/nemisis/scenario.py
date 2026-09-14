@@ -114,6 +114,17 @@ class StoreBase:
         # A private copy: the handler holds the same event dict and may mutate its own.
         self._event = {name: value for name, value in event.items()}
         self._sequence = 0
+        # One connection for the worker's whole life, closed by the worker only after the
+        # controller has read the database and released it. Closing the last connection
+        # checkpoints the WAL, and a checkpoint truncates the file to its page count; when a
+        # per-call connection was closed was decided by the garbage collector, which erased bytes
+        # a handler appended past the last page before the controller looked (the nightly red
+        # team, 2026-09-08). Now the close is a protocol step, after the read.
+        self._connection = connect(database)
+
+    def close(self) -> None:
+        """Close the store's connection; the worker calls this after the controller's release."""
+        self._connection.close()
 
     def _require(self, **supplied: object) -> None:
         """Every supplied value must be the event's exact value and exact type.
@@ -147,14 +158,12 @@ def connect(path: Path) -> sqlite3.Connection:
         connection.close()
         raise sqlite3.OperationalError("worker could not enable WAL")
     connection.execute("PRAGMA synchronous=FULL")
-    # Closing the last connection would checkpoint the WAL, and a checkpoint that backfills
-    # frames truncates the file to its page count, which erased bytes a handler appended past
-    # the last page before the controller could read them; when that close happens is decided
-    # by CPython's cyclic garbage collector, not by the handler. The store's connection never
-    # checkpoints on close, so what a handler wrote to the file outlives the worker and the
-    # controller reads it. The sidecars it leaves are the store's own, and the world scan allows
-    # them by name.
-    connection.setconfig(sqlite3.SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE, True)
+    # No automatic checkpoint: every store commit lives in the WAL for the life of the worker,
+    # so the main database file is byte-identical to the seed for the whole delivery and the
+    # controller pins it whole (a flag in the header's change counter, which a checkpoint would
+    # rewrite and the probe used to mask, is caught at the next commit). The store's close, after
+    # the controller's release, is the only checkpoint.
+    connection.execute("PRAGMA wal_autocheckpoint=0")
     return connection
 
 

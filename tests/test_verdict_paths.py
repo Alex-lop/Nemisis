@@ -1335,26 +1335,26 @@ def test_side_channels_from_the_second_hostile_review_forfeit_the_verdict(
     assert cli._exit_code(result.verdict) == 2
 
 
-def test_a_journal_mode_flag_does_not_survive_the_store_and_the_duplicate_shows(
+def test_a_journal_mode_flag_cannot_be_written_while_the_store_holds_its_connection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Hostile review: a dedup flag kept in the journal-mode header bits. The seed leaves the
-    file in WAL and the store's own connection puts it back in WAL on every commit, so the flag is
-    gone by the time a redelivery looks for it and the credit lands twice. That is the patch's
-    real failure, and it is the same on every machine: an earlier engine leaked a read-only probe
-    connection, which made the handler's own PRAGMA fail with "database is locked" in whichever
-    delivery lost the race, and the case was pinned to that accident."""
+    """Hostile review: a dedup flag kept in the journal-mode header bits. Two engines ago the
+    handler's PRAGMA failed with "database is locked" only in whichever delivery lost a race
+    against a leaked read-only probe, and the case was pinned to that accident; one engine ago
+    the store's per-call connection put the file back in WAL on every commit, so the flag was
+    gone by the redelivery and the duplicate showed. Now the store holds one connection for the
+    worker's whole life, and leaving WAL needs exclusive access to the file, so the handler's
+    PRAGMA fails the same way on every machine, in every world: the run stops without a verdict
+    and says what the handler raised. A flag written into those bits some other way is a change
+    to the main file, which is pinned whole during a delivery."""
     monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
     candidate = _tree(tmp_path, "journal-mode", JOURNAL_MODE_FLAG)
 
     result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
 
-    assert result.verdict is CrashVerdict.PATCH_FAILED_STILL_REPRODUCES, result.summary
-    assert "duplicate" in result.summary, result.summary
-    assert result.integrity_status.value == "VALID"
-    assert all(a.failure_detail is None for a in result.attempts), [
-        a.failure_detail for a in result.attempts
-    ]
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert "the handler raised OperationalError" in result.summary, result.summary
+    assert cli._exit_code(result.verdict) == 2
 
 
 def test_a_flag_written_into_the_scratch_tree_stops_the_run_without_a_verdict(
@@ -1742,8 +1742,8 @@ def apply_credit(store, event):
     ("name", "source", "fragment"),
     [
         ("default-cache-size", DEFAULT_CACHE_SIZE_FLAG, "default_cache_size"),
-        ("header-reserved-byte", HEADER_RESERVED_BYTE, "bytes changed outside SQLite's content"),
-        ("trailing-bytes", TRAILING_BYTES, "bytes changed outside SQLite's content"),
+        ("header-reserved-byte", HEADER_RESERVED_BYTE, "a header field no store commit rewrites"),
+        ("trailing-bytes", TRAILING_BYTES, "bytes past the database file's last page"),
         (
             "file-metadata",
             FILE_METADATA_FLAG,
@@ -1865,10 +1865,10 @@ BYTES_AFTER_THE_LAST_COMMIT = {
     if store.processed(event["event_id"]):
         return
 """,
-    # The third refuter's shape: a garbage collection after the append closes the store's
-    # connection before the worker's final message. On an engine whose connection checkpointed
-    # on close, that erased the bytes before any read and this earned FIX_PROVEN; the store's
-    # connection now never checkpoints on close, so the bytes outlive the worker.
+    # The third refuter's shape: a garbage collection after the append. On an engine whose
+    # per-call store connection was closed by the collector, that close checkpointed and erased
+    # the bytes before any read, and this earned FIX_PROVEN; the store now holds one connection
+    # for the worker's life and closes it only after the controller's release.
     "guarded-atomic-then-tail-then-gc": """import gc
 
 
@@ -1903,7 +1903,7 @@ def test_bytes_written_after_the_last_commit_forfeit_the_verdict(
     assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
     assert result.integrity_status.value == "INVALID"
     assert "before the worker exited" in result.summary, result.summary
-    assert "bytes past the last page" in result.summary, result.summary
+    assert "bytes past the database file's last page" in result.summary, result.summary
     assert cli._exit_code(result.verdict) == 2
 
 
@@ -1919,4 +1919,93 @@ def test_tail_bytes_is_a_packaged_zoo_tree_pinned_to_no_verdict(
     assert result.integrity_status.value == "INVALID"
     assert "before the worker exited" in result.summary
     assert "store.credit_and_mark(account_id, event_id, amount_cents)" in result.summary
+    assert cli._exit_code(result.verdict) == 2
+
+
+# The false-pass lens on the nightly fix (2026-09-14): a flag in the header's change counter,
+# which a checkpoint rewrites and the probe therefore masked, was durable for the life of a world
+# in WAL mode and invisible to every read. The main file is now byte-constant during a delivery
+# (no automatic checkpoint) and pinned whole, so the write is caught at the next commit.
+CHANGE_COUNTER_FLAG = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    path = str(store._database)
+    with open(path, "rb") as handle:
+        handle.seek(24)
+        seen = handle.read(4) == b"\\x5a\\x5a\\x5a\\x5a"
+    if seen:
+        store.mark_processed(event["event_id"])
+        return
+    with open(path, "r+b") as handle:
+        handle.seek(24)
+        handle.write(b"\\x5a\\x5a\\x5a\\x5a")
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+# The same lens: sixteen bytes appended to the write-ahead log after the last commit. SQLite
+# ignores bytes past the last frame, a later worker can read them, and the kernel allowed the
+# sidecar by name without reading it. The log's length must now be its frames'.
+WAL_TAIL_AFTER_COMMIT = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    with open(str(store._database) + "-wal", "ab") as tail:
+        tail.write(b"\\x5a" * 16)
+"""
+
+# The kill-world variant: garbage written into the log before the first commit outlasts the
+# store's frames (SQLite restarts the log from its start and does not truncate it) and the kill.
+WAL_GARBAGE_BEFORE_COMMIT = """def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    wal = str(store._database) + "-wal"
+    with open(wal, "ab") as handle:
+        handle.write(b"\\x5a" * 65536)
+    store.credit(event["account_id"], event["event_id"], event["amount_cents"])
+    store.mark_processed(event["event_id"])
+"""
+
+
+# The lenses' other way to erase the append: a checkpoint through the handler's own connection.
+# It backfills the store's frames into the main file, and the main file may not change during a
+# delivery, so the checkpoint itself is the write that is refused.
+OWN_CHECKPOINT_AFTER_TAIL = """import sqlite3
+
+
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    store.credit_and_mark(event["account_id"], event["event_id"], event["amount_cents"])
+    with open(store._database, "ab") as tail:
+        tail.write(b"\\x5a" * 16)
+    with sqlite3.connect(store._database, isolation_level=None) as connection:
+        connection.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+"""
+
+
+@pytest.mark.parametrize(
+    ("name", "source", "fragment"),
+    [
+        ("change-counter-flag", CHANGE_COUNTER_FLAG, "a header field a checkpoint rewrites"),
+        ("own-checkpoint-after-tail", OWN_CHECKPOINT_AFTER_TAIL, "with no store commit to explain"),
+        ("wal-tail-after-commit", WAL_TAIL_AFTER_COMMIT, "write-ahead log is"),
+        ("wal-garbage-before-commit", WAL_GARBAGE_BEFORE_COMMIT, "write-ahead log is"),
+    ],
+)
+def test_the_file_and_its_log_are_pinned_whole_during_a_delivery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str, source: str, fragment: str
+) -> None:
+    """The false-pass lens on the nightly fix found two channels the reading-schedule fix did
+    not reach: the header's change counter (masked because a checkpoint rewrites it, durable in
+    WAL mode until one does) and the write-ahead log (allowed by name, never read). Each earned
+    FIX_PROVEN_FOR_THIS_CAPSULE; each is refused now with a sentence that names it."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    candidate = _tree(tmp_path, name, source)
+
+    result = check(BUGGY_REF, candidate, SCENARIO_ID, mode="local")
+
+    assert result.verdict is CrashVerdict.EVIDENCE_INCOMPLETE, result.summary
+    assert result.integrity_status.value == "INVALID"
+    assert fragment in result.summary, result.summary
     assert cli._exit_code(result.verdict) == 2

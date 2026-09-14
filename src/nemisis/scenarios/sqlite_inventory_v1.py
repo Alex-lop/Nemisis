@@ -13,7 +13,7 @@ import sqlite3
 from collections.abc import Mapping
 
 from nemisis.crash_models import CrashVerdict, FaultBoundary, StateSnapshot
-from nemisis.scenario import Event, Scenario, StoreBase, Tables, connect
+from nemisis.scenario import Event, Scenario, StoreBase, Tables
 
 SCENARIO_ID = "sqlite-inventory-v1"
 INITIAL_ON_HAND = 10
@@ -64,7 +64,7 @@ class InventoryStore(StoreBase):
 
     def reserved(self, event_id: str) -> bool:
         self._require(event_id=event_id)
-        with connect(self._database) as connection:
+        with self._connection as connection:
             row = connection.execute(
                 "SELECT 1 FROM reserved_orders WHERE event_id = ?", (event_id,)
             ).fetchone()
@@ -72,7 +72,7 @@ class InventoryStore(StoreBase):
 
     def reserve(self, sku: str, event_id: str, quantity: int) -> None:
         self._require(sku=sku, event_id=event_id, quantity=quantity)
-        with connect(self._database) as connection:
+        with self._connection as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute(
                 "UPDATE stock SET on_hand = on_hand - ? WHERE sku = ?", (quantity, sku)
@@ -86,7 +86,7 @@ class InventoryStore(StoreBase):
 
     def mark_reserved(self, event_id: str) -> None:
         self._require(event_id=event_id)
-        with connect(self._database) as connection:
+        with self._connection as connection:
             connection.execute("BEGIN IMMEDIATE")
             connection.execute("INSERT INTO reserved_orders(event_id) VALUES (?)", (event_id,))
             connection.commit()
@@ -94,7 +94,7 @@ class InventoryStore(StoreBase):
 
     def reserve_and_mark(self, sku: str, event_id: str, quantity: int) -> None:
         self._require(sku=sku, event_id=event_id, quantity=quantity)
-        with connect(self._database) as connection:
+        with self._connection as connection:
             connection.execute("BEGIN IMMEDIATE")
             if connection.execute(
                 "SELECT 1 FROM reserved_orders WHERE event_id = ?", (event_id,)
