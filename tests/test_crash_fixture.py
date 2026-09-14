@@ -30,6 +30,7 @@ from nemisis.crash_fixture import (
     materialize_fixture,
 )
 from nemisis.hashing import sha256_json, sha256_text, sha256_tree
+from nemisis.scenarios import SCENARIOS
 
 
 class MemoryStore:
@@ -119,8 +120,13 @@ def test_rejects_unknown_refs_before_creating_a_destination(tmp_path: Path) -> N
         TAIL_BYTES_REF,
     )
     assert FIXTURE_REFS[: len(credit_refs)] == credit_refs
+    # Every other registered scenario contributes its own refs, in registration order, after the
+    # hero's; none of them may borrow the hero's prefix.
+    assert {ref.removeprefix("fixture:").partition("/")[0] for ref in FIXTURE_REFS} == set(
+        SCENARIOS
+    )
     assert all(
-        ref.startswith("fixture:sqlite-inventory-v1/") for ref in FIXTURE_REFS[len(credit_refs) :]
+        not ref.startswith("fixture:sqlite-credit-v1/") for ref in FIXTURE_REFS[len(credit_refs) :]
     )
 
 

@@ -42,7 +42,7 @@ def _tree(tmp_path: Path, name: str, handler_source: str) -> Path:
 
 
 def test_registry_holds_both_scenarios_with_their_own_seed_direction_and_predicate() -> None:
-    assert set(SCENARIOS) == {"sqlite-credit-v1", SCENARIO_ID}
+    assert SCENARIO_ID in SCENARIOS and "sqlite-credit-v1" in SCENARIOS
     assert scenario_for(SCENARIO_ID) is INVENTORY
     event = load_event(INVENTORY)
     assert event == {"event_id": "order-1", "quantity": 2, "sku": "widget"}
