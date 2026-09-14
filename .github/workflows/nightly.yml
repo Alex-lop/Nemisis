@@ -31,7 +31,10 @@ jobs:
       fail-fast: false
       matrix:
         # One sweep per audited scenario; the grammar speaks each one's vocabulary.
-        scenario: ["sqlite-credit-v1", "sqlite-inventory-v1"]
+        scenario:
+          - "sqlite-credit-v1"
+          - "sqlite-inventory-v1"
+          - "sqlite-webhook-idempotency-v1"
     name: redteam (${{ matrix.scenario }})
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
