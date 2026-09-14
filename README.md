@@ -149,6 +149,9 @@ agent: it gets the bug report, the buggy module, and the store API, and nothing 
 CrashCheck kills or judges. Its module is accepted only after deterministic checks (signature,
 imports, no private attributes), becomes an ordinary candidate tree, and is judged like any other.
 
+The `--issue` path below is inside the checkout. `export` copies a fixture tree, not the issue
+text, and no other command prints it, so this section needs the clone from [Try it](#try-it).
+
 ```bash
 export NEBIUS_API_KEY=...   # without it: exit 2, nothing written
 uv run nemisis propose-patch --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md \
