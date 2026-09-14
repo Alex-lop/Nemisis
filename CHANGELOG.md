@@ -4,6 +4,16 @@ Every entry is one idea taken from the commit history. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `sqlite-webhook-idempotency-v1`: a third audited scenario, the Stripe-shaped redelivery. One
+  founder seat, a webhook that grants three more, and a crash between the grant and its idempotency
+  key that bills the workspace for seven. It ships with `raw-sql` and `shadow-table` in its zoo, so
+  the two shapes that keep durable state where no kill point reaches it are packaged trees here and
+  not only generated handlers, and with a nightly red-team leg of its own.
+
 ## [0.2.0] — 2026-09-14
 
 A second scenario, an adversarial generator that red-teams the checker nightly (and the first bug

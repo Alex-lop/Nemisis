@@ -151,9 +151,10 @@ tree, event, database, worker, execution, and capsule identities.
 ## Alpha boundary
 
 Supported: Python 3.12+, POSIX process groups and `SIGKILL`, SQLite WAL with
-`synchronous=FULL`, the two registered scenarios and their fixed trusted stores (`sqlite-credit-v1`
-/ `CreditStore`, `sqlite-inventory-v1` / `InventoryStore`), exact fixture/local directory/Git
-sources, and trusted owner checkouts.
+`synchronous=FULL`, the three registered scenarios and their fixed trusted stores
+(`sqlite-credit-v1` / `CreditStore`, `sqlite-inventory-v1` / `InventoryStore`,
+`sqlite-webhook-idempotency-v1` / `WebhookStore`), exact fixture/local directory/Git sources, and
+trusted owner checkouts.
 
 Unsupported: arbitrary languages, databases, side effects, handlers outside the fixed adapter
 shape, hostile local fork execution, generalized schedule or interleaving search, model-authored

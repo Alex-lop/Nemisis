@@ -212,17 +212,21 @@ is an `EVIDENCE_INCOMPLETE` whose message names the phase, the commits seen so f
 budget. On a slow or loaded machine, `NEMISIS_WORKER_TIMEOUT_SECONDS=30` raises it; no receipt
 depends on the value, and a value outside 1 to 600 is refused rather than clamped.
 
-## Two scenarios, one kernel
+## Three scenarios, one kernel
 
 The kernel is written once; a scenario is one object (schema, seed, store, probe, predicate, words).
 `sqlite-inventory-v1` is the second: an order reserves two units of a SKU, stock goes 10 to 8, and
 a crash between the decrement and its marker oversells to 6. It is the bug the original
-differential verifier could only mark `UNRESOLVED`, decided:
+differential verifier could only mark `UNRESOLVED`, decided. `sqlite-webhook-idempotency-v1` is the
+third: a payment provider redelivers `checkout.session.completed`, the handler grants the three
+purchased seats and then writes the idempotency key, and a crash in that window bills the workspace
+for seven seats instead of four.
 
 | Scenario | Effect | Buggy | Agent's rewrite | Atomic | `mark-first` |
 | --- | --- | --- | --- | --- | --- |
 | `sqlite-credit-v1` | `$0` to `$25` | `$50` | `$50` | `$25` | `$0`, marked done |
 | `sqlite-inventory-v1` | 10 to 8 units | 6 units | 6 units | 8 units | 10 units, marked reserved |
+| `sqlite-webhook-idempotency-v1` | 1 to 4 seats | 7 seats | 7 seats | 4 seats | 1 seat, keyed delivered |
 
 ```bash
 uv run nemisis check --base fixture:sqlite-inventory-v1/buggy --candidate fixture:sqlite-inventory-v1/mark-first
@@ -263,6 +267,7 @@ an image, or a test count here goes stale:
 | Every durable change is attributed: raw SQL, a shadow table, a pragma, a file, an empty directory, `~`, `TMPDIR` forfeit the verdict | [`tests/test_verdict_paths.py`](tests/test_verdict_paths.py) |
 | Complete-but-wrong is a failed patch, never missing evidence | [`tests/test_crash_models.py`](tests/test_crash_models.py), [`tests/test_verdict_paths.py`](tests/test_verdict_paths.py) |
 | The second scenario has its own seed, direction, and predicate and earns the same four verdicts | [`tests/test_inventory_scenario.py`](tests/test_inventory_scenario.py) |
+| The third scenario keeps its own words, and its zoo trees that write around the store are refused | [`tests/test_webhook_scenario.py`](tests/test_webhook_scenario.py) |
 | Generated handlers agree with an oracle that only knows their operation sequence | [`tests/test_redteam.py`](tests/test_redteam.py) |
 | The README's `init` → accept → `check` sequence runs on a real git repository through the CLI | [`tests/test_point_at_your_code.py`](tests/test_point_at_your_code.py) |
 | Truth labels come from code; a config, capsule, or tree cannot claim `LIVE` or an author | [`tests/test_trust_boundaries.py`](tests/test_trust_boundaries.py), [`tests/test_agent_patch.py`](tests/test_agent_patch.py) |

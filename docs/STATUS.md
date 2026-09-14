@@ -16,7 +16,7 @@ Committed hero evidence (regenerated 2026-09-07 at engine `c339aa9`, the third h
 
 Current tree:
 
-- engine code digest: `1afdb6ee88585074eaeda65c50223c18fb73c4b67710affb247ff8e55a51bb15`
+- engine code digest: `b4db648d0bb4ecbede32b8af3d4fc78376e66d3c4ff6b20c39aed5ccb3515f01`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
@@ -142,7 +142,7 @@ provider run.
   reason, 21 holes
   each naming the test it is owed); `mutants.yml` reruns the thirteen targets monthly and fails on a
   survivor the newest ledger does not list;
-- locked dependency sync, formatter, Ruff, mypy, 615 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 625 tests, and package build: pass locally on
   Python 3.12.13; CI runs the same gate on CPython 3.12, 3.13, and 3.14 (the 3.14 leg first ran
   green on a real runner at
   [run 34093138705](https://github.com/Alex-lop/Nemisis/actions/runs/34093138705), where the only

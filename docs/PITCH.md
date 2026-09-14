@@ -108,8 +108,8 @@ scenarios, one handler shape, executed rather than inferred.
 
 ## What it is not, on purpose
 
-Two scenarios (`sqlite-credit-v1`, `sqlite-inventory-v1`), one handler shape, Python 3.12+, SQLite,
-POSIX `SIGKILL`. It is not a general fuzzer, not a formal verifier, and a passing result means "this
+Three scenarios (`sqlite-credit-v1`, `sqlite-inventory-v1`, `sqlite-webhook-idempotency-v1`), one
+handler shape, Python 3.12+, SQLite, POSIX `SIGKILL`. It is not a general fuzzer, not a formal verifier, and a passing result means "this
 exact tree defeated this exact capsule and every kill point of its own," nothing broader. Five
 worlds must agree or there is no verdict; a nondeterministic handler is reported as a split, never
 averaged. The narrowness is what makes the verdict trustworthy.

@@ -128,7 +128,7 @@ tree written), or `NEMOTRON PATCH REJECTED: model module import is not allowed: 
 like, when the model stepped outside the store API. Nothing is written on rejection.
 
 The same beat runs on the second scenario: `uv run nemisis propose-patch --help` lists
-`--scenario {sqlite-credit-v1,sqlite-inventory-v1}`, so `--issue
+`--scenario {sqlite-credit-v1,sqlite-inventory-v1,sqlite-webhook-idempotency-v1}`, so `--issue
 src/nemisis/fixtures/sqlite_inventory_v1/issue.md --base fixture:sqlite-inventory-v1/buggy
 --scenario sqlite-inventory-v1` asks Nemotron for the stock-reservation fix instead, and `check`
 crash-tests it the same way.
