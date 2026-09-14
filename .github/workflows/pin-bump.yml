@@ -1,0 +1,83 @@
+# The copyable example pins the Nemisis action to one reviewed `main` commit. This workflow keeps
+# that pin equal to what `main` runs: after every push to `main` it checks whether anything the
+# action executes (`src/nemisis`, `action.yml`, `pyproject.toml`, `uv.lock`) changed since the
+# pinned commit and, if so, opens a pull request that moves the pin (and the same SHA in
+# docs/STATUS.md) to the new `main` head, with auto-merge enabled.
+#
+# The changed-since-pin guard is what stops it reacting to its own bump commits: a bump touches
+# only the example and STATUS, so the next run finds nothing changed since the new pin and exits.
+# An older bump pull request of its own is closed and replaced, so two engine merges in a row end
+# with the newer pin and a failed run cannot wedge the next one.
+#
+# A pull request opened with the repository token gets a `pull_request` CI run that is held for
+# approval, so this run also dispatches `ci.yml` on the branch; the dispatched run's check runs
+# land on the same head SHA the ruleset's required checks read. Auto-merge is enabled before the
+# dispatch, so a failed dispatch leaves a pull request a human can retry, not an orphan.
+# `tests/test_docs_identity.py` makes a stale pin visible on `main` even if this workflow is off.
+name: Pin bump
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Move the pin to this head if what the action runs changed since the pinned commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          example=.github/examples/crashcheck.yml
+          pin="$(grep -oE 'Alex-lop/Nemisis@[0-9a-f]{40}' "$example" | cut -d@ -f2 || true)"
+          [[ -n "$pin" ]] || { echo "no 40-hex action pin in $example" >&2; exit 1; }
+          if git diff --quiet "$pin"..HEAD -- src/nemisis action.yml pyproject.toml uv.lock; then
+            echo "nothing the action runs changed since $pin; nothing to bump"
+            exit 0
+          fi
+          allowed="$(gh api repos/${GITHUB_REPOSITORY}/actions/permissions/workflow --jq .can_approve_pull_request_reviews)"
+          if [[ "$allowed" != "true" ]]; then
+            echo "the pin needs a bump but this repository does not let Actions open pull requests:" >&2
+            echo "Settings > Actions > General > Workflow permissions > 'Allow GitHub Actions to create and approve pull requests'" >&2
+            exit 1
+          fi
+          new="$(git rev-parse HEAD)"
+          branch="pin/${new:0:12}"
+          sed -i "s|Alex-lop/Nemisis@$pin|Alex-lop/Nemisis@$new|" "$example"
+          sed -i "s|reviewed action pin: \`$pin\`|reviewed action pin: \`$new\`|" docs/STATUS.md
+          grep -q "Alex-lop/Nemisis@$new" "$example" || { echo "the example's pin line did not change" >&2; exit 1; }
+          grep -q "reviewed action pin: \`$new\`" docs/STATUS.md || { echo "STATUS's pin line did not change" >&2; exit 1; }
+          git diff --stat -- "$example" docs/STATUS.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git commit -a \
+            -m "ci(pin): the example runs main at ${new:0:7}" \
+            -m "What the action runs changed between ${pin:0:7} and ${new:0:7}, so the copyable workflow and docs/STATUS.md now pin ${new:0:7}. Opened by pin-bump.yml." \
+            -m "Co-Authored-By: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          git push -u origin "$branch"
+          # An older bump of ours is superseded: close it and drop its branch before opening the new one.
+          gh pr list --state open --limit 100 --json number,headRefName,author \
+            --jq '.[] | select(.headRefName | startswith("pin/")) | select(.author.login | test("github-actions")) | .number' \
+            | while read -r older; do
+                gh pr close "$older" --delete-branch --comment "Superseded by the bump to ${new:0:7}."
+              done
+          url="$(gh pr create --base main --head "$branch" \
+            --title "ci(pin): the example runs main at ${new:0:7}" \
+            --body "What the action runs (\`src/nemisis\`, \`action.yml\`, \`pyproject.toml\`, \`uv.lock\`) changed between \`${pin:0:7}\` and \`${new:0:7}\`. This moves the pin in \`.github/examples/crashcheck.yml\` and the reviewed action pin in \`docs/STATUS.md\` to \`$new\`. Opened by \`pin-bump.yml\`; it merges on its own once the dispatched CI run is green.")"
+          number="${url##*/}"
+          gh pr merge "$number" --auto --merge
+          gh workflow run ci.yml --ref "$branch"
+          echo "opened #$number on $branch with auto-merge; CI dispatched"
