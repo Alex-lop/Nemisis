@@ -425,6 +425,42 @@ that is why `doctor` stays `BLOCKED` and no path from `BLOCKED` to a run is writ
 fail-closed skeleton with an injected client is honest, a transport that reports `LIVE` with
 weaker receipts is not.
 
+## The example pin follows main's engine (2026-09-13)
+
+The copyable workflow pins the action to a full commit SHA, as every action in `.github/` is
+pinned, and that pin was ninety-five commits and three hostile rounds behind `main` by the time
+anyone looked. The reminder to bump it was written down twice and done neither time, so the bump
+is now a rule with a test, and a machine is the backstop.
+
+What the pin must track is what `uses: Alex-lop/Nemisis@<sha>` runs: `src/nemisis`, `action.yml`
+(the action's contract and its own pinned actions), `pyproject.toml`, and `uv.lock`. A first draft
+compared only the engine tree; an independent reader showed a pin nineteen commits behind, one
+action output short, passing every check. The test (`tests/test_docs_identity.py`) requires the
+pinned commit to be in HEAD's history everywhere, and on `main` (HEAD is `origin/main`) requires
+those four paths at the pinned commit to be byte-identical to HEAD's. A branch is not held to the
+strict comparison: a branch cannot pin a commit `main` does not have, and a first draft that
+compared against the branch point would have turned every open pull request red whenever `main`'s
+pin lagged, with the ruleset then blocking every merge. The visibility the test exists for is
+`main` red, and only `main`.
+
+A pull request that changes any of the four paths ends with a commit that moves the pin to its
+last such commit; that commit is an ancestor of the merge, so the strict comparison on `main` is
+green immediately. The bot (`.github/workflows/pin-bump.yml`) is the backstop for a merge that
+forgot: on every push to `main`, if `git diff --quiet <pin>..HEAD -- <the four paths>` is quiet it
+exits (which is also what keeps it from reacting to its own bump commits), otherwise it moves both
+lines on a `pin/<sha>` branch, closes and replaces any older bump of its own (so two engine merges
+in a row end with the newer pin and a failed run cannot wedge the next one), opens the pull
+request, enables auto-merge before anything that can fail, and dispatches `ci.yml` on the branch,
+because a pull request opened with the repository token gets a `pull_request` run that is held
+for approval and the dispatched run is the one that reports on the head SHA. `ci.yml` gained
+`workflow_dispatch` and `fetch-depth: 0` for that and for nothing else. The bot cannot open a pull
+request until the repository setting "Allow GitHub Actions to create and approve pull requests"
+is on (`can_approve_pull_request_reviews`); it checks that first and names the setting when it
+is off. Until its first recorded run it is a design.
+
+Revert: delete the workflow and the test, restore the sentence in STATUS, and the pin is a
+manual step again.
+
 ## The read after the final message happens before the worker may exit (2026-09-14)
 
 The nightly red team failed on five of the six nights after the third hostile round (runs

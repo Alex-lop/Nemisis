@@ -21,10 +21,14 @@ Current tree:
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
 - interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence
-- reviewed action pin: `4db42137ce137b53a8239403a8b0c3e17a24489d`, the exact `main` commit that
+- reviewed action pin: `a0c4a9f211a42c68a6e222c238ee14bda01bd902`, the exact `main` commit that
   [`.github/examples/crashcheck.yml`](../.github/examples/crashcheck.yml) runs
-  (`tests/test_docs_identity.py` fails when the two differ; bump both together after merging
-  engine changes, or anyone who copies the example gets an older engine)
+  (`tests/test_docs_identity.py` fails when the two differ, and fails on `main` when
+  `src/nemisis`, `action.yml`, `pyproject.toml`, or `uv.lock` at the pinned commit differs from
+  `main`'s; an engine pull request carries its own bump, and
+  [`pin-bump.yml`](../.github/workflows/pin-bump.yml) is written to open one after any engine
+  merge that did not, once the repository allows Actions to open pull requests; until its first
+  run is recorded in `MORNING.md` it is a design, not a proof)
 
 ## Product state
 
@@ -116,7 +120,7 @@ provider run.
 
 ## Verified gates
 
-- locked dependency sync, formatter, Ruff, mypy, 555 tests, and package build: pass locally on
+- locked dependency sync, formatter, Ruff, mypy, 556 tests, and package build: pass locally on
   Python 3.12.13; CI runs the same gate on CPython 3.12, 3.13, and 3.14 (the 3.14 leg first ran
   green on a real runner at
   [run 34093138705](https://github.com/Alex-lop/Nemisis/actions/runs/34093138705), where the only
