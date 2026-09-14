@@ -4,7 +4,7 @@ This ledger separates observed behavior from transport and product claims. The c
 was executed from clean source `c339aa90f32ec0874b03d51ff8432505596694b2` on 2026-09-07 at engine
 `29205c5be25169f0ec17faccddd824e2b931ef0efbcaadae23b6f38c7217e94d` and published by the commit
 that follows it on `overnight3/morning`. Later commits may change engine bytes (the current engine
-code digest is `9e13a824a3a3a77d537f5ca6c8130cf7deab17c91342d8ea7547c2c55ee4c5ac`); when they do,
+code digest is `00f25f238193cd6f1c203fe483d5b91fbdab78cca7b4d3169db743e0eefd61ed`); when they do,
 `tests/test_static_hero.py` checks the committed receipts structurally rather than against the live
 strict models, and the hero stays bound to its own engine. A fresh `check` at any later engine
 prints its own capsule and engine digests and is never relabelled.

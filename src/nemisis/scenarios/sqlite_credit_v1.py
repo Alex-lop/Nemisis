@@ -35,7 +35,14 @@ CONTRACT_RESOURCE_DIGEST = "e364533418ea5060fb6abb17b0aa84ab633315d51b7f02646acb
 # raw-sql, which is the textbook fix a judge writes as one SQL transaction and which earns a
 # remedy, not a verdict.
 HERO_VARIANTS = ("buggy", "misleading-green", "atomic")
-ZOO_VARIANTS = ("mark-first", "leftover-credit", "never-marks", "raw-sql", "shadow-table")
+ZOO_VARIANTS = (
+    "mark-first",
+    "leftover-credit",
+    "never-marks",
+    "raw-sql",
+    "shadow-table",
+    "tail-bytes",
+)
 TREE_DIGESTS: Mapping[str, str] = {
     "buggy": "e0e3df5d3bdd0659fd4fcd7719c9047186eb2099dbab2bbb8092c1903a97c0b2",
     "misleading-green": "3d79be420d3a92ee84ac66c15576d1fbfdb7ec3dba4f34dd9e6bfeb8489bf69f",
@@ -45,6 +52,7 @@ TREE_DIGESTS: Mapping[str, str] = {
     "never-marks": "7a9fda4e62e304c3aaa604b97ee1ea4f68c92edbe3fc1e90228b01af6dcd862d",
     "raw-sql": "09e6dc5d9abafa8736c934516a30a9811b53f710b07fe19bff6882cfdc88bc67",
     "shadow-table": "b24b45be51d7380e9ffe582f6d3cdd4e5a92acca1ab15d9b62cd231aa0a8abdf",
+    "tail-bytes": "112c9084ae46f32b81d745899b7b6373b236bea31d2c75f5feb186b9ddc77596",
 }
 
 # What a handler that wrote around the store is told, on the first run, in the summary and report.

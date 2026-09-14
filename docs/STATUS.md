@@ -16,7 +16,7 @@ Committed hero evidence (regenerated 2026-09-07 at engine `c339aa9`, the third h
 
 Current tree:
 
-- engine code digest: `9e13a824a3a3a77d537f5ca6c8130cf7deab17c91342d8ea7547c2c55ee4c5ac`
+- engine code digest: `00f25f238193cd6f1c203fe483d5b91fbdab78cca7b4d3169db743e0eefd61ed`
   (`tests/test_docs_identity.py` pins this value, so it cannot rot; when it differs from the hero's
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
