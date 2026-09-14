@@ -521,6 +521,8 @@ def _timed_out(result: object) -> bool:
     for sweep in getattr(result, "sweeps", ()):
         statuses.append(sweep.census.execution_status)
         statuses += [a.execution_status for a in sweep.attempts]
+    for reduction in getattr(result, "minimization_receipts", ()):
+        statuses += [c.execution_status for c in reduction.confirmations]
     return any(status is ExecutionStatus.TIMEOUT for status in statuses)
 
 
