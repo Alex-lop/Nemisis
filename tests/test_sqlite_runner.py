@@ -38,6 +38,7 @@ from nemisis.sqlite_runner import (
     _kill_and_wait,
     _ledger,
     _probe,
+    _read_content,
     _receive,
     _require_unchanged,
     _seed_database,
@@ -543,3 +544,29 @@ def test_a_write_after_the_worker_died_forfeits_the_post_kill_checkpoint(tmp_pat
         "durable checkpoint changed after worker death: rows that belong to other accounts "
         "or events changed (or this event's own rows did) in credit_ledger"
     )
+
+
+def test_a_probe_that_cannot_read_the_database_is_a_probe_error(tmp_path: Path) -> None:
+    """Every verdict is read through this one function. A read that failed is not a state, and
+    the run has to stop on it instead of carrying on with whatever it half-saw. Both arms of the
+    refusal are staged: a corrupt file answers with a sqlite3 error, a file that is no longer
+    there with an OSError, and the engine turns each into the same refusal."""
+    event = {"account_id": "acct_7", "amount_cents": 2500, "event_id": "evt_1042"}
+    database = tmp_path / "unreadable.sqlite3"
+    _seed_database(CREDIT, database, event)
+    assert _read_content(CREDIT, database, event)["tables"]
+
+    database.write_bytes(b"this is not a database" + bytes(200))
+    with pytest.raises(_AttemptFailure) as corrupt:
+        _read_content(CREDIT, database, event)
+    assert corrupt.value.status is ExecutionStatus.PROBE_ERROR
+    assert corrupt.value.detail == (
+        "read-only state probe failed (the database file has no SQLite header)"
+    )
+
+    database.unlink()
+    with pytest.raises(_AttemptFailure) as gone:
+        _read_content(CREDIT, database, event)
+    assert gone.value.status is ExecutionStatus.PROBE_ERROR
+    # The errno text is the operating system's; the sentence around it is the engine's.
+    assert gone.value.detail.startswith("read-only state probe failed ([Errno 2] ")
