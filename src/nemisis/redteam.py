@@ -28,10 +28,9 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
-from nemisis.crash_models import CrashVerdict
+from nemisis.crash_models import CrashVerdict, ExecutionStatus
 from nemisis.crashcheck import check
 from nemisis.scenarios import scenario_for
-from nemisis.sqlite_runner import WORKER_TIMEOUT_VARIABLE
 
 
 class Op(StrEnum):
@@ -514,6 +513,16 @@ def generate(cases: int, seed: int) -> list[Shape]:
     return out
 
 
+def _timed_out(result: object) -> bool:
+    """Did any world of this check end in the kernel's wall-clock refusal?"""
+    statuses = [getattr(result, "execution_status", None)]
+    statuses += [a.execution_status for a in getattr(result, "attempts", ())]
+    for sweep in getattr(result, "sweeps", ()):
+        statuses.append(sweep.census.execution_status)
+        statuses += [a.execution_status for a in sweep.attempts]
+    return any(status is ExecutionStatus.TIMEOUT for status in statuses)
+
+
 @dataclass(frozen=True)
 class Case:
     index: int
@@ -523,21 +532,25 @@ class Case:
     reason: str
     verdict: str
     summary: str
+    timed_out: bool = False
 
     @property
     def agrees(self) -> bool:
-        return self.verdict == self.expected.value
+        """The verdict the oracle expected, from a check that ran to its own conclusion; a world
+        the kernel ended on the clock agrees with nothing."""
+        return self.verdict == self.expected.value and not self.unknown
 
     @property
     def unknown(self) -> bool:
         """The machine, not the handler: the kernel ran out of wall clock and said so.
 
-        Every wall-clock refusal in the kernel names the budget knob, so a summary that names it
-        is a load-induced ``EVIDENCE_INCOMPLETE``, which is neither agreement nor disagreement:
-        counted as agreement it would hide a real disagreement the oracle expected to be
-        incomplete, and counted as disagreement it would blame the checker for a slow runner.
+        Decided by the kernel's own execution status (``TIMEOUT`` on any world), never by the
+        summary's text, which interpolates names the handler chose. A load-induced
+        ``EVIDENCE_INCOMPLETE`` is neither agreement nor disagreement: counted as agreement it
+        would hide a real disagreement the oracle expected to be incomplete, and counted as
+        disagreement it would blame the checker for a slow runner.
         """
-        return WORKER_TIMEOUT_VARIABLE in self.summary
+        return self.timed_out
 
     @property
     def disagrees(self) -> bool:
@@ -559,9 +572,11 @@ def run(cases: int, seed: int, out: Path, scenario_id: str = CREDIT.scenario_id)
         (handler.parent / "__init__.py").write_text('"""generated"""\n', encoding="utf-8")
         handler.write_text(render(shape.ops, vocabulary, helper=shape.helper), encoding="utf-8")
         os.environ["NEMISIS_ARTIFACT_ROOT"] = str(out / f"artifacts-{index:03d}")
+        timed_out = False
         try:
             result = check(vocabulary.base_ref, tree, scenario_id, mode="local")
             verdict, summary = result.verdict.value, result.summary
+            timed_out = _timed_out(result)
         except Exception as error:  # a crash of the checker is itself a disagreement
             verdict, summary = f"ERROR:{type(error).__name__}", str(error)[:500]
         finally:
@@ -569,7 +584,9 @@ def run(cases: int, seed: int, out: Path, scenario_id: str = CREDIT.scenario_id)
                 os.environ.pop("NEMISIS_ARTIFACT_ROOT", None)
             else:
                 os.environ["NEMISIS_ARTIFACT_ROOT"] = previous
-        results.append(Case(index, shape.ops, shape.helper, expected, reason, verdict, summary))
+        results.append(
+            Case(index, shape.ops, shape.helper, expected, reason, verdict, summary, timed_out)
+        )
     return results
 
 

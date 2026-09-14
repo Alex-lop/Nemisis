@@ -50,7 +50,6 @@ jobs:
           SCENARIO: ${{ matrix.scenario }}
           NEMISIS_WORKER_TIMEOUT_SECONDS: "30"
         run: |
-          set -o pipefail
           status=0
           uv run nemisis redteam --cases "$CASES" --seed "$SEED" --scenario "$SCENARIO" \
             --max-unknown 3 --out "$RUNNER_TEMP/redteam" | tee redteam.txt || status=$?

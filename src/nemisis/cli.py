@@ -172,7 +172,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     redteam.add_argument(
         "--max-unknown",
-        type=int,
+        type=_non_negative,
         default=0,
         help=(
             "how many cases may end in a wall-clock refusal (the kernel's summary names "
@@ -482,6 +482,13 @@ def _fail(message: str, *, as_json: bool = False, crashcheck: bool = True) -> No
     raise SystemExit(2)
 
 
+def _non_negative(value: str) -> int:
+    number = int(value)
+    if number < 0:
+        raise argparse.ArgumentTypeError("--max-unknown must be 0 or more")
+    return number
+
+
 def main() -> None:
     args = _parser().parse_args()
     try:
@@ -622,6 +629,7 @@ def main() -> None:
                                 for case in cases
                             ],
                             "disagreements": len(disagreements),
+                            "max_unknown": args.max_unknown,
                             "scenario": args.scenario,
                             "seed": args.seed,
                             "unknown": len(unknown),

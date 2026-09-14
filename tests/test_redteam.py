@@ -244,22 +244,35 @@ def test_the_nightly_shapes_agree_with_the_oracle(
     assert "before the worker exited" in result.summary, result.summary
 
 
-def _case(index: int, expected: Expected, verdict: str, summary: str) -> Case:
-    return Case(index, (A,), False, expected, "why", verdict, summary)
+def _case(
+    index: int, expected: Expected, verdict: str, summary: str, *, timed_out: bool = False
+) -> Case:
+    return Case(index, (A,), False, expected, "why", verdict, summary, timed_out)
 
 
 def test_a_wall_clock_refusal_is_unknown_not_agreement_and_not_disagreement() -> None:
-    """The machine, not the handler: a summary that names the budget knob is neither side."""
+    """The machine, not the handler: a world the kernel ended in TIMEOUT is neither side, and
+    the decision is the kernel's execution status, never the summary's text, which quotes names
+    the handler chose (a hostile lens named a side file NEMISIS_WORKER_TIMEOUT_SECONDS)."""
     timed_out = _case(
         1,
         Expected.INCOMPLETE,
         CrashVerdict.EVIDENCE_INCOMPLETE.value,
         f"the replay delivery's next store commit did not arrive within 10 s; "
         f"{WORKER_TIMEOUT_VARIABLE} raises the budget on a slow machine",
+        timed_out=True,
     )
     assert timed_out.unknown
-    assert timed_out.agrees  # the verdict strings match, which is exactly what must not count
+    assert not timed_out.agrees  # the verdict strings match, and that must not count
     assert not timed_out.disagrees
+    laundered = _case(
+        4,
+        Expected.PROVEN,
+        CrashVerdict.EVIDENCE_INCOMPLETE.value,
+        "the handler wrote durable entries outside the store "
+        f"(sandbox/cwd/{WORKER_TIMEOUT_VARIABLE})",
+    )
+    assert not laundered.unknown and laundered.disagrees
     real = _case(2, Expected.INCOMPLETE, CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE.value, "proven")
     assert not real.unknown and real.disagrees
     fine = _case(3, Expected.PROVEN, CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE.value, "proven")
@@ -279,6 +292,7 @@ def test_the_cli_counts_unknown_apart_and_fails_only_above_the_threshold(
             CrashVerdict.EVIDENCE_INCOMPLETE.value,
             f"the census delivery's hello did not arrive within 10 s; {WORKER_TIMEOUT_VARIABLE} "
             "raises the budget on a slow machine",
+            timed_out=True,
         ),
     ]
     monkeypatch.setattr(redteam, "run", lambda *args, **kwargs: cases)
