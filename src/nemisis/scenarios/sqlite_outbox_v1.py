@@ -40,11 +40,11 @@ CREATE TABLE outbox(
 CREATE TABLE sent_events(event_id TEXT PRIMARY KEY);
 """
 
-ISSUE_DIGEST = "140c6316da4c11c6c0ea88ac03caf9950db6a2e7f369d26ac2e2f162348ea1dd"
+ISSUE_DIGEST = "34b21d9c2cf9e0f2362000d584185c1692d9079ce20138aa93056224394bff6e"
 EVENT_DIGEST = "d068de76d1045815954ad7c56097a6ff0a487764eaeb4ec045dff51925997410"
 EVENT_RESOURCE_DIGEST = "d068de76d1045815954ad7c56097a6ff0a487764eaeb4ec045dff51925997410"
-AUDITED_CONTRACT_DIGEST = "b05686944f9518e216423017550b068d9be28d8288f2c66303fa6111e8a06c6d"
-CONTRACT_RESOURCE_DIGEST = "4c500e228dc588021c1f002d35f3ca4fb9cb5d2fa38d7eca44a48aa96f03c930"
+AUDITED_CONTRACT_DIGEST = "5f60e941dbe364d7cd6a5867807e4ec37070410db2cd66cb461f514f955fb1af"
+CONTRACT_RESOURCE_DIGEST = "8796e42ce52730ceb6be956f1c6fd419e9dc550f72cf612a9a1e4d388c803d46"
 # The three-tree hero, in canonical order, then the candidate zoo: the same six shapes the credit
 # scenario keeps, spelled for a send. Each one is a patch a reviewer would sign off on.
 HERO_VARIANTS = ("buggy", "misleading-green", "atomic")
