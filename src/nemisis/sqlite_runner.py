@@ -1089,7 +1089,12 @@ def _require_image(
     # deletes the same two); an empty log carries nothing, and the shm's bytes are on the honest
     # list.
     if cast(int, wal["size"]) > 0:
-        problems.append(f"the write-ahead log still holds {wal['size']} bytes after the close")
+        problems.append(
+            f"the write-ahead log still holds {wal['size']} bytes after the close: either "
+            "something wrote to it after the last commit, or a connection the handler left open "
+            "with a transaction or an unexhausted cursor kept the store's checkpoint from "
+            "completing"
+        )
     if problems:
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,

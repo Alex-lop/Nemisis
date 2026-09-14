@@ -153,6 +153,12 @@ class StoreBase:
             raise WroteAroundTheStore(
                 "statements ran on the store's connection outside its methods"
             )
+        # A TEMP trigger or table on the store's connection runs inside the store's own
+        # transaction and shows in no probe; the stores create none.
+        if self._connection.execute("SELECT count(*) FROM sqlite_temp_master").fetchone()[0]:
+            raise WroteAroundTheStore(
+                "a temporary schema object was created on the store's connection"
+            )
 
     def _audit_other_connections(self) -> None:
         if self._read_data_version() != self._data_version:
@@ -168,7 +174,9 @@ class StoreBase:
         The checkpoint is explicit so the state after the exit does not depend on whether this
         was the last connection: a handler that opened one of its own and let it fall out of scope
         would otherwise leave the log full and the file behind the image, and be refused for a
-        write it never made.
+        write it never made. A connection the handler left open with a transaction or an
+        unexhausted cursor still keeps this checkpoint from completing, and the read after the
+        exit says so.
         """
         self._connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchone()
         self._connection.close()
