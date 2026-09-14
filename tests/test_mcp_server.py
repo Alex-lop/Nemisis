@@ -8,18 +8,17 @@ from __future__ import annotations
 import json
 from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, cast
 
 import anyio
 import pytest
 from mcp import Client
-from mcp.types import CallToolResult
+from mcp.types import CallToolResult, TextResourceContents
 
 from nemisis.mcp_server import build_server
 
 CREDIT = "sqlite-credit-v1"
 INVENTORY = "sqlite-inventory-v1"
-T = TypeVar("T")
 
 BUGGY_PORT = '''"""A port of our real webhook credit handler to the CrashCheck store."""
 
@@ -32,7 +31,7 @@ def apply_credit(store, event):
     store.mark_processed(event["event_id"])
 '''
 
-ATOMIC_PORT = '''"""A port of our real webhook credit handler, fixed: credit and mark in one commit."""
+ATOMIC_PORT = '''"""Our real credit handler, fixed: credit and mark in one commit."""
 
 
 def apply_credit(store, event):
@@ -48,7 +47,7 @@ def _artifact_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     return root
 
 
-def _run(body: Callable[[Client], Awaitable[T]]) -> T:
+def _run[T](body: Callable[[Client], Awaitable[T]]) -> T:
     async def main() -> T:
         async with Client(build_server()) as client:
             return await body(client)
@@ -58,7 +57,7 @@ def _run(body: Callable[[Client], Awaitable[T]]) -> T:
 
 def _structured(result: CallToolResult) -> dict[str, Any]:
     assert result.structured_content is not None, result.content
-    return result.structured_content
+    return cast(dict[str, Any], result.structured_content)
 
 
 def _write_port(root: Path, handler: str) -> Path:
@@ -196,7 +195,11 @@ def test_the_nemotron_tools_are_blocked_without_a_key_not_mocked() -> None:
         patch = _structured(
             await client.call_tool(
                 "propose_patch",
-                {"issue": "double credit on retry", "base": f"fixture:{CREDIT}/buggy", "scenario": CREDIT},
+                {
+                    "issue": "double credit on retry",
+                    "base": f"fixture:{CREDIT}/buggy",
+                    "scenario": CREDIT,
+                },
             )
         )
         return draft, patch
@@ -235,12 +238,14 @@ def test_the_scripted_agent_reaches_fix_proven_with_no_model(tmp_path: Path) -> 
         assert proven["exit_code"] == 0
 
         receipt = await client.read_resource(proven["receipt_resource"])
-        body_text = receipt.contents[0].text
-        capsule = json.loads(body_text)
+        receipt_body = receipt.contents[0]
+        assert isinstance(receipt_body, TextResourceContents)
+        capsule = json.loads(receipt_body.text)
         assert capsule["scenario_id"] == CREDIT
 
         report = await client.read_resource(proven["report_resource"])
-        assert "<html" in report.contents[0].text.lower()
+        report_body = report.contents[0]
+        assert isinstance(report_body, TextResourceContents)
+        assert "<html" in report_body.text.lower()
 
     _run(body)
-

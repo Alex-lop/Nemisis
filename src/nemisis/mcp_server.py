@@ -19,7 +19,7 @@ from __future__ import annotations
 import inspect
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from mcp.server.mcpserver import MCPServer
 
@@ -263,7 +263,7 @@ def build_server() -> MCPServer:
             return {"error": str(error), "truth_label": TruthLabel.LOCAL.value}
         with _artifact_root_env():
             result = _map_windows(candidate, scenario_ref)
-        return _jsonable(result)
+        return cast(dict[str, Any], _jsonable(result))
 
     @server.tool(
         description="Ask Nemotron on Token Factory to draft the contract from the issue and base "
@@ -333,7 +333,7 @@ def build_server() -> MCPServer:
         "is BLOCKED, and on what."
     )
     def doctor() -> dict[str, Any]:
-        return _jsonable(_doctor("local"))
+        return cast(dict[str, Any], _jsonable(_doctor("local")))
 
     @server.resource("nemisis://run/{run_id}/report")
     def run_report(run_id: str) -> str:
