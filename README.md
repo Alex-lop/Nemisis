@@ -34,9 +34,9 @@ Exit `1` blocks the merge. The same frozen crash replayed against the real fix e
 Needs Python 3.12+, [uv](https://docs.astral.sh/uv/), and a POSIX machine (macOS or Linux).
 
 ```bash
-git clone https://github.com/Alex-lop/Nemisis.git && cd Nemisis
-uv sync --frozen --dev
-uv run nemisis check --base fixture:sqlite-credit-v1/buggy \
+uv tool install "git+https://github.com/Alex-lop/Nemisis@main"
+# or, once 0.2.0 is published: uv tool install nemisis
+nemisis check --base fixture:sqlite-credit-v1/buggy \
   --candidate fixture:sqlite-credit-v1/misleading-green \
   --corrected fixture:sqlite-credit-v1/atomic
 ```
@@ -45,8 +45,16 @@ About two seconds. Then replay the frozen crash against the fix (the `capsule:` 
 by `check`):
 
 ```bash
-uv run nemisis replay .nemisis/repros/double-credit/*/capsule.json \
+nemisis replay .nemisis/repros/double-credit/*/capsule.json \
   --source fixture:sqlite-credit-v1/atomic --role corrected
+```
+
+The checkout is for developing Nemisis and for [Verify the project](#verify-the-project); every
+`uv run nemisis` below is that checkout running the same command an installed `nemisis` runs.
+
+```bash
+git clone https://github.com/Alex-lop/Nemisis.git && cd Nemisis
+uv sync --frozen --dev
 ```
 
 ## What it does
