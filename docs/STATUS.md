@@ -27,7 +27,7 @@ Current tree:
   tool directory gave a `nemisis` whose engine code digest is the one above, whose `doctor --mode
   local` is READY, and whose verdicts on `atomic` and `tail-bytes` are `FIX_PROVEN_FOR_THIS_CAPSULE`
   and `EVIDENCE_INCOMPLETE`, the same as the checkout's
-- reviewed action pin: `10dfbeecae6bba9dbde607ea8ff9e7f1b4067690`, the commit that
+- reviewed action pin: `3081174d6a80b5214c17ebed33a1a2fff68ba400`, the commit that
   [`.github/examples/crashcheck.yml`](../.github/examples/crashcheck.yml) runs (on `main` it is
   `main`'s engine; a pull request pins its own last engine commit until it merges)
   (`tests/test_docs_identity.py` fails when the two differ, and fails on `main` when
