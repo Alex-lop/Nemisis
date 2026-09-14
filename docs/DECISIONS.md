@@ -461,3 +461,152 @@ is off. Until its first recorded run it is a design.
 Revert: delete the workflow and the test, restore the sentence in STATUS, and the pin is a
 manual step again.
 
+## The read after the final message happens before the worker may exit (2026-09-14)
+
+The nightly red team failed on five of the six nights after the third hostile round (runs
+34219859012, 34345065158, 34593382316, 34689225054, 34755449725; the seed is the run id), twenty
+disagreement lines in all, ten cases each seen in both scenarios, every one the same shape: a handler that appends bytes past the
+database file's last page after its last store commit, in either scenario's vocabulary. The
+oracle said the write forfeits the verdict; the engine said `PATCH_FAILED_STILL_REPRODUCES`,
+`PATCH_FAILED_INVARIANT_BROKEN`, and, for `guard, atomic, tail, guard` and for `guard, atomic,
+tail` through a helper (run 34593382316, cases 16 and 87; the second is the shape that ships as
+`tail-bytes`), `FIX_PROVEN_FOR_THIS_CAPSULE`.
+It reproduces on a laptop in two seconds. The mechanism, proven with a standalone `sqlite3`
+experiment on 3.53.1 and by the triage on the runner's 3.45: the worker's clean exit closes its
+store connection, closing the last connection checkpoints the WAL, and a checkpoint that
+backfills frames truncates the file to `page_count * page_size`. `_finish_replay` waited for
+the exit and only then read the file, so the bytes were gone before it looked, while
+`docs/SECURITY.md` said the engine reads "after the worker's final message".
+
+Five independent triagers, one per run, classified all twenty lines as an oracle bug: the bytes
+were neither durable nor readable by the time the engine read, so under "what the controller
+cannot read, it does not claim" the engine was right. The reconciler that read their five
+reports, and the coordinator before it, classified them as a checker false pass in the reading
+schedule: the controller could read the bytes, at the moment its own documentation names, and
+read later instead. The reconciler instrumented that instant and found the sixteen bytes on
+disk in every affected line, and found why the window is not even a stable boundary: the store
+opens its connection with `with connect(...) as connection:`, whose exit ends the transaction
+and leaves the handle open, so the connection that will checkpoint at exit lives on past the
+store call only until CPython's cyclic garbage collector runs. One `gc.collect()` before the
+same append turns the unpatched engine's `FIX_PROVEN_FOR_THIS_CAPSULE` into
+`EVIDENCE_INCOMPLETE`. A refusal that depends on whether the garbage collector ran is not a
+rule. A handler that writes around the store and is blessed because SQLite tidied up after it
+is exactly what "a write the store did not make forfeits the verdict" exists to refuse, and
+modelling SQLite's backfill state in the oracle (the bytes survive the close when there was
+nothing to backfill, so `atomic, tail` is refused in the census while `guard, atomic, tail,
+guard` was not) would have put SQLite internals into a predictor that is supposed to know only
+the sequence, and would have turned a live false pass into a permanent blind spot with a green
+nightly. The fix is therefore in the kernel and the
+oracle is unchanged: after `done`, the controller reads the database while the worker still holds
+its connection, refuses any content the ledger does not explain (`INTEGRITY_ERROR`, `INVALID`,
+the sentence names bytes past the last page), sends `release`, waits for the exit, and reads once
+more for exit hooks, threads, and children, comparing what a checkpoint leaves comparable. The worker exits only when released, and it is released even when that read refuses (the
+content comparison and the log's rules alike), so its receipt records the exit it earned; the exit has its own budget, the knob's, because it now
+includes the store's close and the checkpoint inside it. A worker that finished without
+reaching the checkpoint is not released and is killed with its group at cleanup, as a worker
+paused inside a commit report is. Verdict semantics do not change: the same handlers earn the same verdicts, except that a write
+around the store after the last commit now forfeits it in every world instead of in the worlds
+where SQLite happened to leave it in place, and two shapes that were never wrong about the money
+move with the store's connection (the journal-mode flag, whose PRAGMA now raises; a checkpoint
+through the handler's own connection, now the refused write). The shape ships as
+`fixture:sqlite-credit-v1/tail-bytes`; the nine distinct nightly shapes are pinned in
+`tests/test_redteam.py` and the two worst in `tests/test_verdict_paths.py`. One older pin moved
+with the store's connection: a handler that switches the journal mode through its own connection
+used to see the store flip it back and then duplicate; leaving WAL needs exclusive access, which
+the store's open connection now denies in every world, so that handler's PRAGMA raises and the run
+says so.
+
+Three refuters then attacked that classification. Two made the same objection, and it deserves
+its answer here: the appended bytes cannot carry a bit to the next delivery (if they survive,
+the engine catches them; if they are erased, nothing can read them), so `guard, atomic, tail,
+guard` is a correct fix carrying a useless write, and refusing it is a false fail. It is not. A
+verdict here has never meant "exactly once"; it has meant "exactly once, and every durable
+change explained by a store commit". `raw-sql` is correct and refused; `shadow-table` deduplicates
+and is refused; a handler that appends to the store's own database file is refused on the same
+ground, and the sentence it gets names the write. What the objection does establish is recorded
+above: the channel was never usable as a flag. What it does not establish is that the engine may
+bless a write it can see.
+
+The third refuter's lens was SQLite itself, and it found the gap in the fix as first written:
+the read before the exit is one checkpoint away from blind, because the store opened a
+connection per call and the garbage collector closed it at a time the handler did not choose,
+and that close checkpointed. A handler that appends and then calls `gc.collect()` earned
+`FIX_PROVEN_FOR_THIS_CAPSULE` on the branch. A first answer, telling the connection never to
+checkpoint on close, closed that gap and opened another: the hostile lenses on the pull request
+showed the write-ahead log then outliving the worker with sixteen appended bytes a later delivery
+could read. The answer that holds: the store keeps one connection for the worker's life and the
+worker closes it only after the controller's release, so the close is a protocol step after the
+read, and the sidecars are reset at exit as before. The same lenses found a false pass older than
+the nightly: a flag in the header's change counter, which the probe masked because a checkpoint
+rewrites it and which, in WAL mode, no checkpoint rewrote for the life of a world. Automatic
+checkpoints are now off, so the main file is byte-identical to the seed for the whole delivery
+and is pinned whole; only the read after the exit, which follows the store's own checkpoint,
+keeps the masked comparison. And the write-ahead log's length must be its header plus the
+frames the wal-index says it holds, so bytes appended past the last frame, which SQLite ignores
+and a later worker in a kill world could read, are refused wherever the file is read. The shm
+sidecar's bytes stay on the honest list: every reader rewrites them. Both shapes are pinned.
+
+A second round of lenses on that redesign found the read after the exit still soft: it followed
+the store's checkpoint, so it compared only a masked header and a page-count rule, and an exit
+hook that ran after the release could append a whole page and bump the header's page count, write
+the change counter, or recreate a sidecar, and a handler could rewrite bytes inside a frame the
+store had already written (the log's length was pinned, its bytes were not) and let the checkpoint
+copy them into the main file. Now every read records SQLite's own serialization of the logical
+database (what a checkpoint writes), the file after the exit must be exactly that image and the
+log must be empty, and the log may only grow by whole frames at store commits, keeping every byte
+it had. The same round showed a hunt-phase timeout was invisible to the nightly's `unknown` (the
+published attempt says `SETUP_ERROR`); the hunt receipts are read now. The shm sidecar stays on
+the honest list, and so does a close that leaves it and an empty log behind, which this build
+does and the seed already cleans up. Four more shapes are pinned.
+
+A third round found the last in-file channel and one false fail. A row inserted and deleted
+again, through any connection, leaves its bytes in the page's free space and no trace in any row;
+every rule about the file's bytes still held, because the image at a commit is recorded, not
+predicted, and the token rode the log across a kill and the checkpoint across a clean exit. The
+store refuses it itself now: SQLite's `data_version` changes only when another connection
+commits, and `total_changes` counts what the store's own connection changed, so the store checks
+its own connection before every method, checks for other connections' commits once the controller
+has accepted each of its own (so the probe, which names a table or a row, speaks first), and the
+worker checks both before it reports done; SQL committed around the store's methods, through any
+connection, is `WroteAroundTheStore`, and the run says what it can see (the rows that changed, or
+that nothing in any row did). That retires the honest-list entry for a write through a private connection reverted
+before the next store commit: a committed write is refused whether or not it was reverted; a rolled-back one is not
+committed and is not what the audit reads. The false fail: a handler that opened a connection of its own
+and let it fall out of scope wrote nothing, but its lingering handle kept the store's close from
+being the last, so no checkpoint ran and the read after the exit refused a write that never was;
+the store's close checkpoints explicitly now (`wal_checkpoint(TRUNCATE)`), so a connection a
+handler merely left open no longer decides the state after the exit; one it left open with a
+transaction or an unexhausted cursor still keeps that checkpoint from completing, and the read
+after the exit names that possibility. The pair of empty sidecars that lingers
+after a clean exit is the controller's own read-only probe's, not the close's.
+
+A fourth round tested the audit and found where it ends: in the handler's hands. A handler that
+calls the store's own `_settle()` after planting, replaces `store._connection` with one the
+kernel never configured, or writes the shm sidecar is not caught, and will not be: the store
+object is in the handler's hands, and a handler that alters the trusted store's private state is
+the in-process boundary SECURITY has named since the third hostile round, hostile code that local
+mode does not claim to contain. What the round did close cheaply: a temporary trigger or table on
+the store's connection, which runs inside the store's own transaction and shows in no probe (the
+stores create none, so `sqlite_temp_master` must be empty). And it found the false fail that
+remains: a connection the handler leaves open with a transaction or an unexhausted cursor past
+its return keeps the store's checkpoint from completing, so the log is not empty after the exit
+and the run is refused with a sentence that names both causes; closing what one opens is the
+remedy, and the honest list says so.
+
+Two decisions about the nightly itself. A case a world of which the kernel ended on the clock (its execution status is `TIMEOUT`, in any
+world) is the machine, not the handler: `nemisis redteam` now counts it
+as `unknown`, apart from agreement and disagreement, prints it, and fails above `--max-unknown`
+(default 0). The nightly passes `--max-unknown 3` (one percent of a 300-case sweep) and runs with
+`NEMISIS_WORKER_TIMEOUT_SECONDS=30`, the knob's documented use on a slower machine; the local
+default stays 10 s. A load-induced refusal is never counted as agreement, because the classification is the
+kernel's own execution status (`TIMEOUT` on any world: the hunt, the deletion control, a boundary
+world, the census, the sweep) and never the summary's text; a case in which some world timed out
+and another disagreed is filed as unknown, the machine's fault before the checker's, and the
+threshold bounds how many such cases a run may excuse, which quotes names the handler
+chose; a lens named a side file after the knob and watched a first draft file the disagreement
+under unknown.
+
+Revert: the `release` handshake is the block after `break` in `_finish_replay` and the
+`worker_receive` call after `done` in `_worker`; the nightly knobs are two lines in
+`nightly.yml`; the `unknown` count is one property on `Case` and the `--max-unknown` flag.
+

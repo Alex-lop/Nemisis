@@ -21,6 +21,7 @@ from nemisis.crash_fixture import (
     NEVER_MARKS_REF,
     RAW_SQL_REF,
     SHADOW_TABLE_REF,
+    TAIL_BYTES_REF,
     FixtureEvent,
     load_contract,
     load_event,
@@ -115,6 +116,7 @@ def test_rejects_unknown_refs_before_creating_a_destination(tmp_path: Path) -> N
         NEVER_MARKS_REF,
         RAW_SQL_REF,
         SHADOW_TABLE_REF,
+        TAIL_BYTES_REF,
     )
     assert FIXTURE_REFS[: len(credit_refs)] == credit_refs
     assert all(

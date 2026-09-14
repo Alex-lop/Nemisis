@@ -57,7 +57,15 @@ from nemisis.crash_models import (
 from nemisis.hashing import canonical_json, sha256_bytes, sha256_json, sha256_tree
 from nemisis.models import TruthLabel
 from nemisis.safety import safe_relative_path
-from nemisis.scenario import MAX_MESSAGE_BYTES, Event, Scenario, StoreBase, Tables, worker_send
+from nemisis.scenario import (
+    MAX_MESSAGE_BYTES,
+    Event,
+    Scenario,
+    StoreBase,
+    Tables,
+    worker_receive,
+    worker_send,
+)
 from nemisis.scenarios import scenario_for
 
 RUNNER_ID = "sqlite-runner-v2"
@@ -977,17 +985,22 @@ class _Ledger:
 
 
 def _file_identity(path: Path) -> dict[str, object]:
-    """The bytes of the database file that SQLite carries but never reads back for a commit.
+    """The database file itself, and the write-ahead log beside it.
 
-    The 100-byte header is compared whole, except the three fields a commit rewrites (the change
-    counter, the page count, and the version-valid-for number); the file must be exactly as many
-    pages long as its own header says. A flag in a header field the store never rewrites
-    (``default_cache_size``, the twenty reserved bytes), or in bytes past the last page, is
-    durable, invisible to every PRAGMA and every row, and caught here.
+    During a delivery no automatic checkpoint runs, so the main file's whole content is pinned by
+    digest and length at every commit, after a kill, and at the worker's final message; a
+    checkpoint a handler runs itself changes the file and is the refused write. After the
+    worker's exit its close checkpoints the WAL: the file must then be exactly the logical image
+    the last read saw through the log (``_require_image``), and the log must be empty. The masked
+    header and the page-count rule are kept for the sentence that names what moved.
+
+    The WAL is the store's own sidecar and grows only at store commits; its length must be exactly
+    its header plus the frames the wal-index says it holds, so bytes appended past the last frame
+    (which SQLite ignores and a later worker could read) are refused wherever the file is read.
     """
     with open(path, "rb") as handle:
-        header = bytearray(handle.read(100))
-        size = os.fstat(handle.fileno()).st_size
+        data = handle.read()
+    header = bytearray(data[:100])
     if len(header) < 100 or header[:16] != b"SQLite format 3\0":
         raise sqlite3.DatabaseError("the database file has no SQLite header")
     page_size = int.from_bytes(header[16:18], "big")
@@ -995,7 +1008,102 @@ def _file_identity(path: Path) -> dict[str, object]:
     pages = int.from_bytes(header[28:32], "big")
     header[24:32] = bytes(8)
     header[92:96] = bytes(4)
-    return {"header": header.hex(), "bytes_beyond_pages": size - pages * page_size}
+    return {
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size": len(data),
+        "header": header.hex(),
+        "bytes_beyond_pages": len(data) - pages * page_size,
+        "wal": _wal_identity(path, page_size),
+    }
+
+
+def _wal_identity(path: Path, page_size: int) -> dict[str, object]:
+    """The write-ahead log beside the file: its bytes, its length, and the length its frame
+    count says it should have (the wal-index header in the shm sidecar, native byte order:
+    iVersion, unused, iChange, isInit, bigEndCksum, szPage, mxFrame, nPage, ...). Opening a
+    connection creates an empty log and an shm before any commit, so an empty log is no log."""
+    wal = path.with_name(path.name + "-wal")
+    shm = path.with_name(path.name + "-shm")
+    try:
+        with open(wal, "rb") as handle:
+            data = handle.read()
+    except FileNotFoundError:
+        data = b""
+    if not data:
+        return {"sha256": "", "size": 0, "frames_size": 0}
+    frames = 0
+    try:
+        with open(shm, "rb") as handle:
+            index = handle.read(48)
+        if len(index) == 48:
+            frames = int.from_bytes(index[16:20], sys.byteorder)
+    except FileNotFoundError:
+        frames = 0
+    frames_size = 32 + frames * (24 + page_size) if frames else min(len(data), 32)
+    return {
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "size": len(data),
+        "frames_size": frames_size,
+    }
+
+
+def _wal_prefix_digest(path: Path, length: int) -> str:
+    """The digest of the write-ahead log's first ``length`` bytes, or "" if it is shorter."""
+    wal = path.with_name(path.name + "-wal")
+    try:
+        with open(wal, "rb") as handle:
+            data = handle.read(length)
+    except FileNotFoundError:
+        return ""
+    return hashlib.sha256(data).hexdigest() if len(data) == length else ""
+
+
+def _after_exit(content: dict[str, object]) -> dict[str, object]:
+    """Once the worker's close has checkpointed the WAL, the content is still comparable; the
+    file itself is compared against the logical image the last read saw (see _require_image)."""
+    return {name: value for name, value in content.items() if name != "file"}
+
+
+def _require_image(
+    scenario: Scenario, observed: dict[str, object], ledger: dict[str, object]
+) -> None:
+    """After a clean exit the main file must be exactly the logical database the last read saw
+    through the WAL (SQLite's own serialization of it), and the log must be empty: the close's
+    checkpoint writes that image and empties the log, so anything else was written after the
+    worker's last reported commit, by an exit hook, a thread, a child, or a decoy close."""
+    file = cast(dict[str, object], observed["file"])
+    wanted = cast(dict[str, object], ledger["file"])
+    wal = cast(dict[str, object], file["wal"])
+    problems: list[str] = []
+    if file["size"] != wanted["image_size"]:
+        problems.append(
+            f"the database file is {file['size']} bytes, not the {wanted['image_size']}-byte "
+            "image the last read saw through the write-ahead log"
+        )
+    elif file["sha256"] != wanted["image_sha256"]:
+        problems.append(
+            "the database file's content is not the image the last read saw through the "
+            "write-ahead log (same length, different bytes)"
+        )
+    # The controller's own read-only probe leaves an empty log and the shm behind (the seed
+    # deletes the same two); an empty log carries nothing, and the shm's bytes are on the honest
+    # list.
+    if cast(int, wal["size"]) > 0:
+        problems.append(
+            f"the write-ahead log still holds {wal['size']} bytes after the close: either "
+            "something wrote to it after the last commit, or a connection the handler left open "
+            "with a transaction or an unexhausted cursor kept the store's checkpoint from "
+            "completing"
+        )
+    if problems:
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            "the database changed after the worker's last reported store commit and after the "
+            "worker exited; something wrote around the trusted store (an exit hook, a thread, a "
+            f"child, or a connection the store did not close): {'; '.join(problems)}. "
+            + scenario.store_remedy,
+            integrity=IntegrityStatus.INVALID,
+        )
 
 
 def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -> dict[str, object]:
@@ -1019,10 +1127,24 @@ def _read_content(scenario: Scenario, path: Path, event: Mapping[str, object]) -
                 name: [[_json_safe(value) for value in row] for row in rows]
                 for name, rows in scenario.tables(connection).items()
             }
+            # The logical database as SQLite sees it through the log: what a checkpoint writes.
+            image = connection.serialize()
     except (sqlite3.Error, OSError) as error:
         raise _AttemptFailure(
             ExecutionStatus.PROBE_ERROR, f"read-only state probe failed ({error})"
         ) from error
+    identity["image_sha256"] = hashlib.sha256(image).hexdigest()
+    identity["image_size"] = len(image)
+    wal = cast(dict[str, object], identity["wal"])
+    if wal["size"] != wal["frames_size"]:
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            f"the database's write-ahead log is {wal['size']} bytes and its wal-index says its "
+            f"frames end at {wal['frames_size']}; something wrote to the store's sidecar around "
+            "the store, and a later worker could read what SQLite ignores. "
+            + scenario.store_remedy,
+            integrity=IntegrityStatus.INVALID,
+        )
     return {"file": identity, "header": header, "schema": schema, "tables": tables}
 
 
@@ -1066,6 +1188,24 @@ def _probe(scenario: Scenario, path: Path, event: Mapping[str, object]) -> State
     return _ledger(scenario, path, event).snapshot
 
 
+def _file_difference(expected: dict[str, object], observed: dict[str, object]) -> str:
+    """Which bytes of the database file itself moved, from most to least specific."""
+    before = cast(dict[str, object], expected.get("file") or {})
+    after = cast(dict[str, object], observed.get("file") or {})
+    if after.get("bytes_beyond_pages") != before.get("bytes_beyond_pages"):
+        return f"{after.get('bytes_beyond_pages')} bytes past the database file's last page"
+    if after.get("header") != before.get("header"):
+        return "a header field no store commit rewrites changed (the reserved bytes or a pragma)"
+    if after.get("wal") != before.get("wal"):
+        return "the write-ahead log changed with no store commit to explain it"
+    if after.get("image_sha256") != before.get("image_sha256"):
+        return "the database's logical image changed with no store commit to explain it"
+    return (
+        "the database file's bytes changed with no store commit to explain them (a header field "
+        "a checkpoint rewrites, or a page written around the store)"
+    )
+
+
 def _content_difference(
     expected: dict[str, object], observed: dict[str, object], scenario: Scenario
 ) -> str:
@@ -1077,11 +1217,6 @@ def _content_difference(
         parts.append(
             "the database header changed (PRAGMA user_version, application_id, or "
             "default_cache_size)"
-        )
-    if observed.get("file") != expected.get("file"):
-        parts.append(
-            "the database file's bytes changed outside SQLite's content (a header field no store "
-            "commit rewrites, or bytes past the last page)"
         )
     expected_tables = cast(Tables, expected["tables"])
     observed_tables = cast(Tables, observed["tables"])
@@ -1095,6 +1230,8 @@ def _content_difference(
             f"rows that belong to {scenario.others_noun} changed (or this event's own rows did) "
             f"in {', '.join(differing)}"
         )
+    if observed.get("file") != expected.get("file"):
+        parts.append(_file_difference(expected, observed))
     return "; ".join(parts) or "the database differs"
 
 
@@ -1271,6 +1408,8 @@ def _wait_for_checkpoint(
                     f"(commits seen: {', '.join(spawn.operations)}); check it "
                     f"{scenario.effect_verb} at all before crash-testing it"
                 )
+            elif message.get("error") == STORE_REFUSAL:
+                raise _store_refusal(scenario, database, event, ledger, spawn, first_delivery=True)
             else:
                 detail = (
                     f"the handler raised {message.get('error', 'an exception')} before the "
@@ -1310,6 +1449,50 @@ def _no_commit_detail(
         f"the handler changed the database without a single {store} commit ({what}), so that "
         "write went through a connection CrashCheck does not own and no kill point exists inside "
         f"that write. {scenario.store_remedy}"
+    )
+
+
+# The name the trusted store raises when SQL was committed around its methods; the worker reports
+# it like any exception, and the controller reads it as what it is: an integrity failure.
+STORE_REFUSAL = "WroteAroundTheStore"
+
+
+def _store_refusal(
+    scenario: Scenario,
+    database: Path,
+    event: Mapping[str, object],
+    ledger: _Ledger,
+    spawn: _Spawn,
+    *,
+    first_delivery: bool,
+) -> _AttemptFailure:
+    """The store refused the delivery. Say what the controller can see first: a change in the
+    rows is named (a first delivery with no store commit is told what it wrote, as it always
+    was), and only a write that left no trace in any row is described as what it is."""
+    observed = _ledger(scenario, database, event)
+    if sha256_json(_after_exit(observed.content)) == sha256_json(_after_exit(ledger.content)):
+        detail = (
+            f"the store refused the {spawn.phase} delivery: SQL was committed to its database "
+            "around its methods and left no trace in any row (a row inserted and deleted again "
+            "keeps its bytes in a page's free space; a checkpoint run by another connection moves "
+            "the store's pages), so the kill point can no longer be trusted to sit where the money "
+            "moved. "
+        )
+    elif first_delivery and not spawn.operations:
+        return _AttemptFailure(
+            ExecutionStatus.CHECKPOINT_NOT_REACHED,
+            _no_commit_detail(scenario, database, event, ledger),
+        )
+    else:
+        detail = (
+            "the database changed after the worker's last reported store commit; something wrote "
+            "around the trusted store: "
+            f"{_content_difference(ledger.content, observed.content, scenario)}. "
+        )
+    return _AttemptFailure(
+        ExecutionStatus.INTEGRITY_ERROR,
+        detail + scenario.store_remedy,
+        integrity=IntegrityStatus.INVALID,
     )
 
 
@@ -1358,6 +1541,8 @@ def _finish_replay(
             _send(spawn.channel, {"type": "continue"})
             continue
         if kind == "error":
+            if message.get("error") == STORE_REFUSAL:
+                raise _store_refusal(scenario, database, event, ledger, spawn, first_delivery=False)
             raise _AttemptFailure(
                 ExecutionStatus.REPLAY_ERROR,
                 f"the handler raised {message.get('error', 'an exception')} during the "
@@ -1371,23 +1556,51 @@ def _finish_replay(
         if message != expected:
             raise _AttemptFailure(ExecutionStatus.PROTOCOL_ERROR, "replay completion was malformed")
         break
+    # Read while the worker still holds its store connection, before it may exit: closing the
+    # connection checkpoints the WAL, and a checkpoint truncates the file to its page count, so
+    # bytes appended past the last page after the last commit would be tidied away before a read
+    # that waited for the exit. The nightly red team found exactly that on 2026-09-08.
+    refusal: _AttemptFailure | None = None
     try:
-        return_code = spawn.process.wait(timeout=max(1.0, deadline - monotonic()))
+        observed = _ledger(scenario, database, event)
+    except _AttemptFailure as failure:
+        refusal = failure
+    if refusal is None and sha256_json(observed.content) != sha256_json(ledger.content):
+        refusal = _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            "the database changed after the worker's last reported store commit and before the "
+            "worker exited; something wrote around the trusted store (a direct connection or a "
+            "raw write to the file): "
+            f"{_content_difference(ledger.content, observed.content, scenario)}. "
+            + scenario.store_remedy,
+            integrity=IntegrityStatus.INVALID,
+        )
+    # Released either way: a worker that finished is not killed for what it wrote, and its
+    # receipt records the exit it earned. The exit has its own budget, because it now includes
+    # the store's close and the checkpoint that runs inside it.
+    _send(spawn.channel, {"type": "release"})
+    try:
+        return_code = spawn.process.wait(timeout=timeout_seconds)
     except subprocess.TimeoutExpired as error:
         raise _AttemptFailure(
             ExecutionStatus.TIMEOUT,
-            f"the {spawn.phase} delivery worker reported done but did not exit within "
-            f"{timeout_seconds:g} s; a non-daemon thread or child kept it alive",
+            f"the {spawn.phase} delivery worker did not exit within {timeout_seconds:g} s of its "
+            "release; a non-daemon thread or child kept it alive, or the store's close took "
+            f"longer; {WORKER_TIMEOUT_VARIABLE} raises the budget on a slow machine",
         ) from error
     _collect(spawn)
+    if refusal is not None:
+        raise refusal
     if return_code != 0:
         raise _AttemptFailure(ExecutionStatus.REPLAY_ERROR, "replay worker returned nonzero")
     observed = _ledger(scenario, database, event)
-    if sha256_json(observed.content) != sha256_json(ledger.content):
+    _require_image(scenario, observed.content, ledger.content)
+    if sha256_json(_after_exit(observed.content)) != sha256_json(_after_exit(ledger.content)):
         raise _AttemptFailure(
             ExecutionStatus.INTEGRITY_ERROR,
-            "the database changed after the worker's last reported store commit; something wrote "
-            "around the trusted store (an exit hook, a thread, a child, or a direct connection): "
+            "the database changed after the worker's last reported store commit and after the "
+            "worker exited; something wrote around the trusted store (an exit hook, a thread, or "
+            "a child): "
             f"{_content_difference(ledger.content, observed.content, scenario)}. "
             + scenario.store_remedy,
             integrity=IntegrityStatus.INVALID,
@@ -1419,13 +1632,36 @@ def _attributed_probe(
             f"worker reported an unknown store operation {operation!r}",
         )
     predicted_tables = scenario.apply(cast(Tables, ledger.content["tables"]), operation, normalized)
+    observed = _ledger(scenario, database, event)
+    # The store's commit appended frames to the WAL, and that is the only change allowed here:
+    # the log keeps every byte it had, the main file is exactly what it was, and the logical image
+    # moves with the rows.
+    ledger_file = cast(dict[str, object], ledger.content["file"])
+    observed_file = cast(dict[str, object], observed.content["file"])
+    before = cast(dict[str, object], ledger_file["wal"])
+    after = cast(dict[str, object], observed_file["wal"])
+    if cast(int, before["size"]) > 0 and (
+        cast(int, after["size"]) < cast(int, before["size"])
+        or _wal_prefix_digest(database, cast(int, before["size"])) != before["sha256"]
+    ):
+        raise _AttemptFailure(
+            ExecutionStatus.INTEGRITY_ERROR,
+            f"the write-ahead log's first {before['size']} bytes changed across {operation}; a "
+            "store commit only appends frames, so something rewrote the log around the store. "
+            + scenario.store_remedy,
+            integrity=IntegrityStatus.INVALID,
+        )
     predicted = {
-        "file": ledger.content["file"],
+        "file": {
+            **ledger_file,
+            "wal": observed_file["wal"],
+            "image_sha256": observed_file["image_sha256"],
+            "image_size": observed_file["image_size"],
+        },
         "header": ledger.content["header"],
         "schema": ledger.content["schema"],
         "tables": predicted_tables,
     }
-    observed = _ledger(scenario, database, event)
     if sha256_json(observed.content) == sha256_json(predicted):
         return observed
     wanted = scenario.snapshot(predicted_tables, normalized)
@@ -1636,10 +1872,21 @@ def _worker(argv: list[str]) -> int:
         _require_trusted_code(scenario, trusted)
         store = scenario.store_class(Path(database), channel, event)
         handler(store, event)
+        store.audit()
         worker_send(
             channel,
             {"event_digest": event_digest, "execution_nonce": execution_nonce, "type": "done"},
         )
+        # The store connection stays open until the controller has read the database once more.
+        # Closing it checkpoints the WAL, and a checkpoint truncates the file to its page count,
+        # so bytes a handler appended past the last page after its last commit were gone before
+        # a controller that waited for the exit could look (the nightly red team, 2026-09-08).
+        # Bounded by the knob's maximum: a controller that is gone closes the channel and ends
+        # this at once; one that is alive but never releases cannot keep the worker forever.
+        channel.settimeout(_WORKER_TIMEOUT_BOUNDS[1])
+        if worker_receive(channel) != {"type": "release"}:
+            raise RuntimeError("controller returned an invalid completion acknowledgement")
+        store.close()
         return 0
     except Exception as error:  # Candidate exceptions are bounded protocol evidence.
         with suppress(OSError):
