@@ -610,3 +610,128 @@ Revert: the `release` handshake is the block after `break` in `_finish_replay` a
 `worker_receive` call after `done` in `_worker`; the nightly knobs are two lines in
 `nightly.yml`; the `unknown` count is one property on `Case` and the `--max-unknown` flag.
 
+
+## A handler that reports two commits as one earns FIX_PROVEN (2026-09-14, open)
+
+The 2026-09-14 eight-lens review of the webhook scenario found the most valuable thing of the
+night, and it is not the scenario's: a false pass in the kernel's core claim. A handler that runs
+two durable transactions on the trusted store's own connection and reports them to the controller
+as a single commit earns `FIX_PROVEN_FOR_THIS_CAPSULE` while being exactly the non-atomic handler
+the audit exists to refuse. It reproduces on `sqlite-credit-v1` and `sqlite-inventory-v1`, so it is
+the kernel, not any one scenario; `git diff origin/main...HEAD` on `scenario.py` and
+`sqlite_runner.py` is empty for the PR that surfaced it.
+
+The shape, verbatim, against `fixture:sqlite-credit-v1/buggy`:
+
+```python
+def apply_credit(store, event):
+    if store.processed(event["event_id"]):
+        return
+    c = store._connection
+    c.execute("BEGIN IMMEDIATE"); c.execute("UPDATE accounts SET balance_cents = ...")
+    c.execute("INSERT INTO credit_ledger ..."); c.commit()      # transaction one: the credit
+    # a crash HERE double-credits on retry — and this commit is never reported
+    c.execute("BEGIN IMMEDIATE"); c.execute("INSERT INTO processed_events ..."); c.commit()
+    store._pause("credit_and_mark")                              # both reported as one
+```
+
+Verdict `FIX_PROVEN_FOR_THIS_CAPSULE`, exit 0, integrity `VALID`. The honest twin — identical SQL,
+but `store._pause("credit")` then `store._pause("mark_processed")` — earns
+`PATCH_FAILED_STILL_REPRODUCES`. The verdict tracks what the handler *reports* through `_pause`, not
+what it made durable, and the commit sweep places its one kill point after both commits, never in
+the window between them.
+
+**Why it is inside the stated boundary, and why that is not an excuse.** The attack reaches the
+store's private members: `store._connection` (the trusted store's own connection) and
+`store._pause` (the private commit-report channel). `docs/SECURITY.md` has said since the third
+hostile round that a handler that alters the trusted store's own private state is the in-process
+boundary local mode does not claim to contain — "the store object is in its hands ... a handler
+that is correct only when it detects the harness is hostile code, and local mode assumes a trusted
+checkout." Committing on `store._connection` and reporting through `store._pause` is that class. The other private-state rails do not catch it, for a precise reason: the writes are on the store's
+*own* connection, so `data_version` (which changes only for another connection's commits) never
+moves, and the `total_changes` audit runs only inside `_require`, which the attacker does not call
+again after its commits — the handler calls `store.processed` once (its `_require` passes, nothing
+foreign yet), then commits on `store._connection` and calls `store._pause` directly. Nothing reads
+the commit count, so two commits reported as one look exactly like one. A boundary that is documented but
+whose breach reads as `FIX_PROVEN` rather than `INTEGRITY_ERROR` is the exact claim-above-evidence
+this repository exists to refuse, so it is written down as open, not filed as acceptable.
+
+**Why the obvious fix is wrong.** The reviewer suggested calling `_audit_own_connection()` at the
+top of `_pause()`. It breaks the honest path: a store method runs `_require()` (which *audits* the connection,
+`total_changes` still at the last settled baseline), executes its own single commit (`total_changes`
+now ahead of the baseline), then calls `_pause()`, whose first act is `_settle()`. An
+`_audit_own_connection()` at `_pause`'s top, before that `_settle()`, would see the connection ahead
+of the baseline by the method's own legitimate commit and refuse every honest delivery. Row counts cannot tell one transaction of three rows
+from two transactions of three rows, and `PRAGMA data_version` does not change for a connection's
+own commits, so neither counter distinguishes the attack from an honest method.
+
+**The fix this is owed.** A real fix makes `_pause` refuse a call that did not originate from one of
+the store's own methods — for example, `_pause` inspects its immediate caller and refuses a frame
+outside the store class, so a handler that calls `store._pause` directly (having committed on
+`store._connection` itself) is `WroteAroundTheStore`, while `credit_and_mark` calling `self._pause`
+is unaffected. Stack inspection in a trust boundary is precisely the kind of change a hostile round
+takes apart (a monkeypatched method, a decorator, `exec`), so it gets the treatment the 2026-09-08
+tail-bytes finding got: its own branch, its own hostile rounds, its own DECISIONS paragraph per
+revision — not a patch rushed the night it was found. Until then the shape is reproduced here and
+in `tests/`-adjacent scratch, and the two new scenarios are staged rather than merged because a
+third instance of "FIX_PROVEN is trustworthy" should not ship while this is open.
+
+## What `check --fault race` would need the kernel to say (2026-09-14)
+
+The crash fault kills one worker between two commits. The race fault is its sibling: two workers
+deliver the same event at once, and the bug is the same bug. The invariant does not move — one
+durable effect plus its marker, a second effect is the duplicate — so `StateSnapshot`,
+`classify_final`, and both scenarios' `snapshot`/`apply` are untouched. What moves is the
+controller: no `SIGKILL`, two live workers, and an interleaving chosen instead of a kill point.
+
+**The `_pause` channel is already a barrier scheduler, and its limits are exact.** Each worker gets
+its own `socketpair` and its own `_Spawn.channel`; `StoreBase._pause` sends the `commit` message
+after the commit is durable and then blocks in `worker_receive` with no timeout, so a worker that
+has committed and not been answered is frozen with its effect on disk. A controller holding two
+`_Spawn`s and sending `continue` to exactly one at a time has a deterministic schedule: between a
+`continue` and the next `commit` only one worker runs, so the order of commits is the order of
+releases, and SQLite's busy wait never fires because no two writers ever contend. What it cannot
+do: park a worker *before* its first commit (nothing pauses between `hello` and the first store
+call), or park one at a read. So the reachable interleavings are exactly "one worker's uncontrolled
+run from its start or last release to its next commit", and the canonical lost update is reachable
+only by staggering the spawn: park A after its k-th commit, *then* spawn B, which reads the guard
+while A's marker is not yet written.
+
+**One trusted-store change, and it is the whole cost.** `_audit_other_connections` reads
+`data_version`, which moves when another connection commits; B's legitimate store commits move it,
+so the `continue` that ends A's park raises `WroteAroundTheStore` on every race world. The fix is
+one field on the controller's acknowledgement — the sibling commits accepted while this worker was
+parked — and `_pause` re-baselines instead of comparing when it is nonzero. Whether `data_version`
+moves by exactly one per foreign commit must be verified before choosing the exact-count form
+(which keeps the channel closed) over the re-baseline form (which reopens the free-space shape for
+race worlds).
+
+**Each pinned shape.** The census survives unchanged and is the input (the commit schedule the park
+points come from). The world scan survives unchanged (two workers share one world; the expected set
+is identical). The commit sweep must change: `sweep_is_coherent` requires `kill_after_commit` to be
+`(1..n)` and `_schedule_split` requires a world's commits to be a prefix of the census's, which an
+interleaving is not; race needs its own receipt keyed on a park point, and the prefix rule re-stated
+per worker. `_attributed_probe` survives (both workers deliver the same event). `AttemptReceipt` and
+the capsule do not fit (they require a kill signal and a single fault boundary); race gets its own
+verdict sentence rather than folding into `FIX_PROVEN_FOR_THIS_CAPSULE`. `_finish_replay` must
+change: with two workers the read/release/exit order per worker is wrong (the first release
+checkpoints a WAL the second still holds), so it becomes drive both to `done`, read once, release in
+order, wait for both exits, `_require_image` once — splitting a trusted function where the engine's
+false passes have lived.
+
+**What this reopens: two shapes.** The write committed and reverted before the next store commit
+(the channel `data_version` closed) reopens inside a park window under the re-baseline form;
+the exact-count form removes it. And sibling detection: a handler in a race world can see another
+worker exists from inside the database (`SQLITE_BUSY`, its own `data_version`, the log's length),
+widening the honest-list entry "a handler can tell it is inside CrashCheck" from a run fact to a
+world fact.
+
+**Acceptance and estimate.** `test_race_fault.py` asserts, without the grammar: on `atomic`, a
+park-at-1 world ends one effect, one marker, and a worker whose recorded operations are empty; on
+`buggy`, park-at-1 ends `DUPLICATE_EFFECT` with the released worker's raise recorded and not
+excusing it, while park-at-2 ends exactly once; on `mark-first`, every park point ends exactly once,
+so the race verdict and the crash verdict disagree and the report prints both; a write around the
+store in a park window is still refused; and `test_the_parked_worker_holds_the_write_lock_for_nobody`
+asserts no store call ever waits on the busy timeout in a race world, which is what makes the
+schedule deterministic rather than merely usually so. **Three days with the gate**, and the hostile
+round this surgery has earned every time is budgeted separately.
