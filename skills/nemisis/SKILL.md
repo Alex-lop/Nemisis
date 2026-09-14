@@ -53,6 +53,7 @@ Nemisis port ledger — <scenario>, verdict FIX_PROVEN_FOR_THIS_CAPSULE, run <ru
 
 It proves that the ported handler, killed at every store commit and retried, lands the effect
 exactly once against the scenario's store. It does not prove anything the port did not carry, and
-it says so. The kernel never calls a model; `draft_contract` and `propose_patch` do, and they are
-`BLOCKED` without a Token Factory key, never mocked. Everything runs on your machine, on your
-checkout, and nothing is uploaded.
+it says so. The kernel never calls a model. `list_scenarios`, `port_template`, `map`, `check`, and
+`doctor` run locally and upload nothing. `draft_contract` and `propose_patch` are the exceptions:
+with a Token Factory key they send the issue text and the base handler you name to the Nebius
+endpoint; without a key they are `BLOCKED` and write nothing, never mocked.

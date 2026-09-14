@@ -1,23 +1,29 @@
 """``nemisis mcp`` — a stdio Model Context Protocol server, so the customer can be an AI coding
 agent instead of a person.
 
-Every tool is a thin wrapper over an existing code path and returns the same JSON the matching
-``--json`` flag prints, plus nothing invented, carrying the truth label of the thing it wraps and
-never upgrading it. The kernel these tools drive never calls a model; only ``draft_contract`` and
-``propose_patch`` do, and both are ``BLOCKED`` without a Token Factory key rather than mocked
-silently.
+Each tool is a thin wrapper over an existing code path. Where the wrapped path has a ``--json``
+flag the tool returns the same JSON it prints; ``list_scenarios`` and ``port_template`` are new,
+deterministic, read-only views the CLI has no command for. Every tool carries the truth label of
+the thing it wraps and never upgrades it. The kernel these tools drive never calls a model; only
+``draft_contract`` and ``propose_patch`` do, and both are ``BLOCKED`` without a Token Factory key
+rather than mocked silently.
 
-Trust boundary: the server runs on the developer's machine, on the developer's checkout, and
-stores nothing anywhere but the artifact root it names (``.nemisis`` by default, or
-``NEMISIS_ARTIFACT_ROOT``). Nothing is uploaded. A ``check`` writes a run directory there; the
-report and the receipt of a run this session produced are exposed as resources addressable by
-run id. That is the whole footprint.
+Trust boundary: the server runs on the developer's machine, on the developer's checkout. The
+local tools (``check``, ``map``, ``list_scenarios``, ``port_template``, ``doctor``) upload nothing
+and write only under the artifact root they name (``.nemisis`` by default, or
+``NEMISIS_ARTIFACT_ROOT``): a ``check`` writes a run directory there, and its report and receipt
+are exposed as resources addressable by run id. ``draft_contract`` and ``propose_patch`` are the
+exceptions: with a key they send the issue text and the base handler you name to the Token Factory
+endpoint, ``propose_patch`` also writes an author receipt under ``.nemisis/agent-patches/`` in the
+working directory (kernel behavior), and both write their draft or candidate under the artifact
+root. Without a key they are ``BLOCKED`` and write nothing.
 """
 
 from __future__ import annotations
 
 import inspect
 import os
+import tempfile
 from pathlib import Path
 from typing import Any, cast
 
@@ -44,11 +50,13 @@ from nemisis.scenario import Scenario
 from nemisis.scenarios import SCENARIOS, scenario_for
 
 TRUST_BOUNDARY = (
-    "This server runs on your machine, on your checkout, and stores nothing anywhere but the "
-    "artifact root it names. Nothing is uploaded. The kernel it drives never calls a model; only "
-    "draft_contract and propose_patch do, and both are BLOCKED without NEBIUS_API_KEY rather than "
-    "mocked silently. A verdict proves the port you handed it, not your real handler; you own the "
-    "correspondence, and the port ledger is where you state it."
+    "This server runs on your machine, on your checkout. The local tools (check, map, "
+    "list_scenarios, port_template, doctor) upload nothing and write only under the artifact root "
+    "they name. The kernel never calls a model. draft_contract and propose_patch are the "
+    "exceptions: with a key they send the issue text and the base handler you name to the Token "
+    "Factory endpoint; without a key they are BLOCKED and write nothing. A verdict proves the port "
+    "you handed it, not your real handler; you own the correspondence, and the port ledger is "
+    "where you state it."
 )
 
 INSTRUCTIONS = (
@@ -273,12 +281,16 @@ def build_server() -> MCPServer:
     def draft_contract(
         issue: str, target: str, base: str, scenario: str, model: str | None = None
     ) -> dict[str, Any]:
+        if not os.getenv("NEBIUS_API_KEY"):
+            return _blocked("NEBIUS_API_KEY is required for live Nemotron calls", model)
         scenario_ref = scenario_for(scenario).scenario_id
-        with _model_env(model):
+        with _model_env(model), tempfile.TemporaryDirectory(prefix="nemisis-mcp-") as tmp:
+            issue_file = Path(tmp) / "issue.md"
+            issue_file.write_text(issue, encoding="utf-8")
             try:
                 with _artifact_root_env():
-                    proposal = propose_contract(_text_or_path(issue), target, base, scenario_ref)
-                    config = initialize(_text_or_path(issue), target, base, scenario_ref)
+                    proposal = propose_contract(issue_file, target, base, scenario_ref)
+                    config = initialize(issue_file, target, base, scenario_ref)
                     write_proposal(proposal, config.with_name(PROPOSAL_NAME))
             except NemotronError as error:
                 return _blocked(str(error), model)
@@ -306,18 +318,23 @@ def build_server() -> MCPServer:
 
     @server.tool(
         description="Ask Nemotron on Token Factory to write the fix; the result is an ordinary "
-        "candidate tree you then check. Super tier by default; pass model=ultra for the hard "
-        "cases. BLOCKED without NEBIUS_API_KEY."
+        "candidate tree you then check. Super tier by default; pass a full Token Factory catalog "
+        "model id via model= for another tier (tier names like 'ultra' are not aliases and are "
+        "not resolved). BLOCKED without NEBIUS_API_KEY."
     )
     def propose_patch(
         issue: str, base: str, scenario: str, out: str | None = None, model: str | None = None
     ) -> dict[str, Any]:
+        if not os.getenv("NEBIUS_API_KEY"):
+            return _blocked("NEBIUS_API_KEY is required for live Nemotron calls", model)
         scenario_ref = scenario_for(scenario).scenario_id
         output = Path(out) if out else _artifact_root() / "port" / scenario_ref / "nemotron"
-        with _model_env(model):
+        with _model_env(model), tempfile.TemporaryDirectory(prefix="nemisis-mcp-") as tmp:
+            issue_file = Path(tmp) / "issue.md"
+            issue_file.write_text(issue, encoding="utf-8")
             try:
                 with _artifact_root_env():
-                    patch = _propose_patch(_text_or_path(issue), base, output, scenario_ref)
+                    patch = _propose_patch(issue_file, base, output, scenario_ref)
             except NemotronError as error:
                 return _blocked(str(error), model)
         return {
@@ -329,11 +346,13 @@ def build_server() -> MCPServer:
         }
 
     @server.tool(
-        description="CrashCheck prerequisites and truth labels, verbatim: what is READY and what "
-        "is BLOCKED, and on what."
+        description="CrashCheck prerequisites and truth labels, verbatim. Live mode (the default) "
+        "adds the secret-free presence checks for the Token Factory key and the live adapters, so "
+        "what is READY and what is BLOCKED, and on what, is visible."
     )
-    def doctor() -> dict[str, Any]:
-        return cast(dict[str, Any], _jsonable(_doctor("local")))
+    def doctor(mode: str = "live") -> dict[str, Any]:
+        checked = mode if mode in {"local", "live"} else "live"
+        return cast(dict[str, Any], _jsonable(_doctor(checked)))
 
     @server.resource("nemisis://run/{run_id}/report")
     def run_report(run_id: str) -> str:
@@ -351,17 +370,6 @@ def _read_run(run_id: str, kind: str) -> str:
     if run is None or kind not in run:
         raise ValueError(f"no {kind} for run {run_id!r} in this session")
     return Path(run[kind]).read_text(encoding="utf-8")
-
-
-def _text_or_path(value: str) -> Any:
-    """An issue may be a path to a file or the text itself; the wrapped code takes either."""
-    candidate = Path(value)
-    if candidate.exists():
-        return candidate
-    tmp = _artifact_root() / "port" / "issue.md"
-    tmp.parent.mkdir(parents=True, exist_ok=True)
-    tmp.write_text(value, encoding="utf-8")
-    return tmp
 
 
 def _blocked(reason: str, model: str | None) -> dict[str, Any]:
@@ -390,8 +398,9 @@ class _artifact_root_env:
 class _model_env:
     """Select the Nemotron tier for one call via NEMISIS_MODEL_ID, if a model id was given.
 
-    The exact catalog ids come from ``doctor`` / the Token Factory listing, not from this file;
-    ``model`` is passed through as the id. Super (the packaged default) is used when none is given.
+    The exact catalog ids come from the Token Factory listing, not from this file; ``model`` is
+    passed through verbatim as the id (no tier-name aliases). Super (the packaged default) is used
+    when none is given.
     """
 
     def __init__(self, model: str | None) -> None:

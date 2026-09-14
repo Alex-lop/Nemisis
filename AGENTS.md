@@ -1,8 +1,9 @@
 # Agent instructions
 
-If you are an AI coding agent with the Nemisis MCP server attached (`claude mcp add nemisis -- uvx
---from nemisis nemisis mcp`, or `nemisis mcp` over stdio from a checkout), use it to prove a
-crash-safety fix the way a human cannot be bothered to.
+If you are an AI coding agent with the Nemisis MCP server attached, use it to prove a crash-safety
+fix the way a human cannot be bothered to. Attach it from a checkout with `claude mcp add nemisis
+-- uv run --project <nemisis-checkout> nemisis mcp`; the `uvx --from nemisis nemisis mcp` form works
+once a release ships the server.
 
 ## When
 
@@ -25,5 +26,6 @@ handler at every store commit and checks the retry lands the effect exactly once
    which real lines map to which store calls, and what the port does not carry. Say what the
    receipt proves and what it does not.
 
-The kernel never calls a model. `draft_contract` and `propose_patch` are the only model calls and
-are `BLOCKED` without a Token Factory key. Everything runs locally; nothing is uploaded.
+The kernel never calls a model, and the local tools upload nothing. `draft_contract` and
+`propose_patch` are the only model calls: with a key they send the issue text and the base handler
+you name to the Nebius endpoint; without a key they are `BLOCKED` and write nothing.

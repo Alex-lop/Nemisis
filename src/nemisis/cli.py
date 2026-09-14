@@ -222,10 +222,13 @@ def _parser() -> argparse.ArgumentParser:
         help="run the Model Context Protocol server over stdio, for an AI coding agent",
         description=(
             "A stdio MCP server whose tools wrap check, map, doctor, and the Nemotron drafters. "
-            "It runs on your machine, on your checkout, and stores nothing anywhere but the "
-            "artifact root it names (NEMISIS_ARTIFACT_ROOT, default .nemisis); nothing is "
-            "uploaded. The kernel it drives never calls a model. Add it to a client with "
-            "`claude mcp add nemisis -- uvx --from nemisis nemisis mcp`."
+            "It runs on your machine, on your checkout. The local tools upload nothing and write "
+            "only under the artifact root they name (NEMISIS_ARTIFACT_ROOT, default .nemisis); the "
+            "kernel never calls a model. draft_contract and propose_patch are the exceptions: with "
+            "a key they send the issue text and the base handler you name to Token Factory, and "
+            "are BLOCKED without one. Add it from a checkout with `claude mcp add nemisis -- uv "
+            "run --project <nemisis-checkout> nemisis mcp` (the `uvx --from nemisis` form works "
+            "once a release ships the server)."
         ),
     )
     return parser

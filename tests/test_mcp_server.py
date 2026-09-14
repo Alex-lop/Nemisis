@@ -211,6 +211,36 @@ def test_the_nemotron_tools_are_blocked_without_a_key_not_mocked() -> None:
     assert "NEBIUS_API_KEY" in patch["blocked"]
 
 
+def test_a_blocked_model_tool_writes_nothing(_artifact_root: Path) -> None:
+    async def body(client: Client) -> None:
+        for name, args in (
+            (
+                "draft_contract",
+                {
+                    "issue": "double credit on retry",
+                    "target": "app.credits:apply_credit",
+                    "base": f"fixture:{CREDIT}/buggy",
+                    "scenario": CREDIT,
+                },
+            ),
+            (
+                "propose_patch",
+                {
+                    "issue": "double credit on retry",
+                    "base": f"fixture:{CREDIT}/buggy",
+                    "scenario": CREDIT,
+                },
+            ),
+        ):
+            result = _structured(await client.call_tool(name, args))
+            assert result["truth_label"] == "BLOCKED"
+
+    _run(body)
+    # The key is unset (the fixture deletes it), so both tools must touch the filesystem not at all:
+    # no artifact root, no port/issue.md, no candidate tree.
+    assert not _artifact_root.exists()
+
+
 def test_the_scripted_agent_reaches_fix_proven_with_no_model(tmp_path: Path) -> None:
     """The whole loop, exactly as an agent would drive it, with no model in the room: list the
     scenarios, read the template, write a buggy port that still reproduces, write the atomic port
