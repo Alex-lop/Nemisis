@@ -4,10 +4,10 @@ Every entry is one idea taken from the commit history. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the versions follow
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] — Unreleased
+## [0.2.0] — 2026-09-14
 
-A second scenario, an adversarial generator that red-teams the checker nightly, and the release
-plumbing. Unreleased until a `v0.2.0` tag is pushed.
+A second scenario, an adversarial generator that red-teams the checker nightly (and the first bug
+it caught on its own), the example pin kept current by a test and a bot, and the release plumbing.
 
 ### Added
 
