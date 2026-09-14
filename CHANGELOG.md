@@ -58,7 +58,8 @@ plumbing. Unreleased until a `v0.2.0` tag is pushed.
   the file must be the logical image the last read saw and the log must be empty.
 - The store audits its own database around every method and before the worker reports done
   (`PRAGMA data_version` and `total_changes`), so SQL committed around its methods through any
-  connection is refused, and the run names the rows that changed or that none did; its close
+  connection is refused (unless the handler alters the store's private state, the stated
+  boundary), and the run names the rows that changed or that none did; its close
   checkpoints explicitly, so a connection a handler left open no longer costs an honest handler
   its verdict.
 - `nemisis redteam` counts a case a world of which the kernel ended on the clock (execution

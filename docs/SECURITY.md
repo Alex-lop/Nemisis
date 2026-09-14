@@ -108,13 +108,16 @@ only when another connection commits, and `total_changes` counts what the store'
 changed, so SQL committed around the store's methods through any connection, whatever bytes it
 left and whether or not it was reverted, is refused as `WroteAroundTheStore` (a row inserted and
 deleted again leaves its bytes in a page's free space and no trace in any row; a third round of
-lenses found that channel on 2026-09-14).
+lenses found that channel on 2026-09-14), unless the handler also alters the store's own private
+state, which is the in-process boundary below.
 
 What the controller cannot read, it does not claim. These stay outside what local mode can see,
 and are the honest list: a flag the store's own next commit overwrites (the database file's
 modification time); the shm sidecar, whose header the kernel reads for the log's frame count
-and whose other bytes every reader rewrites and nothing pins, and which a close leaves behind
-on some builds; a flag at the sidecar names the store owns
+and whose other bytes every reader rewrites and nothing pins, and which the controller's own
+read-only probe leaves behind; a connection the handler leaves open with a transaction or an
+unexhausted cursor past its return, which keeps the store's checkpoint from completing and is
+refused with a sentence that names it, not proven; a flag at the sidecar names the store owns
 (`<database>-wal`, `<database>-shm`), whose presence after a kill a handler can also read as "the
 last delivery crashed"; a handler that reads
 CrashCheck's scratch tree and counts the worlds of its phase, which tells a census from a kill

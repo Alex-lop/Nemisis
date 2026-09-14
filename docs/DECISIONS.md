@@ -570,23 +570,39 @@ has accepted each of its own (so the probe, which names a table or a row, speaks
 worker checks both before it reports done; SQL committed around the store's methods, through any
 connection, is `WroteAroundTheStore`, and the run says what it can see (the rows that changed, or
 that nothing in any row did). That retires the honest-list entry for a write through a private connection reverted
-before the next store commit: a committed write is refused whether or not it was reverted, and
-a rolled-back one leaves no bytes. The false fail: a handler that opened a connection of its own
+before the next store commit: a committed write is refused whether or not it was reverted; a rolled-back one is not
+committed and is not what the audit reads. The false fail: a handler that opened a connection of its own
 and let it fall out of scope wrote nothing, but its lingering handle kept the store's close from
 being the last, so no checkpoint ran and the read after the exit refused a write that never was;
-the store's close checkpoints explicitly now (`wal_checkpoint(TRUNCATE)`), so the state after
-the exit is the same whoever else has the file open. The pair of empty sidecars that lingers
+the store's close checkpoints explicitly now (`wal_checkpoint(TRUNCATE)`), so a connection a
+handler merely left open no longer decides the state after the exit; one it left open with a
+transaction or an unexhausted cursor still keeps that checkpoint from completing, and the read
+after the exit names that possibility. The pair of empty sidecars that lingers
 after a clean exit is the controller's own read-only probe's, not the close's.
 
-Two decisions about the nightly itself. A case a world of which the kernel ended on the clock (its execution status is `TIMEOUT`, in
-the hunt, a boundary world, the census, or the sweep) is the machine, not the handler: `nemisis redteam` now counts it
+A fourth round tested the audit and found where it ends: in the handler's hands. A handler that
+calls the store's own `_settle()` after planting, replaces `store._connection` with one the
+kernel never configured, or writes the shm sidecar is not caught, and will not be: the store
+object is in the handler's hands, and a handler that alters the trusted store's private state is
+the in-process boundary SECURITY has named since the third hostile round, hostile code that local
+mode does not claim to contain. What the round did close cheaply: a temporary trigger or table on
+the store's connection, which runs inside the store's own transaction and shows in no probe (the
+stores create none, so `sqlite_temp_master` must be empty). And it found the false fail that
+remains: a connection the handler leaves open with a transaction or an unexhausted cursor past
+its return keeps the store's checkpoint from completing, so the log is not empty after the exit
+and the run is refused with a sentence that names both causes; closing what one opens is the
+remedy, and the honest list says so.
+
+Two decisions about the nightly itself. A case a world of which the kernel ended on the clock (its execution status is `TIMEOUT`, in any
+world) is the machine, not the handler: `nemisis redteam` now counts it
 as `unknown`, apart from agreement and disagreement, prints it, and fails above `--max-unknown`
 (default 0). The nightly passes `--max-unknown 3` (one percent of a 300-case sweep) and runs with
 `NEMISIS_WORKER_TIMEOUT_SECONDS=30`, the knob's documented use on a slower machine; the local
-default stays 10 s. A load-induced refusal is never counted as agreement, and a real
-disagreement is never counted as load, because the classification is the kernel's own execution
-status (`TIMEOUT` on any world: the hunt, the deletion control, a boundary world, the census, the
-sweep) and never the summary's text, which quotes names the handler
+default stays 10 s. A load-induced refusal is never counted as agreement, because the classification is the
+kernel's own execution status (`TIMEOUT` on any world: the hunt, the deletion control, a boundary
+world, the census, the sweep) and never the summary's text; a case in which some world timed out
+and another disagreed is filed as unknown, the machine's fault before the checker's, and the
+threshold bounds how many such cases a run may excuse, which quotes names the handler
 chose; a lens named a side file after the knob and watched a first draft file the disagreement
 under unknown.
 
