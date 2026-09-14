@@ -101,7 +101,14 @@ directories, a HOME removed or replaced, a directory made unlistable, a scratch-
 built from names, the trusted store patched at import); each is pinned in
 `tests/test_verdict_paths.py`. The worker compares the trusted store's and protocol's code objects
 before and after the handler module is imported, so a module that rebinds a store method to one
-that under-reports its commits is refused as `TrustedStorePatched`.
+that under-reports its commits is refused as `TrustedStorePatched`. The store audits its own
+database before every method (its own connection), after every accepted commit (other
+connections), and before the worker reports done: SQLite's `data_version` changes
+only when another connection commits, and `total_changes` counts what the store's own connection
+changed, so SQL committed around the store's methods through any connection, whatever bytes it
+left and whether or not it was reverted, is refused as `WroteAroundTheStore` (a row inserted and
+deleted again leaves its bytes in a page's free space and no trace in any row; a third round of
+lenses found that channel on 2026-09-14).
 
 What the controller cannot read, it does not claim. These stay outside what local mode can see,
 and are the honest list: a flag the store's own next commit overwrites (the database file's
@@ -109,9 +116,7 @@ modification time); the shm sidecar, whose header the kernel reads for the log's
 and whose other bytes every reader rewrites and nothing pins, and which a close leaves behind
 on some builds; a flag at the sidecar names the store owns
 (`<database>-wal`, `<database>-shm`), whose presence after a kill a handler can also read as "the
-last delivery crashed"; a write through a private connection that is reverted before the next
-store commit, because attribution samples the database at commits and not between them (the kill
-points are store commits, so such a window is one CrashCheck never claimed); a handler that reads
+last delivery crashed"; a handler that reads
 CrashCheck's scratch tree and counts the worlds of its phase, which tells a census from a kill
 world; and durable state kept elsewhere on the machine by absolute path. A handler that forges the
 IPC message on the store's private channel, or patches the interpreter below the store, is hostile

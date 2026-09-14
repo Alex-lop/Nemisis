@@ -56,6 +56,11 @@ plumbing. Unreleased until a `v0.2.0` tag is pushed.
   flag in the header's change counter, which the probe used to mask, is refused; the write-ahead
   log may only grow by whole frames at store commits, keeping every byte it had; after the exit
   the file must be the logical image the last read saw and the log must be empty.
+- The store audits its own database around every method and before the worker reports done
+  (`PRAGMA data_version` and `total_changes`), so SQL committed around its methods through any
+  connection is refused, and the run names the rows that changed or that none did; its close
+  checkpoints explicitly, so a connection a handler left open no longer costs an honest handler
+  its verdict.
 - `nemisis redteam` counts a case a world of which the kernel ended on the clock (execution
   status `TIMEOUT`) as `unknown`, apart from agreement and disagreement, and fails above
   `--max-unknown`; the nightly allows three and runs with a 30 s worker budget.

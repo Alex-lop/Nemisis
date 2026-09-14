@@ -500,8 +500,8 @@ nightly. The fix is therefore in the kernel and the
 oracle is unchanged: after `done`, the controller reads the database while the worker still holds
 its connection, refuses any content the ledger does not explain (`INTEGRITY_ERROR`, `INVALID`,
 the sentence names bytes past the last page), sends `release`, waits for the exit, and reads once
-more for exit hooks, threads, and children, comparing what a checkpoint leaves comparable. The worker exits only when released, and it is released even when that read refuses, so
-its receipt records the exit it earned; the exit has its own budget, the knob's, because it now
+more for exit hooks, threads, and children, comparing what a checkpoint leaves comparable. The worker exits only when released, and it is released even when that read refuses (the
+content comparison and the log's rules alike), so its receipt records the exit it earned; the exit has its own budget, the knob's, because it now
 includes the store's close and the checkpoint inside it. A worker that finished without
 reaching the checkpoint is not released and is killed with its group at cleanup, as a worker
 paused inside a commit report is. Verdict semantics do not change: the same handlers earn the same verdicts, except that a write
@@ -557,7 +557,26 @@ log must be empty, and the log may only grow by whole frames at store commits, k
 it had. The same round showed a hunt-phase timeout was invisible to the nightly's `unknown` (the
 published attempt says `SETUP_ERROR`); the hunt receipts are read now. The shm sidecar stays on
 the honest list, and so does a close that leaves it and an empty log behind, which this build
-does and the seed already cleans up. Five more shapes are pinned.
+does and the seed already cleans up. Four more shapes are pinned.
+
+A third round found the last in-file channel and one false fail. A row inserted and deleted
+again, through any connection, leaves its bytes in the page's free space and no trace in any row;
+every rule about the file's bytes still held, because the image at a commit is recorded, not
+predicted, and the token rode the log across a kill and the checkpoint across a clean exit. The
+store refuses it itself now: SQLite's `data_version` changes only when another connection
+commits, and `total_changes` counts what the store's own connection changed, so the store checks
+its own connection before every method, checks for other connections' commits once the controller
+has accepted each of its own (so the probe, which names a table or a row, speaks first), and the
+worker checks both before it reports done; SQL committed around the store's methods, through any
+connection, is `WroteAroundTheStore`, and the run says what it can see (the rows that changed, or
+that nothing in any row did). That retires the honest-list entry for a write through a private connection reverted
+before the next store commit: a committed write is refused whether or not it was reverted, and
+a rolled-back one leaves no bytes. The false fail: a handler that opened a connection of its own
+and let it fall out of scope wrote nothing, but its lingering handle kept the store's close from
+being the last, so no checkpoint ran and the read after the exit refused a write that never was;
+the store's close checkpoints explicitly now (`wal_checkpoint(TRUNCATE)`), so the state after
+the exit is the same whoever else has the file open. The pair of empty sidecars that lingers
+after a clean exit is the controller's own read-only probe's, not the close's.
 
 Two decisions about the nightly itself. A case a world of which the kernel ended on the clock (its execution status is `TIMEOUT`, in
 the hunt, a boundary world, the census, or the sweep) is the machine, not the handler: `nemisis redteam` now counts it
@@ -566,7 +585,8 @@ as `unknown`, apart from agreement and disagreement, prints it, and fails above 
 `NEMISIS_WORKER_TIMEOUT_SECONDS=30`, the knob's documented use on a slower machine; the local
 default stays 10 s. A load-induced refusal is never counted as agreement, and a real
 disagreement is never counted as load, because the classification is the kernel's own execution
-status (`TIMEOUT` on any world) and never the summary's text, which quotes names the handler
+status (`TIMEOUT` on any world: the hunt, the deletion control, a boundary world, the census, the
+sweep) and never the summary's text, which quotes names the handler
 chose; a lens named a side file after the knob and watched a first draft file the disagreement
 under unknown.
 
