@@ -179,11 +179,16 @@ contract and then ends at `EVIDENCE_INCOMPLETE`, exit `2`, because the handler r
 already in it: porting one means rewriting its storage calls as store calls, and what survives is
 the part with the crash window in it. Inside that shape, the handler body is anything you like.
 
+The contract pins the base tree digest, so the fix lives on a branch while the base branch stays
+at the tree the contract was accepted for. Commit the fix on `main` and `check --base main` exits
+`2`: `contract originating base digest differs from the supplied base`. Committing the contract is
+safe; `.nemisis/` is outside the digest.
+
 ```bash
-uv tool install "git+https://github.com/Alex-lop/Nemisis@main"
 nemisis init --issue issue.md --target app.credits:apply_credit --base main
 nemisis init --issue issue.md --target app.credits:apply_credit --base main \
   --accept-contract PASTE_PRINTED_DIGEST
+git checkout -b fix-double-credit   # the fix is committed here, not on main
 nemisis check --base main --candidate HEAD --scenario .nemisis/config.json
 ```
 
