@@ -1,133 +1,110 @@
 # Morning
 
-A third hostile round found thirty-seven confirmed false passes in the engine the last report
-called reviewed; all four of their root causes are closed and pinned, every wall-clock wait in
-the kernel now says what did not happen, `init` refuses at draft time what `check` would refuse,
-the generator writes every shape the reviewers wrote by hand in both scenarios, the hero is
-measured on two machines with one verdict, and no `LIVE` receipt exists, because no key does.
-
-Nine PRs, `main` untouched, in merge order (each stacked on the one above it):
+The nightly red team was red for five of the last six nights because the engine read the database
+file only after the worker had exited, and a worker's clean exit lets SQLite truncate the bytes a
+handler appended after its last commit; every one of the ten disagreements was that shape, it
+reproduces on a laptop in two seconds, the engine now reads before the worker may exit, the
+shape ships as `fixture:sqlite-credit-v1/tail-bytes`, and the nightly dispatched at the merged engine is green: [run 34820657707](https://github.com/Alex-lop/Nemisis/actions/runs/34820657707), 300 handlers per scenario, 0 disagreements, 0 unknown.
 
 | PR | Title | Head | CI on that head | Merge |
-| -- | ----- | ---- | --------------- | ----: |
-| #15 | feat(redteam): the grammar speaks the hostile reviews' shapes, in both scenarios | `a5d929e` | [34088616032](https://github.com/Alex-lop/Nemisis/actions/runs/34088616032) green | 1 |
-| #16 | fix(kernel): every wall-clock wait names what did not happen; the budget is a knob | `2be08ab` | [34089340263](https://github.com/Alex-lop/Nemisis/actions/runs/34089340263) green | 2 |
-| #17 | feat(check): init refuses what check would refuse; a remedy for every refusal | `466a065` | [34090021960](https://github.com/Alex-lop/Nemisis/actions/runs/34090021960) green | 3 |
-| #18 | docs(seam): what a third scenario would need the seam to say, with the limit pinned | `cc89e8a` | [34091409390](https://github.com/Alex-lop/Nemisis/actions/runs/34091409390) green | 4 |
-| #19 | fix(kernel): close the four root causes the third hostile review found | `2e8aee6` | [34093890874](https://github.com/Alex-lop/Nemisis/actions/runs/34093890874) green | 5 |
-| #20 | ci+release: CPython 3.14, a Linux hero on demand, a tag-driven release, a Dockerfile | `8382c38` | [34094345512](https://github.com/Alex-lop/Nemisis/actions/runs/34094345512) green | 6 |
-| #21 | docs(story): demo scripts, PRODUCT, and the site brought to the engine that exists | `c339aa9` | [34094580768](https://github.com/Alex-lop/Nemisis/actions/runs/34094580768) green | 7 |
-| #22 | docs+evidence: hero at the final engine, the design entries, this report | `6c3512f` | [34094921411](https://github.com/Alex-lop/Nemisis/actions/runs/34094921411) green on `b126610` and re-run on `6c3512f` | 8 |
-| #23 | tools+docs: the mutation ledger of the kernel's refusals | tip of `overnight3/mutation-ledger` (this file is in it) | [branch runs](https://github.com/Alex-lop/Nemisis/actions?query=branch%3Aovernight3%2Fmutation-ledger) | 9 |
-
-Merge each with "delete branch"; GitHub retargets the next PR by itself. Every PR body is a
-mini-ledger. The subagent branches (#20, #21) carry a merge commit from the PR below them rather
-than a rebase, because they had been pushed and the rule is never to rewrite the remote.
+| -- | ----- | ---- | --------------- | ----- |
+| #24 | ci: the example's action pin follows main's engine, by a test and a bot | `a9c7cca` | [34807180668](https://github.com/Alex-lop/Nemisis/actions/runs/34807180668) green | **merged** `21f5df4` (auto-merge, 04:53 UTC); the bot's first run on that push: [34807643729](https://github.com/Alex-lop/Nemisis/actions/runs/34807643729), guard quiet |
+| #25 | fix(kernel): the nightly's finding, bytes past the last page after the last commit, is refused in every world | `2e84b7d` | [34819785648](https://github.com/Alex-lop/Nemisis/actions/runs/34819785648) green | **merged** `5b216a1` (auto-merge, 08:00 UTC) |
+| #26 | docs(readme): the six places a cold judge stalled, fixed | `a4b516d` | [34811649973](https://github.com/Alex-lop/Nemisis/actions/runs/34811649973) green | **merged** `f5bd68e` (auto-merge, 06:07 UTC) |
+| #27 | test(kernel): close the mutation ledger's 33 holes, or name them equivalent | `762b060` | [34821061660](https://github.com/Alex-lop/Nemisis/actions/runs/34821061660) green | **merged** `230cc7c` (auto-merge, 08:17 UTC) |
+| #28 | docs(changelog): 0.2.0 is dated 2026-09-14 | `cfb8c7c` | [34813828694](https://github.com/Alex-lop/Nemisis/actions/runs/34813828694) green | **merged** `e1aeae0` (08:02 UTC; auto-merge refused a clean PR, so `gh pr merge --merge`) |
+| #30 | docs: the mutation ledger at the merged engine, a runner that never calls a broken run a kill, and a monthly rerun | `4a4ba80` | [34832547333](https://github.com/Alex-lop/Nemisis/actions/runs/34832547333) green | **merged** `ad7f1eb` (10:27 UTC, inside #29's merge, since #29 carried its commits) |
+| #29 | test(kernel): close the 2026-09-14 ledger's twenty-one holes, one test each | `caaa3d3` | [34832478502](https://github.com/Alex-lop/Nemisis/actions/runs/34832478502) green | **merged** `ad7f1eb` (auto-merge, 10:27 UTC; stacked on #30) |
+| this one | docs: the morning report, the direction memo, and the release on the site | the branch's head | its CI run on that SHA | auto-merge armed at the window's end; if you read this on `main`, it merged |
 
 ## The evidence ledger
 
 | # | Claim | PR | Status | Proof (exact command → expected output) |
 | - | ----- | -- | ------ | -------------------------------------- |
-| 1 | Gate on clean `main` (`db7969f`) is green | – | PASS | `uv sync --frozen --dev && uv run ruff format --check src tests && uv run ruff check src tests && uv run mypy src tests && uv run pytest -q && uv build` → 453 passed (4:13 under coverage) |
-| 2 | Gate at the final head is green | #22 | PASS | same commands at the commit before this file → 530 passed; laptop wall 3:20 for #19's head while a mutation sweep ran beside it |
-| 3 | CI runs the gate on CPython 3.12, 3.13, and 3.14 | #20 | PASS | run [34093138705](https://github.com/Alex-lop/Nemisis/actions/runs/34093138705): three legs, `uv sync`/ruff/mypy green on 3.14.6, the one failure on each leg the count line this stack requotes; the head run on `8382c38` is the proof |
-| 4 | The nightly red team has run on GitHub | – | PASS | [34086693284](https://github.com/Alex-lop/Nemisis/actions/runs/34086693284): `generated 300 handlers from seed 20260907; 0 disagreements`, 15:37 on Linux, at engine `228430389f…` (before tonight's grammar and fixes) |
-| 5 | Generated handlers vs oracle, widened grammar, both scenarios | #15 | PASS | `uv run nemisis redteam --cases 300 --seed 20260907 --scenario sqlite-credit-v1` and `--scenario sqlite-inventory-v1` → 0 disagreements each (184 refused, 31 proven, 51 invariant, 34 duplicate) at the pre-fix engine, and 0 disagreements each again at the post-fix engine of #17; `uv run pytest -q tests/test_redteam.py` → 45 pinned shapes plus ten credit and four inventory handlers end to end |
-| 6 | Third hostile round: counts | #19 | PASS | 6 lenses, 57 handlers, 44 claimed, 37 confirmed by independent re-runs (each run twice or more); 4 root causes; 13 shapes plus 2 scratch escapes pinned in `test_side_channels_from_the_third_hostile_review_forfeit_the_verdict` and `test_the_scratch_tree_is_known_by_identity_not_by_name`; 3 channels named as boundaries; 3 claims kept as decisions; 2 readers, 22 findings, 6 acted on |
-| 7 | Every third-round shape is now refused with its reason | #19 | PASS | `uv run pytest -q tests/test_verdict_paths.py -k "third_hostile_review or scratch_tree_is_known or same_ref"` → 16 passed; every earlier pinned shape keeps its expectation (`-k "hidden_from_the_probes or second_hostile_review or beside_the_database"` → 17 passed) |
-| 8 | Every packaged tree keeps its verdict at the final engine | #22 | PASS | `uv run pytest -q tests/test_verdict_paths.py -k packaged_zoo tests/test_inventory_scenario.py` inside the gate of row 2; hero → `PATCH_FAILED_STILL_REPRODUCES`, atomic → `FIX_PROVEN…` |
-| 9 | `mark-first` is caught; `shadow-table` refused; the raw-SQL remedy named; inventory verdicts | – | PASS | CI's wheel smoke on every head (`ci.yml`), plus `--candidate fixture:sqlite-credit-v1/mark-first` → `PATCH_FAILED_INVARIANT_BROKEN` exit 1; `shadow-table` → `EVIDENCE_INCOMPLETE`, "the schema changed", exit 2; `raw-sql` → exit 2 naming `store.credit_and_mark(...)`; `fixture:sqlite-inventory-v1/mark-first` → "10 units on hand instead of 8 units", exit 1 |
-| 10 | A timeout says what did not happen, and the budget is a knob | #16 | PASS | `uv run pytest -q tests/test_sqlite_runner.py tests/test_verdict_paths.py -k "timeout or knob or never_returns or fixed_tree_as_base or receive"` → 28 passed; a spinning candidate's summary is exactly "5 of 5 candidate worlds did not complete: the replay delivery's next store commit or its end (commits so far: credit, mark_processed) did not arrive within 2 s; NEMISIS_WORKER_TIMEOUT_SECONDS raises the budget on a slow machine."; `NEMISIS_WORKER_TIMEOUT_SECONDS=0` is refused before any world runs |
-| 11 | `init` refuses a target the base cannot bind, with the remedy | #17 | PASS | `uv run pytest -q tests/test_crashcheck.py -k "init_refuses or anchor_binding_failure"` → 3 passed; `init --target m:handler` → `UNSUPPORTED_TARGET: … sqlite-credit-v1 binds app.credits:apply_credit, so pass --target app.credits:apply_credit`, nothing written |
-| 12 | Hero regenerated at the final engine, strict branch | #22 | PASS | `uv run pytest -q tests/test_static_hero.py` → 4 passed with engine digests equal; identities in STATUS (`c339aa9`, capsule `190d62ea…`, result `7d0672e4…`) |
-| 13 | A second measurement of the hero on Linux agrees | #20 | PASS | [34092142968](https://github.com/Alex-lop/Nemisis/actions/runs/34092142968): verdict `PATCH_FAILED_STILL_REPRODUCES`, engine `228430389f…` and event `4ad9ce16…` byte-identical to the laptop's, capsule `85adf7b9…` and environment `13fc1958…` different as designed; artifact `linux-hero-34092142968` |
-| 14 | The Docker image runs the zoo | #20 | PASS | `docker build -t nemisis . && docker run --rm --network none nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/mark-first` → `PATCH_FAILED_INVARIANT_BROKEN`, exit 1, same engine digest (tested by the subagent; Docker Desktop started and quit for it) |
-| 15 | The sdist ships the package, not the repository | #20 | PASS | `uv run pytest -q tests/test_release.py` → the sdist holds `src/nemisis`, `README.md`, `LICENSE`, `pyproject.toml`, `PKG-INFO`, `.gitignore` and nothing else (it used to ship docs, tests, the site, and the directive files) |
-| 16 | The seam cannot say a conservation invariant; the limit is pinned | #18 | PASS | `uv run pytest -q tests/test_crash_models.py -k second_subject` → 1 passed: a destination-only transfer reads `EXACTLY_ONCE` with the source untouched; a zero delta is refused by the capsule |
-| 17 | The site's hero terminal is the command's real stdout | #21 | PASS | the fabricated `sweep:` line is gone; every non-dim line is verbatim from `nemisis check … misleading-green`; the proof strip cites run 34086693284 |
-| 18 | README H1 equals the proven level | #22 | PASS | unchanged H1; rows 6–9 are the proof, and the boundary list in SECURITY is longer and truer than yesterday's |
-| 19 | `LIVE` receipt | – | FAIL | `printenv NEBIUS_API_KEY \| wc -c` → 0; nothing is `LIVE`; `BLOCKED` stays |
-| 20 | Mutation ledger of the kernel's refusals | #23 | PASS | `docs/reports/2026-09-07-mutation-ledger.md`: 222 mutants enumerated over 13 targets, 222 run, 179 killed, 43 survived, 0 timed out, at the engine before #19's fix; of the survivors, 10 are provably equivalent and 33 are holes, each named with the test it is owed; regenerate with the command in the ledger |
-| 21 | Nightly at the final engine on GitHub | – | UNKNOWN | the dispatch was declined by this session's permission layer twice; row 5's local sweeps at the post-fix engine stand in until the 06:17 UTC cron runs on `main` |
+| 1 | Gate on clean `main` (`a0c4a9f`) is green | – | PASS | `uv sync --frozen --dev && uv run ruff format --check src tests && uv run ruff check src tests && uv run mypy src tests && uv run pytest -q && uv build` → 530 passed in 3:16 |
+| 2 | Every failing nightly run is classified | – | PASS | runs 34219859012 (4 lines), 34345065158 (2), 34593382316 (10), 34689225054 (2), 34755449725 (2): 20 lines, one mechanism, all `tail_bytes` after the last store commit; the run's seed is its id, so `uv run python -c "from nemisis.redteam import generate; print(generate(300, 34593382316)[15].ops)"` → `(guard, atomic, tail_bytes, guard)`; kind 3 (the machine): 0 lines; kinds 1 and 2: see "Decisions" |
+| 3 | The mechanism is SQLite's close-time checkpoint | – | PASS | a standalone `sqlite3` script: WAL database, one commit, append 16 bytes, `close()` → file size back to `page_count * page_size` (8208 → 8192); the same append with nothing to backfill survives the close; a read-only connection's close changes nothing |
+| 4 | The shape reproduces at `a0c4a9f` on Darwin, so it is not load and not Linux | – | PASS | render `(effect, tail_bytes)` and `(guard, atomic, tail_bytes, guard)` with `nemisis.redteam.render`, run `check` → `PATCH_FAILED_STILL_REPRODUCES` and `FIX_PROVEN_FOR_THIS_CAPSULE` where the oracle says `EVIDENCE_INCOMPLETE`; the cold judge hit the same shape with the README's own `redteam --cases 100 --seed 1` (case 62) |
+| 5 | Every failing nightly line is classified into the three kinds | – | PASS | five triagers, one per run: 20 lines, all kind 2; the reconciler and the coordinator: all 20 kind 1 (the kernel read after the exit, its documentation says after the final message; one `gc.collect()` flipped the unpatched verdict, so the boundary was a garbage-collector accident); kind 3: 0 lines; three refuters: two argued the refusal is a false fail (answered under "Decisions"), the SQLite one could not refute and found the gc gap; the disagreement and its resolution are `docs/DECISIONS.md` "The read after the final message happens before the worker may exit" |
+| 6 | The engine refuses every nightly shape, in every world, whenever the connection closes | #25 | PASS | `uv run pytest -q tests/test_redteam.py -k nightly_shapes` → 9 passed; `uv run pytest -q tests/test_verdict_paths.py -k "after_the_last_commit or tail_bytes"` → 4 passed (the two worst shapes, the gc shape, the packaged `tail-bytes` tree); each summary says "before the worker exited" and names bytes past the last page |
+| 7 | The README's own red-team command is true again | #25 | PASS | `uv run nemisis redteam --cases 100 --seed 1 --out ./rt1` at `main` (`230cc7c`) → `generated 100 handlers from seed 1; 0 disagreements; 0 unknown (the kernel ran out of wall clock; --max-unknown 0)`, exit 0; the same command at `a0c4a9f` in a fresh worktree → `generated 100 handlers from seed 1; 1 disagreement`, `case 62: oracle says a write around the store forfeits the verdict; checker said: The candidate replayed evt_1042 to a durable +$50 duplicate effect.`, exit 1 (the cold judge hit that case independently) |
+| 8 | Gate at #25's merged head | #25 | PASS | the six gate commands on the tree that became `2e84b7d` (run at 03:50 EDT, before its last three commits were made) → 568 passed in 4:20; CI on `2e84b7d`: [34819785648](https://github.com/Alex-lop/Nemisis/actions/runs/34819785648), three legs green |
+| 9 | A load-induced refusal is neither agreement nor disagreement | #25 | PASS | `uv run pytest -q tests/test_redteam.py -k "unknown or threshold"` → 3 passed; `redteam` prints `N disagreements; M unknown`, exits 1 above `--max-unknown` (default 0); the nightly passes 3 and `NEMISIS_WORKER_TIMEOUT_SECONDS=30` |
+| 10 | The example pin equals what `main` runs, and cannot rot silently | #24 | PASS | `uv run pytest -q tests/test_docs_identity.py` → 3 passed; on `main` the test compares `src/nemisis`, `action.yml`, `pyproject.toml`, `uv.lock` at the pin with HEAD's; #25's head `2e84b7d` pins its own last engine commit `10dfbee`, and on `main` `git diff --quiet 10dfbee..HEAD -- src/nemisis action.yml pyproject.toml uv.lock; echo $?` → `0` |
+| 11 | The pin bot is proven on one push | #24 | UNKNOWN | its guard has run on all five merges since it landed (`gh run list --workflow pin-bump.yml --branch main` → five successes, each "nothing to bump", because every engine pull request carried its own bump); it has never had to open a pull request, and could not: `gh api repos/Alex-lop/Nemisis/actions/permissions/workflow --jq .can_approve_pull_request_reviews` → `false`, which the bot checks and names (hands, item 2); the session's permission layer declined to flip it through the API |
+| 12 | `LIVE` receipt | – | FAIL | `printenv NEBIUS_API_KEY \| wc -c` → 0; nothing is `LIVE`; `BLOCKED` stays |
+| 13 | The worst failing seed agrees at the merged engine | #25 | PASS | `NEMISIS_WORKER_TIMEOUT_SECONDS=30 uv run nemisis redteam --cases 300 --seed 34593382316 --scenario sqlite-credit-v1 --max-unknown 3 --out ./rt2` at `main` (`230cc7c`) → `generated 300 handlers from seed 34593382316; 0 disagreements; 0 unknown (the kernel ran out of wall clock; --max-unknown 3)`, exit 0 (that seed had five disagreeing cases per scenario at `a0c4a9f`) |
+| 14 | `main` is green after #24, pin test strict | #24 | PASS | [34807643762](https://github.com/Alex-lop/Nemisis/actions/runs/34807643762) on `21f5df4`: three legs green; on `main` the identity test compares the four runtime paths at `a0c4a9f` with HEAD's |
+| 15 | The mutation ledger is republished at the merged engine | #30 | PASS | `docs/reports/2026-09-14-mutation-ledger.md` at digest `1afdb6ee…` (`230cc7c`): 288 mutants enumerated and run, 243 killed, 45 survived, 0 timed out, 0 errored; survivors: 24 equivalent with the reason, 21 holes each naming its owed test, 0 unclassified; the 2026-09-07 ledger had 222 run, 179 killed, 43 survived (10 equivalent, 33 holes); the counts are the three run files' totals summed |
+| 16 | Every survivor was read, and every equivalence claim attacked | #30 | PASS | six readers (one per target function with survivors) classified 40 survivors; 21 refuters each tried to kill one equivalence claim with a test: 15 claimed kills, 6 of them wording-only (the ellipsis, the trailing slash) and kept equivalent by the ledger's rule, 9 real and relabelled holes; the 12 `_xattrs` survivors traced to one fact (every fresh file on this Mac carries `com.apple.provenance`) |
+| 17 | The 21 holes are closed with tests, each shown to kill its mutant | #29 | PASS | three writers, one test file each: 12 tests (one parametrized four ways); `uv run pytest -q tests/test_crash_models.py tests/test_sqlite_runner.py tests/test_verdict_paths.py` → all passed; each test was run on a copy with the mutation applied and failed there (the commit messages say so); the ledger rows name the tests by their final names |
+| 18 | The runner never calls a broken run a kill | #30 | PASS | `uv run pytest -q tests/test_mutants_runner.py` → 5 passed (exit 0 survived; exit 1 with a FAILED line killed; exit 1 without one, exit 2, exit 4 → error); the two void `_xattrs` reruns are the case |
+| 19 | The mutation number cannot rot unseen | #30 | PASS | `.github/workflows/mutants.yml`: monthly cron and `workflow_dispatch`, thirteen bounded jobs, a compare job that fails on any survivor the newest ledger does not list; the compare script run locally over the three run files: exit 0 against the 2026-09-14 ledger, exit 1 against the 2026-09-07 one (naming the new survivors); dispatched once on `main` at `ad7f1eb`: [run 34833311907](https://github.com/Alex-lop/Nemisis/actions/runs/34833311907), still running when the window closed (four of thirteen target jobs green, the slow ones in flight); its compare job fails the run if the tree disagrees with the ledger this branch published, so a green run confirms them and a red one names the drift |
+| 20 | The nightly is green at the merged engine on GitHub | #25 | PASS | `gh workflow run nightly.yml --ref main` at `5b216a1`, then `gh run view 34820657707` → success, both jobs; each job's summary line: `generated 300 handlers from seed 34820657707; 0 disagreements; 0 unknown (the kernel ran out of wall clock; --max-unknown 3)`; [run 34820657707](https://github.com/Alex-lop/Nemisis/actions/runs/34820657707); the run URL is in STATUS and on the site |
+| 21 | `v0.2.0` is tagged and the release workflow's three jobs are green | #28 | PASS | `git tag -a v0.2.0 -m v0.2.0 e1aeae0 && git push origin v0.2.0` after CI on `e1aeae0` ([34820699116](https://github.com/Alex-lop/Nemisis/actions/runs/34820699116)) went green; `Release` run [34821573278](https://github.com/Alex-lop/Nemisis/actions/runs/34821573278): `build` success, `github-release` success, `pypi` success; `gh release view v0.2.0` → the wheel and the sdist attached |
+| 22 | `uv tool install nemisis` from PyPI runs the zoo | #28 | PASS | `UV_TOOL_DIR=$(mktemp -d) uv tool install --no-cache nemisis==0.2.0` → `nemisis 0.2.0`; `nemisis doctor --mode local` → READY (SQLite 3.51.0 on this laptop); `nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/atomic` → `FIX_PROVEN_FOR_THIS_CAPSULE`, exit 0; `…/tail-bytes` → `EVIDENCE_INCOMPLETE`, exit 2; the wheel's engine code digest is `main`'s (`1afdb6ee…`) |
+| 23 | Every packaged tree's verdict at the final engine | – | PASS | at `e1aeae0`, `nemisis check --base fixture:<scenario>/buggy --candidate fixture:<scenario>/<tree>`: credit `atomic` → `FIX_PROVEN_FOR_THIS_CAPSULE` (0); `misleading-green`, `leftover-credit`, `never-marks` → `PATCH_FAILED_STILL_REPRODUCES` (1); `mark-first` → `PATCH_FAILED_INVARIANT_BROKEN` (1); `raw-sql`, `shadow-table`, `tail-bytes` → `EVIDENCE_INCOMPLETE` (2); inventory `atomic` → proven, `misleading-green` → still reproduces, `mark-first` → invariant broken; `uv run pytest -q tests/test_benchmark.py tests/test_redteam.py::test_oracle_knows_the_zoo` → 65 passed |
 
 ## Explicit negatives
-- **The mutation ledger is published but its holes are not closed.** The runner's sweep ran beside the whole night's other work (its subagent died on a network error while wrapping up; the runner kept going and restored every file); the ledger names 33 untested refusal branches, and no test was written for them tonight. The exit -9 confirmation in `_kill_and_wait` is among them.
-- **Three channels were named, not closed** (SECURITY lists them): a write through a private
-  connection reverted before the next store commit; counting sibling worlds through the shared
-  scratch tree; patching below the store class. The mount-namespace design that closes the first
-  two is in DECISIONS, as a design.
-- **No third scenario.** The conservation class is not honest on this seam (row 16); the outbox
-  class is one seam change away and is described, not built.
-- **The nightly was not dispatched at the final engine** and **the four stale remote branches
-  were not deleted**: both commands were declined by the session's permission classifier. Both
-  are one line each under hands.
-- **One load flake, not hidden.** During a local full gate that ran beside the mutation sweep,
-  `test_dedup_state_hidden_from_the_probes_forfeits_the_verdict[repointed-ledger]` failed once;
-  it passed three times in a row alone and in the next full gate. The message class is the 10 s
-  budget; the knob and the soak workflow exist for exactly this.
-- **The action's new outputs were proven locally against four real runs, not on a runner**
-  before #20's head run; #20's own CI run exercises the composite action.
-- **No new recording.** `vhs` is here and the demo scripts changed; the tape was not re-recorded.
-- **`propose-patch`, `init --nemotron`, ConTree**: untouched, still `BLOCKED` without a key.
-- **The transient-write finding is inside the stated boundary** ("kill points are store commits")
-  and is now written down as such rather than fixed.
+- **The pin bot has never opened a pull request.** The repository forbids Actions from creating them (`can_approve_pull_request_reviews: false`); the workflow checks that first and names the setting; its guard has run on all five merges since it landed (runs 34807643729, 34812166224, 34820543033, 34820699120, 34821943534, each "nothing to bump"), because every engine pull request carried its own bump.
+- **The five stale branches are still there**: `git push --delete` and the API deletion were both declined by the session's permission layer.
+- **Two false passes stand at the stated boundary and are not closed**: a handler that plants bytes in a page's free space and then resets the store's own audit counter (`store._settle()`), and one that replaces `store._connection`; both need the trusted store's private state, which SECURITY calls hostile code local mode does not contain. Written down in DECISIONS; not pinned as expected passes, because that would be a lie by test.
+- **One false fail is named, not fixed**: a handler that leaves a connection of its own open with a transaction or an unexhausted cursor past its return keeps the store's checkpoint from completing; the refusal after the exit now says so.
+- **Two nits from the lenses are next steps**: a delivery that commits but never reaches the effect checkpoint is not re-read at its end; and the worker's invalid-release branch has no test that sends a bad acknowledgement.
+- **The shm sidecar's bytes are on the honest list**, where the WAL's used to be: every reader rewrites them, and nothing pins them.
+- **No `LIVE` receipt**: no key.
+- **The first mutation rerun was void and is not counted.** Its four worktrees were cut from a commit whose two re-pinned 3b tests still carried the old sentences, so one failing pin "killed" all 288 mutants in under two seconds each, including the ten the ledger calls equivalent. Caught by asking why an equivalent mutant died; the second rerun starts from a commit with the pins and a green unmutated selection, and only its numbers appear in this file.
+- **Two reruns of the `_xattrs` target were void and are not counted**: every one of their 24 mutants was "killed" in a tenth of a second by no test, because zsh had passed the six test paths as one argument and pytest exited 4, which the runner took for a kill. Caught by the same question as the first void run (why does an equivalent mutant die?); the runner now calls such a run an error, with a test, and the third rerun's numbers are the ones in the ledger.
+- **One gate run failed on a test that passes everywhere else, and the cause is not found**: in the ledger branch's gate, run beside the holes branch's gate, `test_raw_sql_judge_handler_is_told_the_one_line_change` saw `INTEGRITY_ERROR` on some candidate worlds where `CHECKPOINT_NOT_REACHED` belongs (the raw-SQL handler commits through its own connection; the worker's store audit refuses it; the controller then reads the database and, finding the handler's rows, files it as the no-commit case; the failing worlds took the other branch, which means the controller's read-only probe saw the seed's rows and not the handler's). It passed alone, six times concurrently, and in #29's gate on the same tree; in isolation the audit refuses deterministically. The failing run's artifacts were in pytest's temp root and are gone. Listed under next steps; not relabelled, not retried into green: #30's gate was #29's, on the superset tree.
+- **§5 was not started**: no mount-namespace leg, no outbox scenario. §3's last merge was #27 at 08:17 UTC and its mutation rerun outlived the window; the memo says what each costs.
+- **The mutation workflow's first run is [34833311907](https://github.com/Alex-lop/Nemisis/actions/runs/34833311907)**, dispatched on `main` after #30 merged; four of its thirteen target jobs were green and the rest in flight when the window closed; the run is not yet confirmed green, and its conclusion is not in this file
 
 ## Decisions made for you
-- **Stacked PRs, merges not rebases for the pushed subagent branches** (#20, #21). Revert: none
-  needed; squash-merge each PR if the merge commits offend.
-- **`NEMISIS_WORKER_TIMEOUT_SECONDS` is refused outside 1 to 600 s, never clamped**; the default
-  is still 10. Revert: `worker_timeout_seconds` in `sqlite_runner.py`.
-- **`init` refuses, not warns**, a target the base cannot bind. Revert: `_require_bindable` in
-  `crashcheck.py`; `tests/test_crashcheck.py` pins the refusal.
-- **A failing corrected control still withholds the candidate's verdict**; the sentence now says
-  so and that omitting `--corrected` restores it. A reviewer argued the opposite.
-- **A handler that guards on the shelf level instead of its marker keeps its capsule-scoped pass**;
-  that is what the verdict's name says. Revert: none, it is a non-change.
-- **The sidecars are pinned by kind only**; macOS stamps `com.apple.provenance` on files the
-  worker creates, and a flag at their names is a named channel. Revert: `_require_only_the_store_wrote`.
-- **Worker stdout/stderr stay hashed and unpersisted**; the test that pins it was kept.
-- **Version 0.2.0; the sdist is the package only; PR comments stay deferred (annotations instead);
-  the Docker entrypoint runs `--no-dev`.** Revert: the commits on #20.
-- **The root `index.html` stays.** The live Pages source is the branch build (`build_type:
-  legacy`), so the root file is what serves; the Pages workflow now deploys only when the source
-  is a workflow. Revert: `pages.yml` on #20.
-- **The two old morning reports are under `docs/reports/`** (2026-09-05 and 2026-09-06).
+- **The nightly's twenty lines are a checker false pass in the reading schedule, not an oracle bug.** Five triagers said oracle; the reconciler and I said kernel, because the engine read after the exit while SECURITY says after the final message, and one `gc.collect()` flipped the unpatched verdict. Revert: none offered; the oracle is unchanged and the docs now match the code.
+- **A handler that writes around the store is refused even when the write carries no information.** Two refuters called that a false fail of a correct fix; `raw-sql` and `shadow-table` are refused on the same ground. Revert: none; this is the verdict's definition.
+- **The kernel fix took five revisions under four rounds of hostile lenses, and each revision is one paragraph in `docs/DECISIONS.md` (the 2026-09-14 entry).** In order: the controller reads at the worker's final message before releasing it; the store keeps one connection per worker, closed only after the release, with automatic checkpoints off so the main file is pinned whole during a delivery and the write-ahead log is held to its frames; after the exit the file must be the logical image the last read saw and the log must be empty, and the log may only grow by whole frames keeping its bytes; the store audits its own database with SQLite's `data_version` and `total_changes` and checkpoints explicitly on close; a temporary schema object on the store's connection is refused. Revert: each piece is one function, named in the entry.
+- **Where the audit ends is written down, not hidden.** A handler that alters the trusted store's private state (`_settle()`, replacing `store._connection`, the shm sidecar) is hostile code by the boundary SECURITY has stated since the third hostile round; the lenses' two remaining false passes need it. A connection a handler leaves open with a transaction past its return is refused with a sentence naming that cause. Revert: strike the paragraph in `docs/SECURITY.md` and pin the two handlers as expected refusals, which means guarding the store's private attributes.
+- **The nightly excuses load by the kernel's `TIMEOUT` status, up to `--max-unknown 3`, with a 30 s worker budget.** The local default stays 10 s. Revert: two lines in `nightly.yml`, one property on `Case`.
+- **The example pin follows what the action runs (`src/nemisis`, `action.yml`, `pyproject.toml`, `uv.lock`), strictly on `main`, by ancestry on a branch; an engine pull request carries its own bump; the bot is the backstop and needs a repository setting.** Revert: delete `pin-bump.yml` and the test.
+- **Stacked pull requests carry a merge commit from the one below, never a rebase of a pushed branch.** Revert: none needed; the merge commits are in the history and harm nothing.
+- **The mutation runner gets a monthly workflow, shipped in the ledger pull request #30 (`mutants.yml`: `workflow_dispatch` and a cron on the first of the month, one bounded job per target, 180 minutes each).** Its last job fails when a mutant survives that the newest ledger under `docs/reports/` does not list, so a new hole or a new equivalent is noticed by CI and classified by a person; it never relabels. Revert: delete the workflow; the ledger stays a document.
+- **A message-only mutant is equivalent, as the 2026-09-07 ledger already ruled** (`extra[:5]`, the ellipsis): the trailing slash that marks a directory in the refusal's sentence (`is_dir() and not is_symlink()` → `or`) moves no verdict, so it is labelled equivalent, not pinned by an exact-sentence test. Revert: pin the sentence in `test_durable_files_beside_the_database_forfeit_the_verdict` and rerun that target (5 mutants, five minutes).
+- **The release was tagged by me** once CI on the merge commit was green, because §3d says to; PyPI's Trusted Publisher was already registered, so the publish needed no click. Revert: `git push --delete origin v0.2.0 && gh release delete v0.2.0`; the PyPI upload cannot be deleted, only yanked from the project page.
+- **The five stale remote branches were not deleted** (declined twice by the permission layer); they are hands item 1 with their restore SHAs. Revert: none; deleting them is the item.
 
 ## Needs your hands
-1. Merge #15 through #23 in order, each with "delete branch".
-2. After the last merge: set the action pin in `.github/examples/crashcheck.yml` and STATUS's
-   "reviewed action pin" to the new `main` SHA (`tests/test_docs_identity.py` refuses drift).
-3. `gh workflow run nightly.yml --ref main -f cases=300 -f seed=20260907` (or wait for the
-   06:17 UTC cron); paste its URL into STATUS row 4.
-4. `git push origin --delete overnight2/docs-and-evidence chore/license-copyright docs/customer-readme imgbot`
-   (SHAs to restore if ever wanted: `6eedb51`, `e9129be`, `ec0336e`, `6b2a962`).
-5. PyPI: pypi.org → Your account → Publishing → add a pending publisher (project `nemisis`, owner
-   `Alex-lop`, repo `Nemisis`, workflow `release.yml`, environment `pypi`); GitHub → Settings →
-   Environments → new `pypi`; then `git tag -a v0.2.0 -m v0.2.0 && git push origin v0.2.0`.
-6. `set -a; source .env; set +a` with `NEBIUS_API_KEY`, then `docs/LIVE_SETUP.md` Stage A2b.
-7. Optional: Settings → Pages → Source → GitHub Actions; the `Pages` workflow then deploys and
-   the branch build stops racing it.
-8. On a quiet laptop: `uv run nemisis benchmark --output benchmarks/results/crashcheck-v1.json --json`;
-   tonight's timings were taken beside a mutation sweep and BENCHMARK says so.
+1. `git push origin --delete overnight2/docs-and-evidence overnight3/mutation-ledger docs/customer-readme chore/license-copyright imgbot` (restore SHAs `6eedb51`, `1ac626b`, `ec0336e`, `e9129be`, `6b2a962`); the session's permission layer declined the deletion twice, as it did on Sep 7; `git ls-remote --heads origin` afterwards should list `main` alone.
+2. Settings → Actions → General → Workflow permissions → tick "Allow GitHub Actions to create and approve pull requests" → Save. `pin-bump.yml` refuses to run without it and prints this line. Proof afterwards: `gh api repos/Alex-lop/Nemisis/actions/permissions/workflow --jq .can_approve_pull_request_reviews` → `true`.
+3. `export NEBIUS_API_KEY=…` then the README's two `propose-patch` lines (`uv run nemisis propose-patch --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md --base fixture:sqlite-credit-v1/buggy --out ./nemotron-candidate`, then `check` on it): the ledger's only FAIL, the `LIVE` row, is this receipt.
 
 ## Alex's ten-minute grading pass
-1. `for n in 15 16 17 18 19 20 21 22 23; do gh pr checks $n; done` — every head green.
-2. `git fetch origin && git checkout overnight3/morning && uv sync --frozen --dev && uv run pytest -q` → 530 passed.
-3. `uv run pytest -q tests/test_verdict_paths.py -k third_hostile_review` → 13 passed: each of
-   the shapes that earned `FIX_PROVEN` at 02:00 is refused with the sentence that names it.
-4. `NEMISIS_WORKER_TIMEOUT_SECONDS=0 uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/atomic` → refused before any world runs, exit 2.
-5. `uv run nemisis init --issue src/nemisis/fixtures/sqlite_credit_v1/issue.md --target m:handler --base fixture:sqlite-credit-v1/buggy` → `UNSUPPORTED_TARGET: … pass --target app.credits:apply_credit`, exit 2, nothing written.
-6. `uv run nemisis redteam --cases 30 --seed 3 --scenario sqlite-inventory-v1 --out ./redteam` → "0 disagreements".
-7. `open https://alex-lop.github.io/Nemisis/` — the terminal block matches
-   `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/misleading-green --mode local` line for line.
-8. `docker build -t nemisis . && docker run --rm nemisis doctor --mode local` → READY.
-9. `git diff db7969f..overnight3/morning -- src | grep -nE "^\+.*(sleep\(|xfail|skip\(|LIVE)"` → no sleep, no xfail, no skip, no relabeling.
-10. Read `docs/SECURITY.md`'s "What the controller cannot read" paragraph, then row 6.
+1. `gh pr view 24 --json state,mergeCommit` → MERGED at `21f5df4`; `gh pr view 25 --json state,mergeCommit` → MERGED at `5b216a1`; `gh pr view 28 --json state,mergeCommit` → MERGED at `e1aeae0`.
+2. `git fetch origin && git checkout main && git pull && uv sync --frozen --dev && uv run pytest -q` → 615 passed (600 before #29).
+3. `uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/tail-bytes` → `EVIDENCE_INCOMPLETE`, exit 2, the summary names "bytes past the database file's last page"; for the old engine, `git worktree add ../old a0c4a9f && cd ../old && uv sync --frozen --dev && uv run nemisis redteam --cases 100 --seed 1` → `1 disagreement`, case 62, exit 1.
+4. `uv run nemisis redteam --cases 100 --seed 1 --out ./rt1` → `0 disagreements; 0 unknown`.
+5. `uv run pytest -q tests/test_verdict_paths.py -k "pinned_whole or after_the_last_commit or tail_bytes"` → 15 passed: the nightly's two shapes and the gc one, the packaged `tail-bytes` tree, and the eleven shapes the lenses' rounds pinned whole.
+6. `uv run pytest -q tests/test_docs_identity.py` → 3 passed; `grep -n "Nemisis@" .github/examples/crashcheck.yml` → the pin equals the last engine commit on `main`.
+7. `gh run view 34820657707` → success, both scenarios, `0 disagreements; 0 unknown` in each summary.
+8. `gh run list --workflow release.yml` → run 34821573278 success; `gh release view v0.2.0` → two assets; `uv tool install nemisis` → 0.2.0.
+9. `git log --format='%h %s' a0c4a9f..main -- src/nemisis | grep -nE "sleep\(|xfail|skip\(|LIVE"` → nothing; `git diff a0c4a9f..main -- src tests | grep -nE "^\+.*(sleep\(|xfail|skip\(|LIVE)"` → nothing.
+10. Read `docs/DECISIONS.md` "The read after the final message happens before the worker may exit", then `docs/DIRECTION.md`.
 
 ## What I would do next
-1. Close the mutation ledger's holes: one test per untested refusal branch, the exit -9
-   confirmation first, then rerun `tools/mutants.py` at the final engine and republish.
-2. The Linux mount-namespace leg from DECISIONS: `bwrap` around the worker in CI, so "nothing
-   outside the world" is enforced there and two named boundaries become impossible.
-3. The outbox scenario after one seam change (an optional audited scalar), then Stage A2b with
-   a key: the `LIVE` Nemotron patch is still the beat that kills the last dismissal.
+1. Read `docs/DIRECTION.md`; it ends in one recommendation and one probe, and says what the probe costs.
+2. Find why the raw-SQL judge test can see `INTEGRITY_ERROR` under load (the negative above): run `tests/test_verdict_paths.py` in a loop beside a CPU hog with `NEMISIS_ARTIFACT_ROOT` kept, and read the first failing world's report; the probe's read at `_store_refusal` is the place to look.
+3. The two nits the lenses left: re-read the database at the end of a delivery that committed but never reached the effect checkpoint, so a raw write there is named rather than reported as "never committed"; and a test that sends the worker a bad release and pins its refusal.
+4. The mount-namespace leg from DECISIONS, so "nothing outside the world" is enforced on Linux CI rather than scanned for.
+
+## The team and the window
+| Workstream | Subagents | What they produced, as counts | State at the window's end |
+| ---------- | --------: | ---------------------------- | ------------------------- |
+| 3a triage | 5 triagers, 1 reconciler, 3 refuters | 20 lines classified (5 said kind 2; reconciler and coordinator kind 1; refuters 2 refuted, 1 not); the gc flip; SQLite 3.45.1 built from source | done |
+| 3a fix, round one lenses | 10 lenses | 138 + 19 + 8 handlers written; 29 findings: 5 false passes, 8 weakenings, 14 untrue sentences, 2 nits | done; verify phase stopped as moot after the redesign |
+| 3a fix, round two lenses | 5 lenses | 37 handlers written; 19 findings: 6 false passes (all in the read after the exit or the log's bytes; closed by the third revision), 2 weakenings, 9 untrue sentences, 2 nits | done; verify phase stopped as moot after the third revision |
+| 3a fix, round three lenses | 3 lenses + 12 refuters | 21 handlers; 13 findings: 2 false passes (a flag in a page's free space, through a private connection and through the store's own) and 1 false fail (an honest private reader left open), each confirmed by three refuters; 9 untrue sentences; 1 nit | done; closed by the fourth revision |
+| 3a fix, round four lenses | 2 lenses + 12 refuters | 28 handlers; 10 findings: 2 false passes that need the store's private state (the stated boundary, written down), 1 false fail named in the refusal, 1 temp trigger closed, 6 untrue sentences corrected | done; the fifth revision is the merged one |
+| 3c pin | 2 readers | 14 findings: 3 blockers (the repository setting, the branch-point test, the wedge), the rest fixed | done, merged |
+| 3b mutation holes | 1 owner | 33 holes read; 24 closed with 27 tests; 9 argued equivalent with the runner's own numbers; 7 per-target reruns (`_kill_and_wait` 5/5, `_require_unchanged` 6/6, `_read_content` 9/10, `_HEADER_PRAGMAS` 9/9, `_finish_replay` 19/19, `evidence_is_coherent` 79/87, `_xattrs` 10/24) | merged as #27 |
+| 3b mutation rerun and ledger | 2 workers (one killed by the machine at 113/121; its last target rerun alone), 6 readers, 21 refuters, 3 test writers | 288 mutants, 243 killed, 45 survived; 40 survivors classified then 5 more from the rerun; 15 kills claimed, 9 real; 21 holes closed by 12 tests | ledger PR #30 and tests PR #29 open with auto-merge when the window closed, or merged: see the PR table |
+| §4 research and memo | 3 drafts, 1 cold read, 1 cold judge, then 2 hostile readers + 69 refuters on the memo | A 12.5 d / 40 d, B 10 d / 34 d, C 4.5 d; 43 pinned shapes, 91 SQLite lines, 13 shape sites; the judge reproduced the nightly's bug with the README's own command; the readers claimed 23 untruths, 11 confirmed and corrected (init does check the shape; nineteen digest names, not nine; the README already carries the judge's fixes; the map probe filed so its numbers can be rerun) | done; memo merged with this report |
+| coordinator | 1 | 8 worktrees, 8 pull requests, 23 gate runs (one failed, above) | – |

@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-09-07 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
+Updated 2026-09-14 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
 
 ## Exact identities
 
@@ -21,15 +21,25 @@ Current tree:
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
 - interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence
+- release: `v0.2.0` is tagged at `e1aeae0` and published; the `Release` run
+  [34821573278](https://github.com/Alex-lop/Nemisis/actions/runs/34821573278) went green on all
+  three jobs (`build`, `github-release`, `pypi`), and `uv tool install nemisis==0.2.0` into a clean
+  tool directory gave a `nemisis` whose engine code digest is the one above, whose `doctor --mode
+  local` is READY, and whose verdicts on `atomic` and `tail-bytes` are `FIX_PROVEN_FOR_THIS_CAPSULE`
+  and `EVIDENCE_INCOMPLETE`, the same as the checkout's
 - reviewed action pin: `10dfbeecae6bba9dbde607ea8ff9e7f1b4067690`, the commit that
   [`.github/examples/crashcheck.yml`](../.github/examples/crashcheck.yml) runs (on `main` it is
   `main`'s engine; a pull request pins its own last engine commit until it merges)
   (`tests/test_docs_identity.py` fails when the two differ, and fails on `main` when
   `src/nemisis`, `action.yml`, `pyproject.toml`, or `uv.lock` at the pinned commit differs from
   `main`'s; an engine pull request carries its own bump, and
-  [`pin-bump.yml`](../.github/workflows/pin-bump.yml) is written to open one after any engine
-  merge that did not, once the repository allows Actions to open pull requests; until its first
-  run is recorded in `MORNING.md` it is a design, not a proof)
+  [`pin-bump.yml`](../.github/workflows/pin-bump.yml) opens one after any engine merge that did
+  not, once the repository allows Actions to open pull requests; its guard has run on every merge
+  since it landed, five so far (the first:
+  [34807643729](https://github.com/Alex-lop/Nemisis/actions/runs/34807643729); the engine merge:
+  [34820543033](https://github.com/Alex-lop/Nemisis/actions/runs/34820543033)), each time "nothing
+  to bump" because the engine pull request carried its own; it has never opened a pull request,
+  because the repository setting is off)
 
 ## Product state
 
@@ -65,7 +75,10 @@ New since 2026-09-05, from `overnight/hardening` and the `overnight2/*` branches
   verdict with an oracle, in either scenario's vocabulary; ten cases run in the normal suite,
   three hundred per scenario nightly. The nightly's first GitHub run is
   [34086693284](https://github.com/Alex-lop/Nemisis/actions/runs/34086693284) (300 handlers, seed
-  20260907, 0 disagreements, on the engine before this grammar).
+  20260907, 0 disagreements, on the engine before this grammar); the first run at the engine that
+  refuses what the nightly found is
+  [34820657707](https://github.com/Alex-lop/Nemisis/actions/runs/34820657707) (300 per scenario,
+  seed 34820657707, 0 disagreements, 0 unknown, with the 30 s worker budget and `--max-unknown 3`).
 - Attribution reads the whole database file (schema, every durable header field a commit never
   changes, every row with its rowid) and the whole per-world directory (cwd, its two parents,
   `HOME`, `TMPDIR`, the bound tree entry by entry) after the kill, between the census deliveries,
@@ -136,7 +149,10 @@ provider run.
 - the nightly red team's first run on GitHub's Linux:
   [run 34086693284](https://github.com/Alex-lop/Nemisis/actions/runs/34086693284), 300 generated
   handlers at seed 20260907, 0 disagreements, on the engine before tonight's grammar and fixes;
-  two local sweeps of 300 per scenario at the post-fix engine also had 0 disagreements;
+  two local sweeps of 300 per scenario at the post-fix engine also had 0 disagreements; the first
+  run at the engine that refuses the tail-bytes shape, dispatched on `main` at `5b216a1`:
+  [run 34820657707](https://github.com/Alex-lop/Nemisis/actions/runs/34820657707), 300 handlers
+  per scenario at seed 34820657707, 0 disagreements, 0 unknown;
 - a second, independent measurement of the hero on GitHub's Linux (CPython 3.12.3, SQLite 3.45.1,
   x86_64): [run 34092142968](https://github.com/Alex-lop/Nemisis/actions/runs/34092142968), the
   `Evidence` workflow at engine `228430389f…`, verdict `PATCH_FAILED_STILL_REPRODUCES`, engine and

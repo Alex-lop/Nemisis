@@ -34,8 +34,7 @@ Exit `1` blocks the merge. The same frozen crash replayed against the real fix e
 Needs Python 3.12+, [uv](https://docs.astral.sh/uv/), and a POSIX machine (macOS or Linux).
 
 ```bash
-uv tool install "git+https://github.com/Alex-lop/Nemisis@main"
-# or, once 0.2.0 is published: uv tool install nemisis
+uv tool install nemisis   # 0.2.0 from PyPI; for the tip of main: uv tool install "git+https://github.com/Alex-lop/Nemisis@main"
 nemisis check --base fixture:sqlite-credit-v1/buggy \
   --candidate fixture:sqlite-credit-v1/misleading-green \
   --corrected fixture:sqlite-credit-v1/atomic
