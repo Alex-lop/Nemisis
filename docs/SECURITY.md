@@ -196,6 +196,21 @@ public candidate requires CrashCheck ConTree isolation, which is not implemented
 Pin the Nemisis composite action and all third-party actions to reviewed full commit SHAs. Accepted
 configuration is loaded from the exact base commit, not a candidate replacement.
 
+## The MCP server
+
+`nemisis mcp` is a stdio Model Context Protocol server for an AI coding agent. It runs on the
+developer's machine, on the developer's checkout, and stores nothing anywhere but the artifact root
+it names (`NEMISIS_ARTIFACT_ROOT`, default `.nemisis`). Nothing is uploaded. Every tool is a thin
+wrapper over an existing code path and returns the same JSON the matching `--json` flag prints,
+carrying the truth label of the thing it wraps and never upgrading it. The kernel the tools drive
+never calls a model; `draft_contract` and `propose_patch` are the only tools that do, and both are
+`BLOCKED` without `NEBIUS_API_KEY` rather than mocked silently. Model-tier selection for those two
+is by `NEMISIS_MODEL_ID` (Super, the packaged default, is used when none is given); the exact
+catalog ids come from `doctor` and the Token Factory listing, not from the server. A `FIX_PROVEN`
+receipt proves the ported handler the agent supplied, not the agent's real handler; the port ledger
+the skill requires is where the agent states the correspondence, and a receipt without one is a
+claim above its evidence.
+
 ## Provider and credential separation
 
 Token Factory credentials may be sent only to an official Nebius HTTPS `/v1` global or regional
