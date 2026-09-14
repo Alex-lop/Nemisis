@@ -5,7 +5,8 @@ import signal
 import socket
 import subprocess
 import sys
-from contextlib import suppress
+from collections.abc import Iterator
+from contextlib import contextmanager, suppress
 from datetime import UTC, datetime
 from pathlib import Path
 from time import monotonic, sleep
@@ -33,6 +34,7 @@ from nemisis.sqlite_runner import (
     _attributed_probe,
     _cleanup,
     _collect,
+    _kill_and_wait,
     _ledger,
     _probe,
     _receive,
@@ -418,3 +420,95 @@ def test_worker_output_is_hashed_but_not_persisted_in_its_receipt(tmp_path: Path
         assert b"candidate" not in canonical_json(receipt.model_dump(mode="json"))
     finally:
         controller.close()
+
+
+@contextmanager
+def _bare_spawn(code: str, *, phase: str = "replay") -> Iterator[tuple[_Spawn, socket.socket]]:
+    """A ``_Spawn`` around a plain process and one end of its channel.
+
+    The refusals below fire before any worker protocol runs, and no handler can be written that
+    makes a kill fail, that lingers past its own ``done``, or that exits on its own in the
+    microseconds before SIGKILL lands. The process, its process group, and its pipes are real;
+    only the worker's side of the conversation is written by the test.
+    """
+    process = subprocess.Popen(
+        [sys.executable, "-c", code],
+        start_new_session=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    controller, worker = socket.socketpair()
+    spawn = _Spawn(
+        index=2,
+        phase=phase,
+        process=process,
+        channel=controller,
+        worker_nonce="worker-nonce",
+        session_id="session-id",
+        started_at=datetime.now(UTC),
+        event_digest="0" * 64,
+    )
+    try:
+        yield spawn, worker
+    finally:
+        # os.kill, never os.killpg: these tests replace killpg, and teardown must not use it.
+        process.kill()
+        process.wait(timeout=5)
+        controller.close()
+        worker.close()
+
+
+def _killpg_refused(pgid: int, number: int) -> None:
+    raise OSError(1, "Operation not permitted")
+
+
+def _killpg_lost(pgid: int, number: int) -> None:
+    """The signal goes nowhere: the group is gone, or the kernel dropped it."""
+
+
+def test_a_process_group_kill_that_fails_is_a_kill_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The kill is the experiment; a kill that did not happen is not a verdict."""
+    monkeypatch.setattr(os, "killpg", _killpg_refused)
+
+    with (
+        _bare_spawn("import time; time.sleep(30)") as (spawn, _worker),
+        pytest.raises(_AttemptFailure) as failure,
+    ):
+        _kill_and_wait(spawn, 5.0)
+
+    assert failure.value.status is ExecutionStatus.KILL_ERROR
+    assert failure.value.detail == "process-group SIGKILL failed"
+
+
+def test_a_killed_worker_that_is_not_reaped_names_its_budget(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The wait has a budget, and its expiry says which budget, like every other wall-clock wait."""
+    monkeypatch.setattr(os, "killpg", _killpg_lost)
+
+    with (
+        _bare_spawn("import time; time.sleep(30)") as (spawn, _worker),
+        pytest.raises(_AttemptFailure) as failure,
+    ):
+        _kill_and_wait(spawn, 0.05)
+
+    assert failure.value.status is ExecutionStatus.WAIT_ERROR
+    assert failure.value.detail == "the killed worker was not reaped within 0.05 s"
+
+
+def test_a_worker_that_exited_before_the_kill_landed_is_a_wait_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Exit -9 is the sentence the README rests on: a worker that ended any other way, even
+    cleanly on its own before the signal arrived, was not killed at the boundary, and the
+    evidence it leaves is not a crash."""
+    monkeypatch.setattr(os, "killpg", _killpg_lost)
+
+    with (
+        _bare_spawn("raise SystemExit(0)") as (spawn, _worker),
+        pytest.raises(_AttemptFailure) as failure,
+    ):
+        _kill_and_wait(spawn, 5.0)
+
+    assert failure.value.status is ExecutionStatus.WAIT_ERROR
+    assert failure.value.detail == "worker did not exit from SIGKILL"
