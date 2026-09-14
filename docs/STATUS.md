@@ -21,7 +21,7 @@ Current tree:
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
 - interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence
-- reviewed action pin: `a0c4a9f211a42c68a6e222c238ee14bda01bd902`, the exact `main` commit that
+- reviewed action pin: `8fd45f9ac59b8909810081a932b1415a09b10953`, the exact `main` commit that
   [`.github/examples/crashcheck.yml`](../.github/examples/crashcheck.yml) runs
   (`tests/test_docs_identity.py` fails when the two differ, and fails on `main` when
   `src/nemisis`, `action.yml`, `pyproject.toml`, or `uv.lock` at the pinned commit differs from
