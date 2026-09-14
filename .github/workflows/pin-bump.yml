@@ -1,0 +1,67 @@
+# The copyable example pins the Nemisis action to one reviewed `main` commit. This workflow keeps
+# that pin equal to the engine on `main`: after every push to `main` it checks whether
+# `src/nemisis` changed since the pinned commit and, if so, opens a pull request that moves the pin
+# (and the same SHA in docs/STATUS.md) to the new `main` head, with auto-merge enabled.
+#
+# The engine-changed guard is what stops it reacting to its own bump commits: a bump touches only
+# the example and STATUS, so the next run finds `src/nemisis` unchanged since the new pin and exits.
+# A pull request opened with the repository token does not start CI by itself, so the run
+# dispatches `ci.yml` on the branch; the required checks land on the same head SHA.
+# `tests/test_docs_identity.py` makes a stale pin visible even if this workflow is disabled.
+name: Pin bump
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Move the pin to this engine if the engine changed since the pinned commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          example=.github/examples/crashcheck.yml
+          pin="$(grep -oE 'Alex-lop/Nemisis@[0-9a-f]{40}' "$example" | cut -d@ -f2)"
+          if git diff --quiet "$pin"..HEAD -- src/nemisis; then
+            echo "engine unchanged since $pin; nothing to bump"
+            exit 0
+          fi
+          open="$(gh pr list --state open --json headRefName --jq '[.[] | select(.headRefName | startswith("pin/"))] | length')"
+          if [[ "$open" != "0" ]]; then
+            echo "a pin/ pull request is already open; the next push to main re-evaluates"
+            exit 0
+          fi
+          new="$(git rev-parse HEAD)"
+          branch="pin/${new:0:12}"
+          sed -i "s|Alex-lop/Nemisis@$pin|Alex-lop/Nemisis@$new|" "$example"
+          sed -i "s|reviewed action pin: \`$pin\`|reviewed action pin: \`$new\`|" docs/STATUS.md
+          git diff --stat -- "$example" docs/STATUS.md
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git commit -a \
+            -m "ci(pin): the example runs the engine at ${new:0:7}" \
+            -m "The engine under src/nemisis changed between ${pin:0:7} and ${new:0:7}, so the copyable workflow and docs/STATUS.md now pin ${new:0:7}. Opened by pin-bump.yml." \
+            -m "Co-Authored-By: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>"
+          git push -u origin "$branch"
+          url="$(gh pr create --base main --head "$branch" \
+            --title "ci(pin): the example runs the engine at ${new:0:7}" \
+            --body "The engine under \`src/nemisis\` changed between \`${pin:0:7}\` and \`${new:0:7}\`. This moves the pin in \`.github/examples/crashcheck.yml\` and the reviewed action pin in \`docs/STATUS.md\` to \`$new\`. Opened by \`pin-bump.yml\`; it merges on its own once CI is green.")"
+          number="${url##*/}"
+          gh workflow run ci.yml --ref "$branch"
+          gh pr merge "$number" --auto --merge
+          echo "opened #$number on $branch"
