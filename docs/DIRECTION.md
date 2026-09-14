@@ -22,7 +22,7 @@ until the judge's seven stalls were fixed in #26). The cold judge's realistic
 handler's shape (one top-level `def`, two positional parameters) and cannot see that the second one
 is a connection, not the store. That is the limit: "your code" is not a thing this tool is pointed at; it is a thing you port into it.
 
-Sizes: 13,729 source lines under `src/nemisis` without the fixtures and 615 tests at the merged
+Sizes: 13,954 source lines under `src/nemisis` without the fixtures and 623 tests at the merged
 engine; from the cold read at `a0c4a9f`, before the fix added its pins, 43 pinned side-channel
 shapes in `tests/test_verdict_paths.py`, 91 code lines that assume SQLite (47 of them in the kernel's four
 files, in 11 functions and 6 constants), 13 places that assume the handler shape. `crashcheck.py`

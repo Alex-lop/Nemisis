@@ -127,6 +127,16 @@ $EDITOR ./my-candidate/app/credits.py
 uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate ./my-candidate
 ```
 
+See where a handler can die before you fix it, with no verdict and no capsule:
+
+```bash
+uv run nemisis map fixture:sqlite-credit-v1/mark-first
+```
+
+`map` runs the same commit sweep `check` runs and reports, for each store commit, the durable
+state a crash there leaves and the state after the retry. A tree the kernel cannot attribute (a
+write around the store) gets its census refusal, not a map.
+
 A handler that writes outside the store still runs. It forfeits the verdict instead of earning one.
 `raw-sql` is the textbook fix written as one raw SQL transaction on the store's database: correct,
 and unjudgeable, because a write the store did not make has no kill point. CrashCheck names the
