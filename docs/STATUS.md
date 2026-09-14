@@ -1,6 +1,6 @@
 # Status
 
-Updated 2026-09-07 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
+Updated 2026-09-14 (America/New_York). Hackathon deadline: 2026-10-30 10:00 PDT.
 
 ## Exact identities
 
@@ -21,15 +21,24 @@ Current tree:
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
 - interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence
+- release: `v0.2.0` is tagged at `e1aeae0` and published; the `Release` run
+  [34821573278](https://github.com/Alex-lop/Nemisis/actions/runs/34821573278) went green on all
+  three jobs (`build`, `github-release`, `pypi`), and `uv tool install nemisis==0.2.0` into a clean
+  tool directory gave a `nemisis` whose engine code digest is the one above, whose `doctor --mode
+  local` is READY, and whose verdicts on `atomic` and `tail-bytes` are `FIX_PROVEN_FOR_THIS_CAPSULE`
+  and `EVIDENCE_INCOMPLETE`, the same as the checkout's
 - reviewed action pin: `10dfbeecae6bba9dbde607ea8ff9e7f1b4067690`, the commit that
   [`.github/examples/crashcheck.yml`](../.github/examples/crashcheck.yml) runs (on `main` it is
   `main`'s engine; a pull request pins its own last engine commit until it merges)
   (`tests/test_docs_identity.py` fails when the two differ, and fails on `main` when
   `src/nemisis`, `action.yml`, `pyproject.toml`, or `uv.lock` at the pinned commit differs from
   `main`'s; an engine pull request carries its own bump, and
-  [`pin-bump.yml`](../.github/workflows/pin-bump.yml) is written to open one after any engine
-  merge that did not, once the repository allows Actions to open pull requests; until its first
-  run is recorded in `MORNING.md` it is a design, not a proof)
+  [`pin-bump.yml`](../.github/workflows/pin-bump.yml) opens one after any engine merge that did
+  not, once the repository allows Actions to open pull requests; its guard has run on two merges
+  ([34807643729](https://github.com/Alex-lop/Nemisis/actions/runs/34807643729),
+  [34820543033](https://github.com/Alex-lop/Nemisis/actions/runs/34820543033): nothing to bump,
+  both pull requests carried their own), and it has never opened a pull request, because the
+  repository setting is off)
 
 ## Product state
 
