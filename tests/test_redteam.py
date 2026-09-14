@@ -1,5 +1,5 @@
 """The adversarial generator: the oracle knows the zoo and the hostile shapes, and the checker
-agrees with it in both scenario vocabularies."""
+agrees with it in every scenario vocabulary."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from nemisis.redteam import (
     CREDIT,
     HAZARD_OPS,
     INVENTORY,
+    OUTBOX,
     STORE_OPS,
     Case,
     Expected,
@@ -130,7 +131,7 @@ def test_generation_is_deterministic_and_distinct() -> None:
     assert all(sum(op in STORE_OPS for op in shape.ops) >= 1 for shape in first)
 
 
-@pytest.mark.parametrize("vocabulary", [CREDIT, INVENTORY], ids=lambda v: v.scenario_id)
+@pytest.mark.parametrize("vocabulary", [CREDIT, INVENTORY, OUTBOX], ids=lambda v: v.scenario_id)
 def test_every_op_renders_to_valid_python_in_both_shapes(vocabulary: Vocabulary) -> None:
     for op in Op:
         for helper in (False, True):
@@ -151,6 +152,12 @@ def test_render_is_a_bindable_handler() -> None:
     assert "def reserve_inventory(store, event):\n    _deliver(store, event)\n" in inventory
     assert 'store.reserve_and_mark(event["sku"], event["event_id"], event["quantity"])' in inventory
     assert "CREATE TABLE IF NOT EXISTS dedup" in inventory
+    outbox = render((G, A, S), OUTBOX)
+    assert "def dispatch_outbox(store, event):" in outbox
+    assert (
+        'store.send_and_mark(event["channel"], event["event_id"], event["payload_bytes"])' in outbox
+    )
+    assert "INSERT INTO outbox(event_id, channel, payload_bytes)" in outbox
 
 
 def test_vocabulary_is_refused_for_an_unknown_scenario(
@@ -206,6 +213,35 @@ def test_inventory_vocabulary_agrees_with_the_oracle(
     )
 
     result = check(INVENTORY.base_ref, tree, INVENTORY.scenario_id, mode="local")
+
+    assert oracle(ops)[0].value == expected.value
+    assert result.verdict is expected, result.summary
+
+
+@pytest.mark.parametrize(
+    ("ops", "helper", "expected"),
+    [
+        ((G, E, M), False, CrashVerdict.PATCH_FAILED_STILL_REPRODUCES),
+        ((A,), True, CrashVerdict.FIX_PROVEN_FOR_THIS_CAPSULE),
+        ((G, M, E), False, CrashVerdict.PATCH_FAILED_INVARIANT_BROKEN),
+        ((S,), False, CrashVerdict.EVIDENCE_INCOMPLETE),
+    ],
+)
+def test_outbox_vocabulary_agrees_with_the_oracle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    ops: tuple[Op, ...],
+    helper: bool,
+    expected: CrashVerdict,
+) -> None:
+    """The same oracle judges the send scenario; the grammar only changes its spelling."""
+    monkeypatch.setenv("NEMISIS_ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    tree = tmp_path / "candidate"
+    (tree / "app").mkdir(parents=True)
+    (tree / "app" / "__init__.py").write_text('"""generated"""\n', encoding="utf-8")
+    (tree / "app" / "outbox.py").write_text(render(ops, OUTBOX, helper=helper), encoding="utf-8")
+
+    result = check(OUTBOX.base_ref, tree, OUTBOX.scenario_id, mode="local")
 
     assert oracle(ops)[0].value == expected.value
     assert result.verdict is expected, result.summary

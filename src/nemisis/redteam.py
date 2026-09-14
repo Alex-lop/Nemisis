@@ -161,7 +161,36 @@ INVENTORY = Vocabulary(
         '(event["event_id"],)',
     ),
 )
-VOCABULARIES = {CREDIT.scenario_id: CREDIT, INVENTORY.scenario_id: INVENTORY}
+OUTBOX = Vocabulary(
+    scenario_id="sqlite-outbox-v1",
+    base_ref="fixture:sqlite-outbox-v1/buggy",
+    handler_file="app/outbox.py",
+    function="dispatch_outbox",
+    guard="sent",
+    effect="send",
+    mark="mark_sent",
+    atomic="send_and_mark",
+    effect_arguments='event["channel"], event["event_id"], event["payload_bytes"]',
+    raw_effect_sql=(
+        (
+            "UPDATE channels SET sent_bytes = sent_bytes + ? WHERE channel = ?",
+            '(event["payload_bytes"], event["channel"])',
+        ),
+        (
+            "INSERT INTO outbox(event_id, channel, payload_bytes) VALUES (?, ?, ?)",
+            '(event["event_id"], event["channel"], event["payload_bytes"])',
+        ),
+    ),
+    repoint_sql=(
+        "UPDATE outbox SET channel = 'other-channel' WHERE event_id = ?",
+        '(event["event_id"],)',
+    ),
+)
+VOCABULARIES = {
+    CREDIT.scenario_id: CREDIT,
+    INVENTORY.scenario_id: INVENTORY,
+    OUTBOX.scenario_id: OUTBOX,
+}
 
 
 def vocabulary_for(scenario_id: str) -> Vocabulary:
@@ -597,6 +626,7 @@ __all__ = [
     "CREDIT",
     "HAZARD_OPS",
     "INVENTORY",
+    "OUTBOX",
     "STORE_OPS",
     "VOCABULARIES",
     "Case",
