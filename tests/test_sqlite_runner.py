@@ -7,10 +7,11 @@ import sqlite3
 import subprocess
 import sys
 from collections.abc import Iterator
-from contextlib import contextmanager, suppress
+from contextlib import closing, contextmanager, suppress
 from datetime import UTC, datetime
 from pathlib import Path
 from time import monotonic, sleep
+from typing import cast
 
 import pytest
 
@@ -29,6 +30,7 @@ from nemisis.crashcheck import _audited_contract, _seal_capsule
 from nemisis.hashing import canonical_json, sha256_bytes
 from nemisis.scenarios.sqlite_credit_v1 import SCENARIO as CREDIT
 from nemisis.sqlite_runner import (
+    _HEADER_PRAGMAS,
     WORKER_TIMEOUT_VARIABLE,
     AnchorResolutionError,
     _AttemptFailure,
@@ -39,6 +41,7 @@ from nemisis.sqlite_runner import (
     _ledger,
     _probe,
     _read_content,
+    _read_only,
     _receive,
     _require_unchanged,
     _seed_database,
@@ -570,3 +573,36 @@ def test_a_probe_that_cannot_read_the_database_is_a_probe_error(tmp_path: Path) 
     assert gone.value.status is ExecutionStatus.PROBE_ERROR
     # The errno text is the operating system's; the sentence around it is the engine's.
     assert gone.value.detail.startswith("read-only state probe failed ([Errno 2] ")
+
+
+@pytest.mark.parametrize(
+    "pragma",
+    [
+        "application_id",
+        "auto_vacuum",
+        "default_cache_size",
+        "encoding",
+        "freelist_count",
+        "journal_mode",
+        "page_size",
+        "schema_version",
+        "user_version",
+    ],
+)
+def test_every_named_header_pragma_is_read_into_the_content(tmp_path: Path, pragma: str) -> None:
+    """One test per durable header field the probe names, because the suite caught a dropped
+    pragma only for `freelist_count` and `schema_version`: every other name could fall out of the
+    read and every end-to-end test still passed. The names are written out here rather than taken
+    from `_HEADER_PRAGMAS`, because a list that supplies its own test cases cannot notice a
+    missing one. `_file_identity` reads the raw first 100 bytes beside this, which covers some of
+    the same fields twice; the overlap is deliberate and neither read replaces the other."""
+    assert pragma in _HEADER_PRAGMAS
+    event = {"account_id": "acct_7", "amount_cents": 2500, "event_id": "evt_1042"}
+    database = tmp_path / "header.sqlite3"
+    _seed_database(CREDIT, database, event)
+
+    header = cast(dict[str, object], _read_content(CREDIT, database, event)["header"])
+
+    assert pragma in header
+    with closing(_read_only(database)) as connection:
+        assert header[pragma] == connection.execute(f"PRAGMA {pragma}").fetchone()[0]
