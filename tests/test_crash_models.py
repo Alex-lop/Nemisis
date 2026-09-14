@@ -1276,3 +1276,96 @@ def test_the_four_field_rule_cannot_see_a_second_subject() -> None:
     fields = {name: value for name, value in capsule.model_dump().items() if name != "digest"}
     with pytest.raises(ValidationError, match="nonzero effect"):
         ReproCapsule.with_digest(**{**fields, "effect_delta": 0})
+
+
+def test_an_attempt_must_expect_a_nonzero_effect() -> None:
+    """An effect of zero is not an effect: there is nothing for a kill to land inside, and every
+    verdict downstream is measured against a delta that cannot move."""
+    capsule = _capsule()
+    values = _attempt_values(capsule, _binding(capsule))
+    values["effect_delta"] = 0
+
+    with pytest.raises(ValidationError, match="an attempt must expect a nonzero effect"):
+        AttemptReceipt.with_digest(**values)
+
+
+def test_an_unordered_attempt_timeline_is_refused() -> None:
+    """The timeline is the attempt's own account of what happened when. Out of order it is not
+    evidence of a sequence, and the phases it names are what a failure is diagnosed from."""
+    capsule = _capsule()
+    values = _attempt_values(capsule, _binding(capsule))
+    values["timeline"] = (
+        TimelineEntry(state=TimelineState.COMPLETE, timestamp=NOW + timedelta(seconds=3)),
+        TimelineEntry(state=TimelineState.PREFLIGHT, timestamp=NOW),
+    )
+
+    with pytest.raises(ValidationError, match="attempt timeline is not ordered"):
+        AttemptReceipt.with_digest(**values)
+
+
+def test_worker_spawn_indices_must_be_unique() -> None:
+    """Two spawns at the same index are one spawn counted twice, and the kill and the replay the
+    verdict rests on are exactly two distinct processes."""
+    capsule = _capsule()
+    values = _attempt_values(capsule, _binding(capsule))
+    values["spawns"] = (
+        _worker(1, "first", nonce="worker-1", session="session-1"),
+        _worker(1, "replay", nonce="worker-2", session="session-2"),
+    )
+
+    with pytest.raises(ValidationError, match="worker spawn indices must be unique"):
+        AttemptReceipt.with_digest(**values)
+
+
+def test_a_worker_bound_to_another_event_is_refused() -> None:
+    """Every spawn has to be a delivery of this attempt's event. One carrying another event's
+    digest is evidence from a different run, and the four numbers it produced describe some
+    other money."""
+    capsule = _capsule()
+    values = _attempt_values(capsule, _binding(capsule))
+    replay = _worker(2, "replay", nonce="worker-2", session="session-2")
+    values["spawns"] = (
+        _worker(1, "first", nonce="worker-1", session="session-1"),
+        WorkerSpawnReceipt(**{**replay.model_dump(), "event_digest": HASHES[8]}),
+    )
+
+    with pytest.raises(ValidationError, match="worker event digest differs from attempt event"):
+        AttemptReceipt.with_digest(**values)
+
+
+def test_a_completed_attempt_cannot_carry_a_failure_detail() -> None:
+    """A completed attempt says its evidence is whole; a failure detail says it is not. Together
+    they are a receipt that contradicts itself, and every reader downstream believes the status."""
+    capsule = _capsule()
+    values = _attempt_values(capsule, _binding(capsule))
+    values["failure_detail"] = "read-only state probe failed"
+
+    with pytest.raises(ValidationError, match="completed attempt cannot have a failure detail"):
+        AttemptReceipt.with_digest(**values)
+
+
+def test_a_completed_attempt_must_begin_from_the_seeded_state() -> None:
+    """Every world starts from a fresh seed. A pre-crash state that already carries this event's
+    marker began somewhere else, and the duplicate or the exactly-once measured from it is
+    measured from the wrong zero."""
+    capsule = _capsule()
+    values = _attempt_values(capsule, _binding(capsule))
+    values["pre_crash_snapshot"] = _snapshot(effects=0, marker=1)
+
+    with pytest.raises(
+        ValidationError, match="completed attempt pre-crash snapshot is not the seeded state"
+    ):
+        AttemptReceipt.with_digest(**values)
+
+
+def test_an_incomplete_attempt_requires_a_failure_detail() -> None:
+    """An attempt that did not complete owes a sentence saying why: EVIDENCE_INCOMPLETE reaches a
+    judge with the reason, never as a bare status."""
+    capsule = _capsule()
+    values = _attempt_values(capsule, _binding(capsule))
+    values["execution_status"] = ExecutionStatus.PROBE_ERROR
+    values["integrity_status"] = IntegrityStatus.INCOMPLETE
+    values["failure_detail"] = None
+
+    with pytest.raises(ValidationError, match="incomplete attempt requires a failure detail"):
+        AttemptReceipt.with_digest(**values)
