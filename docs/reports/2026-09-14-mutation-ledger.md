@@ -5,8 +5,8 @@ The checker of the checker, rerun at the engine the nightly now judges: each ope
 - engine code digest: `1afdb6ee88585074eaeda65c50223c18fb73c4b67710affb247ff8e55a51bb15` (at `230cc7c`)
 - started: 2026-09-14T04:01:21-0400 on two parallel workers on a laptop also running the night's other suites; the machine killed the second worker at 113 of its 121 mutants (low memory), so its last target, `_xattrs`, was rerun alone from a clean tree (two earlier reruns of it were void, every mutant "killed" in a tenth of a second by no test because the shell had passed the test paths as one argument; they are discarded and the runner now calls such a run an error); the slowest worker took 5259 s
 - tests per mutant, in order: `tests/test_scenario.py`, `tests/test_crash_models.py`, `tests/test_sqlite_runner.py`, `tests/test_inventory_scenario.py`, `tests/test_crashcheck.py`, `tests/test_verdict_paths.py`
-- mutants enumerated: 288; run: 288; killed: 243; survived: 45; timed out: 0; errored: 0
-- survivors: 24 equivalent, 21 holes, 0 unclassified
+- mutants enumerated: 288; run: 288; on the macOS run that produced this ledger, 243 killed and 45 survived; four `_xattrs` line-835 `argtypes` drops that macOS kills survive on Linux CI (dead code behind the `os.listxattr` door), so the cross-platform classification this ledger records is 239 killed and 49 survived; 0 timed out; 0 errored
+- survivors: 28 equivalent, 21 holes, 0 unclassified (the four extra equivalents are the line-835 platform-dependent ones)
 
 Regenerate with `tools/mutants.py` and the thirteen `--target`s below (the 2026-09-07 ledger has the one-line form), or the parallel script in the report.
 
@@ -362,7 +362,7 @@ Regenerate with `tools/mutants.py` and the thirteen `--target`s below (the 2026-
 
 ### `src/nemisis/sqlite_runner.py::_xattrs`
 
-24 mutants: 12 killed, 12 survived, 0 timed out.
+24 mutants: 8 killed, 16 survived, 0 timed out (four `argtypes` drops on line 835 are counted as survivors here because they survive on Linux CI, though the macOS run that produced this ledger killed them; see their rows).
 
 | line | mutation | status | killed by / why it survives | s |
 | ---: | -------- | ------ | --------------------------- | --: |
@@ -370,10 +370,10 @@ Regenerate with `tools/mutants.py` and the thirteen `--target`s below (the 2026-
 | 829 | `return sorted(str(name) for name in listxattr(path, follow_symlinks… -> return N` | survived | **hole**: The `os.listxattr` door is dead on the macOS this run was made on but live on Linux and under a monkeypatched `os`; nothing asserts the names it returns or that it does not follow symlinks. Owed: tests/test_sqlite_runner.py::test_xattrs_answers_through_the_os_door_when_the_build_has_one (written by a refuter tonight; installs a fake `os.listxattr`, asserts sorted names and `follow_symlinks=False`) | 173 |
 | 830 | `sys.platform != "darwin" -> (sys.platform == 'darwin')` | killed | `tests/test_sqlite_runner.py::test_xattrs_names_an_extended_attribute_that_was_set` | 3 |
 | 831 | `return [] -> return None` | survived | **hole**: On a platform with neither door the fallback must be an empty listing; `None` makes `_stat_entry` crash with TypeError while pinning the world, a crash where a listing belongs. Owed: tests/test_sqlite_runner.py::test_a_world_entry_on_a_platform_with_neither_xattr_door_reads_as_having_none (written by a refuter tonight; clears `os.listxattr`, sets a third platform, expects an `_Entry` with no attributes) | 164 |
-| 835 | `[ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int] -> ([ctypes.c_` | killed | `tests/test_sqlite_runner.py::test_buggy_fixture_duplicates_at_effect_commit` | 1 |
-| 835 | `[ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int] -> ([ctypes.c_` | killed | `tests/test_sqlite_runner.py::test_buggy_fixture_duplicates_at_effect_commit` | 1 |
-| 835 | `[ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int] -> ([ctypes.c_` | killed | `tests/test_sqlite_runner.py::test_buggy_fixture_duplicates_at_effect_commit` | 1 |
-| 835 | `[ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int] -> ([ctypes.c_` | killed | `tests/test_sqlite_runner.py::test_buggy_fixture_duplicates_at_effect_commit` | 1 |
+| 835 | `[ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int] -> ([ctypes.c_` | survived | **equivalent**: platform-dependent. On Linux CI the `os.listxattr` door returns at line 829, so this `argtypes` declaration is dead code and dropping an element cannot move a verdict; on macOS the real libc path runs and the drop is killed by `test_buggy_fixture_duplicates_at_effect_commit`. Listed as a survivor so the monthly run on Linux matches the ledger. | 1 |
+| 835 | `[ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int] -> ([ctypes.c_` | survived | **equivalent**: platform-dependent. On Linux CI the `os.listxattr` door returns at line 829, so this `argtypes` declaration is dead code and dropping an element cannot move a verdict; on macOS the real libc path runs and the drop is killed by `test_buggy_fixture_duplicates_at_effect_commit`. Listed as a survivor so the monthly run on Linux matches the ledger. | 1 |
+| 835 | `[ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int] -> ([ctypes.c_` | survived | **equivalent**: platform-dependent. On Linux CI the `os.listxattr` door returns at line 829, so this `argtypes` declaration is dead code and dropping an element cannot move a verdict; on macOS the real libc path runs and the drop is killed by `test_buggy_fixture_duplicates_at_effect_commit`. Listed as a survivor so the monthly run on Linux matches the ledger. | 1 |
+| 835 | `[ctypes.c_char_p, ctypes.c_char_p, ctypes.c_size_t, ctypes.c_int] -> ([ctypes.c_` | survived | **equivalent**: platform-dependent. On Linux CI the `os.listxattr` door returns at line 829, so this `argtypes` declaration is dead code and dropping an element cannot move a verdict; on macOS the real libc path runs and the drop is killed by `test_buggy_fixture_duplicates_at_effect_commit`. Listed as a survivor so the monthly run on Linux matches the ledger. | 1 |
 | 837 | `0 -> (-1)` | survived | **equivalent**: macOS `listxattr` ignores the buffer size when the name buffer is NULL and answers the byte count the names need, so 0, 1, and (size_t)-1 return the same size; measured on a file with one attribute and with none. | 159 |
 | 837 | `0 -> (1)` | killed | `tests/test_verdict_paths.py::test_raw_sql_judge_handler_is_told_the_one_line_change` | 85 |
 | 838 | `0 -> (-1)` | killed | `tests/test_sqlite_runner.py::test_xattrs_raises_instead_of_answering_for_a_path_it_cannot_read` | 3 |
