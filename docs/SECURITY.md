@@ -70,17 +70,22 @@ changes (journal mode, the schema cookie, the free-page count, page size, vacuum
 `default_cache_size`, `user_version`, `application_id`), and the file's own identity (its 100-byte
 header, except the three fields a commit rewrites, and its length, which must be exactly the page
 count its header states), reads all of it at that instant, and refuses anything that differs; it
-reads again after the kill, after the worker's final message while the worker still holds its
-store connection open (closing that connection checkpoints the WAL, and a checkpoint truncates
-the file to its page count, so a read that waited for the exit missed bytes a handler appended
-after its last commit; the nightly red team found that on 2026-09-08, the worker now exits
-only when released, and the store's connection never checkpoints on close, so what a handler
-wrote to the file outlives the worker whenever the garbage collector closes that connection),
-and once more after the worker has exited. The seed leaves the file in WAL
+reads again after the kill, after the worker's final message (the store holds one connection
+for the worker's life and closes it only after that read and the controller's release, because
+closing a connection checkpoints the WAL and a checkpoint truncates the file to its page count;
+the nightly red team found on 2026-09-08 that a per-call connection closed by the garbage
+collector had erased bytes a handler appended after its last commit before the engine looked),
+and once more after the worker has exited. During a delivery no checkpoint runs, so the main
+database file is byte-identical to the seed and is pinned whole, by digest and length; only
+the read after the exit, which follows the store's own checkpoint, compares the header with
+the three fields a checkpoint rewrites blanked and the length against the header's page count.
+The write-ahead log beside the file grows only at store commits and its length must be exactly
+its frames', so bytes appended past the last frame are refused wherever the file is read. The seed leaves the file in WAL
 mode so the journal bits are constant for the run. A handler that moves money through its own
-SQLite connection, creates a table for its dedup flag, stores a flag in a header field (read or
-reserved), in a rowid, in the free-page count, or in bytes past the last page, re-points a ledger
-row, or renames and replaces a table therefore cannot earn a verdict. If it also makes a store
+SQLite connection, creates a table for its dedup flag, stores a flag in a header field (read,
+reserved, or one a checkpoint rewrites), in a rowid, in the free-page count, in bytes past the last
+page, or past the last frame of the write-ahead log, re-points a ledger row, or renames and replaces
+a table therefore cannot earn a verdict. If it also makes a store
 commit, the unattributed content is caught at the next probe and the run is `INTEGRITY_ERROR` /
 `INVALID`, because the kill point could no longer be trusted to sit where the money moved. If it
 makes no store commit at all, which is what the textbook atomic fix written as one raw transaction
@@ -98,7 +103,7 @@ that under-reports its commits is refused as `TrustedStorePatched`.
 
 What the controller cannot read, it does not claim. These stay outside what local mode can see,
 and are the honest list: a flag the store's own next commit overwrites (the database file's
-modification time, the bytes of the WAL sidecar); a flag at the sidecar names the store owns
+modification time); the bytes of the shm sidecar, which every reader rewrites; a flag at the sidecar names the store owns
 (`<database>-wal`, `<database>-shm`), whose presence after a kill a handler can also read as "the
 last delivery crashed"; a write through a private connection that is reverted before the next
 store commit, because attribution samples the database at commits and not between them (the kill

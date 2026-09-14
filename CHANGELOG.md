@@ -46,11 +46,15 @@ plumbing. Unreleased until a `v0.2.0` tag is pushed.
 ### Fixed
 
 - The controller reads the database after the worker's final message while the worker still
-  holds its store connection, and releases it to exit only then: closing the connection
+  holds its store connection (one per worker, closed only after the release), and releases it
+  to exit only then: closing the connection
   checkpoints the WAL and truncates the file to its page count, which tidied away bytes a handler
   appended past the last page after its last commit before the read that waited for the exit.
   The nightly red team reported that shape in five runs (ten cases, each in both scenarios); it ships as
   `fixture:sqlite-credit-v1/tail-bytes` and is pinned to `EVIDENCE_INCOMPLETE`.
+- During a delivery the main database file is pinned whole (automatic checkpoints are off), so a
+  flag in the header's change counter, which the probe used to mask, is refused; the write-ahead
+  log's length must be its frames', so bytes appended past the last frame are refused too.
 - `nemisis redteam` counts a case whose summary names the wall-clock budget as `unknown`, apart
   from agreement and disagreement, and fails above `--max-unknown`; the nightly allows three
   and runs with a 30 s worker budget.

@@ -99,7 +99,7 @@ fixture refs, so the claim above is one flag away for anyone:
 | `atomic` | green | `$25` | `$25` | `FIX_PROVEN_FOR_THIS_CAPSULE` |
 | `raw-sql` | red (needs SQLite) | n/a | no kill point | `EVIDENCE_INCOMPLETE`, names the one-line change |
 | `shadow-table` | red (needs SQLite) | n/a | `$0`, in-flight forever | `EVIDENCE_INCOMPLETE`, the schema changed |
-| `tail-bytes` | green | `$25` | `$25`, then bytes past the file's last page | `EVIDENCE_INCOMPLETE`, a write around the store |
+| `tail-bytes` | red (needs SQLite) | n/a | `$25`, then bytes past the file's last page | `EVIDENCE_INCOMPLETE`, a write around the store |
 
 ```bash
 uv run nemisis check --base fixture:sqlite-credit-v1/buggy --candidate fixture:sqlite-credit-v1/mark-first
@@ -126,10 +126,12 @@ and unjudgeable, because a write the store did not make has no kill point. Crash
 write and the store call that expresses the same fix (`store.credit_and_mark(...)`, see [the store
 API](docs/PRODUCT.md#the-store-api)) instead of guessing a verdict. `shadow-table` keeps its dedup
 flag in a table it creates inside the store's own database: an earlier engine blessed it while a
-crash between that write and the credit left the customer unpaid forever. `tail-bytes` is the atomic
-fix followed by sixteen bytes appended past the database file's last page: the nightly red team
-caught the engine blessing it for five nights running (SQLite's own close tidied the bytes away
-before the engine looked), and the engine now reads the file before the worker may exit. Attribution now reads the
+crash between that write and the credit left the customer unpaid forever. `tail-bytes` is the guarded
+atomic fix (`processed`, then `credit_and_mark`) followed by sixteen bytes appended past the
+database file's last page: the nightly red team
+caught the engine issuing verdicts on it for five nights, and blessing it once (SQLite's own close
+had tidied the bytes away before the engine looked); the engine now reads the file before the
+worker may exit, pins the file whole during a delivery, and holds the write-ahead log to its frames. Attribution now reads the
 whole database file (schema, the header fields a commit never changes, every row with its rowid)
 and the whole world the worker runs in (its working directory and the two above it, `HOME`,
 `TMPDIR`, the bound tree entry by entry, with every entry's permission bits, flags, attributes,
