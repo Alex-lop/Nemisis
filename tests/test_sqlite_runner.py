@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import ctypes
+import errno
 import os
 import signal
 import socket
@@ -47,6 +49,7 @@ from nemisis.sqlite_runner import (
     _seed_database,
     _Spawn,
     _spawn_receipt,
+    _xattrs,
     bind_anchor,
     execute_attempt,
     worker_timeout_seconds,
@@ -606,3 +609,64 @@ def test_every_named_header_pragma_is_read_into_the_content(tmp_path: Path, prag
     assert pragma in header
     with closing(_read_only(database)) as connection:
         assert header[pragma] == connection.execute(f"PRAGMA {pragma}").fetchone()[0]
+
+
+_XATTR_NAME = "user.nemisis.seen"
+
+
+def _set_xattr(path: Path, name: str) -> None:
+    """Set one extended attribute, through whichever door this platform has.
+
+    The same two doors `_xattrs` reads through, and the same two the packaged `xattr` handler in
+    the zoo uses: CPython builds `os.setxattr` only on Linux, and on macOS the libc call is
+    reached through ctypes.
+    """
+    setxattr = getattr(os, "setxattr", None)
+    if setxattr is not None:
+        setxattr(path, name, b"1")
+        return
+    libc = ctypes.CDLL(None, use_errno=True)
+    call = libc.setxattr
+    call.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_char_p,
+        ctypes.c_void_p,
+        ctypes.c_size_t,
+        ctypes.c_uint32,
+        ctypes.c_int,
+    ]
+    if call(os.fsencode(path), name.encode(), b"1", 1, 0, 0) != 0:
+        raise OSError(ctypes.get_errno(), f"setxattr failed for {path}")
+
+
+def test_xattrs_does_not_name_an_attribute_that_was_never_set(tmp_path: Path) -> None:
+    """The guard has to answer, not just never object: a reader that reports nothing at all is
+    the shape the third hostile review found (on macOS, CPython has no `os.listxattr`, so the
+    whole guard was inert and every branch of it was dead)."""
+    path = tmp_path / "plain"
+    path.write_bytes(b"")
+
+    assert _XATTR_NAME not in _xattrs(path)
+
+
+def test_xattrs_names_an_extended_attribute_that_was_set(tmp_path: Path) -> None:
+    """An extended attribute is durable state no store commit made, invisible to every PRAGMA
+    and every row. The read must add exactly the name that was set, in sorted order, so two
+    worlds that differ only by a flag are two different entries."""
+    path = tmp_path / "flagged"
+    path.write_bytes(b"")
+    before = _xattrs(path)
+
+    _set_xattr(path, _XATTR_NAME)
+
+    assert _xattrs(path) == sorted([*before, _XATTR_NAME])
+
+
+def test_xattrs_raises_instead_of_answering_for_a_path_it_cannot_read(tmp_path: Path) -> None:
+    """A read that failed must not come back as "no attributes": the engine before the third
+    hostile round swallowed the error and returned an empty list, which is indistinguishable
+    from a clean file and made the whole channel invisible."""
+    with pytest.raises(OSError) as failure:
+        _xattrs(tmp_path / "not-there")
+
+    assert failure.value.errno == errno.ENOENT
