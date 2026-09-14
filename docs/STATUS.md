@@ -21,7 +21,7 @@ Current tree:
   engine above, `tests/test_static_hero.py` checks the committed receipts structurally and the hero
   is not relabelled)
 - interpreter pinned by `.python-version` to 3.12, matching CI and the measured evidence
-- reviewed action pin: `eb801228f82177bb71f28851ff02f3c74b4a301e`, the commit that
+- reviewed action pin: `400fe74d29baaaa09f7e7fdac09af20ddb9c1d3d`, the commit that
   [`.github/examples/crashcheck.yml`](../.github/examples/crashcheck.yml) runs (on `main` it is
   `main`'s engine; a pull request pins its own last engine commit until it merges)
   (`tests/test_docs_identity.py` fails when the two differ, and fails on `main` when
