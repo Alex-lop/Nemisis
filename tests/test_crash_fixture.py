@@ -120,7 +120,8 @@ def test_rejects_unknown_refs_before_creating_a_destination(tmp_path: Path) -> N
     )
     assert FIXTURE_REFS[: len(credit_refs)] == credit_refs
     assert all(
-        ref.startswith("fixture:sqlite-inventory-v1/") for ref in FIXTURE_REFS[len(credit_refs) :]
+        ref.startswith(("fixture:sqlite-inventory-v1/", "fixture:sqlite-outbox-v1/"))
+        for ref in FIXTURE_REFS[len(credit_refs) :]
     )
 
 
