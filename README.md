@@ -240,6 +240,8 @@ own `app.inventory:reserve_inventory` the same way the credit contract does.
 
 ## Verify the project
 
+From the checkout in [Try it](#try-it); an installed tool ships no tests to run.
+
 ```bash
 uv run ruff format --check src tests && uv run ruff check src tests
 uv run mypy src tests
